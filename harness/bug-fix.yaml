@@ -1,0 +1,21 @@
+# Harness Template: 修复 Bug
+# 触发: 实例状态变为 error
+
+meta:
+  name: bug-fix
+  version: "1.0"
+
+preconditions:
+  - 实例存在且状态为 error/stopped
+  - workspace 有 write 权限
+
+steps:
+  1. diagnose:  读取最后 20 条日志定位 error
+  2. isolate:   停止进程，防止继续写入
+  3. fix:       修改代码（决策点，Agent 有自由度）
+  4. verify:    重启实例，确认 60s 无 error
+  5. document:  在日志中记录修复摘要
+
+rollback:
+  fix 失败 → git checkout 恢复，重新诊断
+  verify 失败 → 回滚，标记需人工介入

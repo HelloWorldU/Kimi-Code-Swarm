@@ -1,0 +1,22 @@
+# Harness Template: 新建 CLI 实例
+# 触发: 用户点击"新建实例"
+
+meta:
+  name: new-instance
+  version: "1.0"
+
+preconditions:
+  - 活跃实例数 < MAX_CONCURRENT（否则排队）
+  - workspace 目录存在且可写
+  - Token 全局剩余 > 10%
+
+steps:
+  1. init:      创建实例记录，状态 queued
+  2. spawn:     node-pty 启动 kimi CLI
+  3. handshake: 等待 CLI 就绪输出（超时 15s）
+  4. activate:  状态改为 running，记录 PID
+  5. observe:   注册 stdout/stderr 监听器
+
+rollback:
+  spawn 失败 → 删除实例记录
+  handshake 失败 → kill 进程，标记 error
