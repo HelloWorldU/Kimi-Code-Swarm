@@ -23,7 +23,11 @@ Vue 3 + TypeScript + Vite + Tailwind CSS + lucide-vue-next
 
 ```bash
 cd kimi-code-swarm
-npm run dev
-npm run typecheck
-npm run build
+npm run dev         # 开发服务器
+npm run typecheck   # TypeScript 类型检查
+npm run lint        # ESLint 代码检查
+npm run lint:fix    # ESLint 自动修复
+npm run analyze     # AST 结构分析
+npm run ci          # 完整流水线：typecheck → lint → analyze → build
+npm run build       # 生产构建
 ```
