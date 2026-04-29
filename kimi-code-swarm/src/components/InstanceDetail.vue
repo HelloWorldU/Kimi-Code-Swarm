@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, type Component } from 'vue'
 import { ArrowLeft, Send, Terminal, AlertCircle, CheckCircle, MessageSquare } from 'lucide-vue-next'
 import type { CliInstance } from '../types'
 
@@ -34,7 +34,7 @@ const statusColor = computed(() => {
   return 'text-gray-400'
 })
 
-const logTypeConfig: Record<string, { icon: any; color: string; bg: string }> = {
+const logTypeConfig: Record<string, { icon: Component; color: string; bg: string }> = {
   system: { icon: Terminal, color: 'text-gray-400', bg: 'bg-gray-800/50' },
   input: { icon: MessageSquare, color: 'text-swarm-400', bg: 'bg-swarm-500/5' },
   output: { icon: CheckCircle, color: 'text-blue-400', bg: 'bg-blue-500/5' },
@@ -60,8 +60,8 @@ watch(() => props.instance.logs.length, async () => {
     <!-- Header -->
     <div class="flex items-center gap-4 mb-6">
       <button
-        @click="emit('back')"
         class="p-2 rounded-lg bg-gray-800/50 text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
+        @click="emit('back')"
       >
         <ArrowLeft class="w-5 h-5" />
       </button>
@@ -113,7 +113,7 @@ watch(() => props.instance.logs.length, async () => {
     </div>
 
     <!-- Command Input -->
-    <form @submit.prevent="handleSend" class="mt-4 flex gap-3">
+    <form class="mt-4 flex gap-3" @submit.prevent="handleSend">
       <input
         v-model="command"
         type="text"

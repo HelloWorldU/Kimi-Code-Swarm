@@ -30,13 +30,13 @@ const runtimeMinutes = computed(() => Math.round((Date.now() - props.instance.cr
 
 <template>
   <div
-    @click="emit('select', instance.id)"
     :class="[
       'relative rounded-xl border p-4 cursor-pointer transition-all hover:scale-[1.02]',
       isSelected
         ? 'bg-gray-800/80 border-swarm-500/50 ring-1 ring-swarm-500/30'
         : 'bg-gray-800/40 border-gray-700/50 hover:border-gray-600'
     ]"
+    @click="emit('select', instance.id)"
   >
     <div class="flex items-start justify-between mb-3">
       <div class="flex items-center gap-2">
@@ -80,15 +80,15 @@ const runtimeMinutes = computed(() => Math.round((Date.now() - props.instance.cr
     <div class="flex items-center gap-1" @click.stop>
       <button
         v-if="instance.status === 'running'"
-        @click="emit('stop', instance.id)"
         class="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors text-xs font-medium"
+        @click="emit('stop', instance.id)"
       >
         <Square class="w-3 h-3" /> 停止
       </button>
       <button
         v-else-if="instance.status === 'stopped' || instance.status === 'error'"
-        @click="emit('restart', instance.id)"
         class="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-swarm-500/10 text-swarm-400 hover:bg-swarm-500/20 transition-colors text-xs font-medium"
+        @click="emit('restart', instance.id)"
       >
         <RotateCcw class="w-3 h-3" /> 重启
       </button>
@@ -99,8 +99,8 @@ const runtimeMinutes = computed(() => Math.round((Date.now() - props.instance.cr
         <Play class="w-3 h-3" /> 等待中
       </button>
       <button
-        @click="emit('delete', instance.id)"
         class="px-2 py-1.5 rounded-lg bg-gray-700/30 text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+        @click="emit('delete', instance.id)"
       >
         <Trash2 class="w-3 h-3" />
       </button>

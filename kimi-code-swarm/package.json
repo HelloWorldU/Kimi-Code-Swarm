@@ -6,15 +6,26 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "typecheck": "vue-tsc --noEmit",
+    "lint": "eslint src --ext .ts,.vue",
+    "lint:fix": "eslint src --ext .ts,.vue --fix",
+    "analyze": "npx tsx ../ast/analyzer.ts src",
+    "ci": "npm run typecheck && npm run lint && npm run analyze && npm run build"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.4",
     "autoprefixer": "^10.5.0",
+    "eslint": "^9.39.4",
+    "eslint-plugin-vue": "^10.9.0",
+    "globals": "^17.5.0",
     "postcss": "^8.5.12",
     "tailwindcss": "^3.4.19",
     "tsx": "^4.21.0",
     "typescript": "~6.0.2",
-    "vite": "^8.0.10"
+    "typescript-eslint": "^8.59.1",
+    "vite": "^8.0.10",
+    "vue-tsc": "^3.2.7"
   },
   "dependencies": {
     "@vitejs/plugin-vue": "^6.0.6",

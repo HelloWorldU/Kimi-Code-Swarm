@@ -33,13 +33,13 @@ const navItems = [
       <button
         v-for="item in navItems"
         :key="item.id"
-        @click="emit('change', item.id)"
         :class="[
           'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
           props.activeTab === item.id
             ? 'bg-swarm-600/15 text-swarm-400 border border-swarm-600/30'
             : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50'
         ]"
+        @click="emit('change', item.id)"
       >
         <component :is="item.icon" class="w-5 h-5" />
         {{ item.label }}
@@ -53,7 +53,7 @@ const navItems = [
           <span class="text-xs font-semibold text-swarm-400">小快板</span>
         </div>
         <div class="w-full bg-gray-700 rounded-full h-1.5">
-          <div class="bg-swarm-500 h-1.5 rounded-full" style="width: 23%" />
+          <div class="bg-swarm-500 h-1.5 rounded-full w-[23%]" />
         </div>
         <p class="text-xs text-gray-500 mt-2">46K / 200K tokens 今日</p>
       </div>

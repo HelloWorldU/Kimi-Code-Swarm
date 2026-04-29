@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: kimi-code-swarm/package-lock.json
+
+      - name: Install dependencies
+        run: cd kimi-code-swarm && npm ci
+
+      - name: Type check
+        run: cd kimi-code-swarm && npm run typecheck
+
+      - name: Lint
+        run: cd kimi-code-swarm && npm run lint
+
+      - name: AST analyze
+        run: cd kimi-code-swarm && npm run analyze
+
+      - name: Build
+        run: cd kimi-code-swarm && npm run build

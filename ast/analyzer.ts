@@ -5,12 +5,11 @@
  */
 
 import { readFileSync, readdirSync, statSync } from 'fs'
-import { join, extname } from 'path'
-import { parse as parseVue } from '@vue/compiler-sfc'
+import { join, extname, relative } from 'path'
 
-// TODO: 导入规则模块
-// import { checkVueStructure } from './rules/vue-structure'
-// import { checkImports } from './rules/import-restrictions'
+import { checkVueStructure } from './rules/vue-structure'
+import { checkImports } from './rules/import-restrictions'
+import { checkStyle } from './rules/style-constraints'
 
 export interface AstIssue {
   file: string
@@ -18,14 +17,18 @@ export interface AstIssue {
   message: string
   line?: number
   fixable: boolean
+  fix?: string
 }
+
+const SHOULD_FIX = process.argv.includes('--fix')
 
 function findFiles(dir: string): string[] {
   const results: string[] = []
   for (const entry of readdirSync(dir)) {
+    if (entry === 'node_modules' || entry === 'dist') continue
     const full = join(dir, entry)
     const stat = statSync(full)
-    if (stat.isDirectory() && entry !== 'node_modules') {
+    if (stat.isDirectory()) {
       results.push(...findFiles(full))
     } else if (stat.isFile() && ['.vue', '.ts'].includes(extname(entry))) {
       results.push(full)
@@ -34,30 +37,24 @@ function findFiles(dir: string): string[] {
   return results
 }
 
-function analyzeFile(filePath: string, content: string): AstIssue[] {
+function analyzeVueFile(filePath: string, content: string): AstIssue[] {
   const issues: AstIssue[] = []
-  const ext = extname(filePath)
 
-  if (ext === '.vue') {
-    const { descriptor, errors } = parseVue(content)
-    if (errors.length) {
-      issues.push({ file: filePath, rule: 'vue/parse-error', message: String(errors[0]), fixable: false })
-      return issues
-    }
+  // Vue 结构规则
+  issues.push(...checkVueStructure(content, filePath))
 
-    // TODO: 接入规则检查
-    // issues.push(...checkVueStructure(descriptor))
-    // issues.push(...checkImports(content, filePath))
+  // 导入限制规则（script 内容）
+  issues.push(...checkImports(content, filePath))
 
-    // 临时占位检查
-    if (!descriptor.scriptSetup) {
-      issues.push({ file: filePath, rule: 'vue/no-script-setup', message: '必须使用 <script setup lang="ts">', line: 1, fixable: true })
-    }
-    if (descriptor.styles.some(s => s.scoped)) {
-      issues.push({ file: filePath, rule: 'vue/no-scoped-style', message: '禁止 <style scoped>，用 Tailwind', fixable: true })
-    }
-  }
+  // 样式约束规则
+  issues.push(...checkStyle(content, filePath))
 
+  return issues
+}
+
+function analyzeTsFile(filePath: string, content: string): AstIssue[] {
+  const issues: AstIssue[] = []
+  issues.push(...checkImports(content, filePath))
   return issues
 }
 
@@ -68,20 +65,43 @@ function main() {
     process.exit(1)
   }
 
-  const files = statSync(target).isDirectory() ? findFiles(target) : [target]
+  const stat = statSync(target)
+  const files: string[] = stat.isDirectory() ? findFiles(target) : [target]
+
   let total = 0
+  let fixable = 0
 
   for (const file of files) {
-    const issues = analyzeFile(file, readFileSync(file, 'utf-8'))
-    if (issues.length) {
-      console.log(`\n📄 ${file}`)
-      issues.forEach(i => console.log(`  ${i.fixable ? '🔧' : '❌'} [${i.rule}] ${i.message}`))
-      total += issues.length
+    const content = readFileSync(file, 'utf-8')
+    const ext = extname(file)
+
+    const issues = ext === '.vue'
+      ? analyzeVueFile(file, content)
+      : analyzeTsFile(file, content)
+
+    if (issues.length > 0) {
+      const relPath = relative(process.cwd(), file)
+      console.log(`\n📄 ${relPath}`)
+      for (const issue of issues) {
+        const icon = issue.fixable ? '🔧' : '❌'
+        const loc = issue.line ? `:${issue.line}` : ''
+        console.log(`  ${icon} [${issue.rule}]${loc} ${issue.message}`)
+        if (issue.fix && SHOULD_FIX) {
+          console.log(`     💡 ${issue.fix}`)
+        }
+        total++
+        if (issue.fixable) fixable++
+      }
     }
   }
 
-  console.log(`\n📊 总计: ${total} 个问题`)
-  process.exit(total > 0 ? 1 : 0)
+  if (total === 0) {
+    console.log('✅ 所有 AST 检查通过')
+    process.exit(0)
+  } else {
+    console.log(`\n📊 总计: ${total} 个问题，${fixable} 个可修复`)
+    process.exit(1)
+  }
 }
 
 main()

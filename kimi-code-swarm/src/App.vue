@@ -39,8 +39,8 @@ const statCards = [
           </h2>
         </div>
         <button
-          @click="store.setIsCreateModalOpen(true)"
           class="px-4 py-2 bg-swarm-600 hover:bg-swarm-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+          @click="store.setIsCreateModalOpen(true)"
         >
           <Plus class="w-4 h-4" /> 新建实例
         </button>

@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { X, Plus } from 'lucide-vue-next'
 
-const props = defineProps<{
+defineProps<{
   isOpen: boolean
 }>()
 
@@ -31,12 +31,12 @@ function handleSubmit() {
     <div class="relative bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
       <div class="flex items-center justify-between px-6 py-4 border-b border-gray-800">
         <h2 class="text-lg font-semibold text-white">新建 CLI 实例</h2>
-        <button @click="emit('close')" class="text-gray-500 hover:text-gray-300 transition-colors">
+        <button class="text-gray-500 hover:text-gray-300 transition-colors" @click="emit('close')">
           <X class="w-5 h-5" />
         </button>
       </div>
 
-      <form @submit.prevent="handleSubmit" class="p-6 space-y-4">
+      <form class="p-6 space-y-4" @submit.prevent="handleSubmit">
         <div>
           <label class="block text-sm font-medium text-gray-300 mb-1.5">实例名称</label>
           <input
@@ -71,8 +71,8 @@ function handleSubmit() {
         <div class="pt-2 flex items-center justify-end gap-3">
           <button
             type="button"
-            @click="emit('close')"
             class="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors"
+            @click="emit('close')"
           >
             取消
           </button>
