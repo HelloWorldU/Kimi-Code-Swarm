@@ -60,8 +60,10 @@ Kimi-Code-Swarm/
 │   ├── rules/               规则定义
 │   └── fixers/              自动修复器
 │
-├── ci/                    ← ✅ CI 约束配置（预留）
-│
+├── ci/                    ← ✅ CI 约束配置
+│   ├── hooks/               git hooks（提交前自动检查）
+│   ├── lint-rules/          自定义 ESLint 规则（未来扩展）
+│   └── scripts/             CI 辅助脚本（文档同步检查等）
 ├── evals/                 ← 📊 评估用例（预留）
 │
 ├── scripts/               ← 🤖 自动化脚本
