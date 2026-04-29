@@ -17,9 +17,10 @@
 | Token 监控设计 | [`docs/TOKEN_MONITORING.md`](docs/TOKEN_MONITORING.md) |
 | 可观测性 | [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md) |
 | 查看执行计划 | [`docs/PLANS.md`](docs/PLANS.md) |
-| 检查代码 AST 结构 | `npx tsx ast/analyzer.ts` |
-| 运行 CI 流水线 | `npm run lint && npm run typecheck && npx tsx ast/analyzer.ts src && npm run build` |
+| 检查代码 AST 结构 | `ast/analyzer.ts` |
 | 使用工作流模板 | `harness/*.yaml` |
+| 运行清理脚本 | `scripts/cleanup.ts` |
+| 跑 CI 流水线 | `npm run lint && npm run typecheck && npm run build` |
 
 ---
 
@@ -36,11 +37,13 @@
 ```
 Kimi-Code-Swarm/
 ├── AGENTS.md              ← 🗺️ 地图（~40行）
+├── README.md              ← 人类友好的项目介绍
+├── .gitignore
 │
-├── docs/                  ← 📚 知识库（统一入口）
+├── docs/                  ← 📚 知识库（Agent 按需加载）
 │   ├── DESIGN.md            顶层设计 + Harness 五层架构
 │   ├── ARCHITECTURE.md      系统架构、数据流、状态分层
-│   ├── FRONTEND.md          前端 Agent 指南（编码规范+命令）
+│   ├── FRONTEND.md          前端编码规范 + 命令
 │   ├── CLI_HARNESS.md       CLI 进程接入设计
 │   ├── COMPONENT_PATTERNS.md Vue 组件规范
 │   ├── TOKEN_MONITORING.md  Token 监控设计
@@ -51,29 +54,23 @@ Kimi-Code-Swarm/
 │   ├── product-specs/       产品规格
 │   └── references/          外部参考资料
 │
-├── ast/                   ← 🔧 AST 分析器代码
-│   ├── README.md            极简使用说明
+├── ast/                   ← 🔧 AST 结构约束代码
 │   ├── analyzer.ts          分析器入口
-│   ├── rules/               AST 规则定义
+│   ├── rules/               规则定义
 │   └── fixers/              自动修复器
 │
-├── ci/                    ← ✅ CI 约束配置
-│   └── README.md            极简流水线说明
+├── ci/                    ← ✅ CI 约束配置（预留）
 │
-├── evals/                 ← 📊 评估用例（待建）
-│   └── README.md
+├── evals/                 ← 📊 评估用例（预留）
 │
 ├── scripts/               ← 🤖 自动化脚本
-│   ├── README.md
 │   └── cleanup.ts           熵管理清理脚本
 │
 ├── harness/               ← 📋 工作流模板
-│   ├── README.md
-│   ├── new-instance.yaml
-│   └── bug-fix.yaml
+│   ├── new-instance.yaml    新建 CLI 实例模板
+│   └── bug-fix.yaml         修复 Bug 模板
 │
 └── kimi-code-swarm/       ← 💻 前端应用（Vue3 + Vite + Tailwind）
-    ├── AGENTS.md            极简入口（详细见 docs/FRONTEND.md）
     ├── src/
     │   ├── types/
     │   ├── store/
@@ -81,6 +78,7 @@ Kimi-Code-Swarm/
     │   ├── skills/
     │   ├── App.vue
     │   └── main.ts
+    ├── index.html
     ├── vite.config.ts
     ├── tailwind.config.js
     └── package.json
