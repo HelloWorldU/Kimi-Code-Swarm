@@ -1,0 +1,46 @@
+{
+  "mappings": [
+    {
+      "id": "ast-rules",
+      "paths": ["ast/**/*.ts"],
+      "docs": ["docs/DESIGN.md"],
+      "reason": "AST 规则变更需同步 Harness 设计文档"
+    },
+    {
+      "id": "ci-config",
+      "paths": ["ci/**/*", ".github/workflows/*.yml", "kimi-code-swarm/package.json"],
+      "docs": ["docs/DESIGN.md", "docs/FRONTEND.md"],
+      "reason": "CI/依赖配置变更需同步技术栈说明"
+    },
+    {
+      "id": "frontend-components",
+      "paths": ["kimi-code-swarm/src/components/*.vue"],
+      "docs": ["docs/COMPONENT_PATTERNS.md", "docs/FRONTEND.md"],
+      "reason": "组件变更需同步编码规范"
+    },
+    {
+      "id": "frontend-store",
+      "paths": ["kimi-code-swarm/src/store/*.ts", "kimi-code-swarm/src/types/*.ts"],
+      "docs": ["docs/ARCHITECTURE.md"],
+      "reason": "状态管理/类型变更需同步架构文档"
+    },
+    {
+      "id": "frontend-app",
+      "paths": ["kimi-code-swarm/src/App.vue", "kimi-code-swarm/src/main.ts"],
+      "docs": ["docs/ARCHITECTURE.md", "docs/FRONTEND.md"],
+      "reason": "入口文件变更需同步架构和前端指南"
+    },
+    {
+      "id": "harness-templates",
+      "paths": ["harness/*.yaml"],
+      "docs": ["docs/DESIGN.md"],
+      "reason": "工作流模板变更需同步设计文档"
+    },
+    {
+      "id": "scripts-automation",
+      "paths": ["scripts/*.ts"],
+      "docs": ["docs/DESIGN.md"],
+      "reason": "自动化脚本变更需同步设计文档"
+    }
+  ]
+}

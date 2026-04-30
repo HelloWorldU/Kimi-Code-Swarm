@@ -11,7 +11,8 @@
     "lint": "eslint src --ext .ts,.vue",
     "lint:fix": "eslint src --ext .ts,.vue --fix",
     "analyze": "npx tsx ../ast/analyzer.ts src",
-    "ci": "npm run typecheck && npm run lint && npm run analyze && npm run build"
+    "check-docs": "npx tsx ../ci/scripts/check-docs-sync.ts",
+    "ci": "npm run typecheck && npm run lint && npm run analyze && npm run check-docs && npm run build"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

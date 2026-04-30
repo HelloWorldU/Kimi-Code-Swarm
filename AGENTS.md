@@ -20,7 +20,8 @@
 | 检查代码 AST 结构 | `ast/analyzer.ts` |
 | 使用工作流模板 | `harness/*.yaml` |
 | 运行清理脚本 | `scripts/cleanup.ts` |
-| 跑 CI 流水线 | `npm run lint && npm run typecheck && npm run build` |
+| 跑 CI 流水线 | `npm run ci` |
+| 检查文档同步 | `npm run check-docs` |
 
 ---
 

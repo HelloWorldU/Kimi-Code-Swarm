@@ -1,13 +1,26 @@
 #!/bin/sh
-# Pre-commit hook: 提交前自动跑 CI 检查
+# Pre-commit hook: 提交前自动跑 CI 检查 + 文档同步检测
 # 安装: git config core.hooksPath ci/hooks
 
 echo "🔍 运行 pre-commit 检查..."
 
 cd kimi-code-swarm || exit 1
 
+echo ""
+echo "1️⃣ TypeScript 类型检查..."
 npm run typecheck || exit 1
+
+echo ""
+echo "2️⃣ ESLint 代码检查..."
 npm run lint || exit 1
+
+echo ""
+echo "3️⃣ AST 结构分析..."
 npm run analyze || exit 1
 
+echo ""
+echo "4️⃣ 文档同步检测..."
+npx tsx ../ci/scripts/check-docs-sync.ts || exit 1
+
+echo ""
 echo "✅ pre-commit 检查通过"
