@@ -24,6 +24,6 @@ const emit = defineEmits<{...}>()
 
 | 类型 | 规则 | 示例 |
 |------|------|------|
-| 组件 | PascalCase.vue | `InstanceCard.vue` |
+| 组件 | PascalCase.vue | `TaskCard.vue` |
 | Composable | camelCase.ts | `useSwarmStore.ts` |
 | 事件 | kebab-case | `@send-command` |

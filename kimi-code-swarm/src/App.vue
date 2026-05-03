@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Plus, Activity, Server, Coins, Layers } from 'lucide-vue-next'
+import { Plus, Activity, ClipboardList, Coins, CheckCircle } from 'lucide-vue-next'
 import Sidebar from './components/Sidebar.vue'
-import InstanceCard from './components/InstanceCard.vue'
-import CreateInstanceModal from './components/CreateInstanceModal.vue'
-import InstanceDetail from './components/InstanceDetail.vue'
+import TaskCard from './components/TaskCard.vue'
+import CreateTaskModal from './components/CreateTaskModal.vue'
+import TaskDetail from './components/TaskDetail.vue'
 import { useSwarmStore } from './store/useSwarmStore'
 
 const store = useSwarmStore()
@@ -12,13 +12,13 @@ const activeTab = ref('dashboard')
 
 function handleTabChange(tab: string) {
   activeTab.value = tab
-  store.setSelectedId(null)
+  store.setSelectedTaskId(null)
 }
 
 const statCards = [
-  { label: '活跃实例', value: () => store.stats.value.activeInstances.toString(), sub: () => `共 ${store.stats.value.totalInstances} 个实例`, icon: Server, color: 'bg-emerald-600' },
-  { label: 'Token 消耗', value: () => `${(store.stats.value.totalTokensUsed / 1000).toFixed(1)}K`, sub: () => `限额 ${(store.stats.value.totalTokenLimit / 1000).toFixed(0)}K`, icon: Coins, color: 'bg-amber-600' },
-  { label: '排队任务', value: () => store.stats.value.queueLength.toString(), sub: () => '等待启动', icon: Layers, color: 'bg-blue-600' },
+  { label: '活跃任务', value: () => store.stats.value.activeTasks.toString(), sub: () => `共 ${store.stats.value.totalTasks} 个任务`, icon: ClipboardList, color: 'bg-amber-600' },
+  { label: '已完成', value: () => store.stats.value.completedTasks.toString(), sub: () => '累计交付', icon: CheckCircle, color: 'bg-emerald-600' },
+  { label: 'Token 消耗', value: () => `${(store.stats.value.totalTokensUsed / 1000).toFixed(1)}K`, sub: () => `预算 ${(store.stats.value.totalTokenBudget / 1000).toFixed(0)}K`, icon: Coins, color: 'bg-blue-600' },
   { label: '系统状态', value: () => '正常', sub: () => '所有节点在线', icon: Activity, color: 'bg-swarm-600' },
 ]
 </script>
@@ -32,8 +32,8 @@ const statCards = [
       <header class="h-16 border-b border-gray-800 flex items-center justify-between px-6 bg-gray-900/50 backdrop-blur">
         <div>
           <h2 class="text-lg font-semibold text-white">
-            <span v-if="activeTab === 'dashboard'">控制台总览</span>
-            <span v-else-if="activeTab === 'instances'">实例管理</span>
+            <span v-if="activeTab === 'dashboard'">任务总览</span>
+            <span v-else-if="activeTab === 'tasks'">任务管理</span>
             <span v-else-if="activeTab === 'analytics'">监控分析</span>
             <span v-else>系统设置</span>
           </h2>
@@ -42,22 +42,27 @@ const statCards = [
           class="px-4 py-2 bg-swarm-600 hover:bg-swarm-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
           @click="store.setIsCreateModalOpen(true)"
         >
-          <Plus class="w-4 h-4" /> 新建实例
+          <Plus class="w-4 h-4" /> 新建任务
         </button>
       </header>
 
       <!-- Content -->
       <div class="flex-1 overflow-hidden p-6">
-        <!-- Instance Detail -->
-        <InstanceDetail
-          v-if="store.selectedId.value && store.selectedInstance.value"
-          :instance="store.selectedInstance.value"
-          @back="store.setSelectedId(null)"
-          @send-command="store.sendCommand"
+        <!-- Task Detail -->
+        <TaskDetail
+          v-if="store.selectedTaskId.value && store.selectedTask.value"
+          :task="store.selectedTask.value"
+          @back="store.setSelectedTaskId(null)"
+          @start="store.startTask"
+          @stop="store.stopTask"
+          @send-instruction="store.sendInstruction"
+          @submit-for-review="store.submitForReview"
+          @merge-pr="store.mergePr"
+          @reject-pr="store.rejectPr"
         />
 
-        <!-- Dashboard / Instances -->
-        <div v-else-if="activeTab === 'dashboard' || activeTab === 'instances'" class="h-full flex flex-col">
+        <!-- Dashboard / Tasks -->
+        <div v-else-if="activeTab === 'dashboard' || activeTab === 'tasks'" class="h-full flex flex-col">
           <!-- Stats Grid -->
           <div class="grid grid-cols-4 gap-4 mb-6">
             <div
@@ -76,26 +81,26 @@ const statCards = [
             </div>
           </div>
 
-          <!-- Instances Grid -->
+          <!-- Tasks Grid -->
           <div class="flex items-center justify-between mb-4">
-            <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">CLI 实例列表</h3>
+            <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">任务列表</h3>
             <div class="flex items-center gap-2 text-xs text-gray-500">
-              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-400" /> 运行中</span>
-              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-blue-400" /> 空闲</span>
-              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-red-400" /> 错误</span>
+              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-400" /> 工作中</span>
+              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-purple-400" /> 待审阅</span>
+              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-400" /> 已完成</span>
             </div>
           </div>
           <div class="flex-1 overflow-y-auto scrollbar-thin">
             <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 pb-4">
-              <InstanceCard
-                v-for="instance in store.instances.value"
-                :key="instance.id"
-                :instance="instance"
-                :is-selected="store.selectedId.value === instance.id"
-                @select="store.setSelectedId"
-                @stop="store.stopInstance"
-                @restart="store.restartInstance"
-                @delete="store.deleteInstance"
+              <TaskCard
+                v-for="task in store.tasks.value"
+                :key="task.id"
+                :task="task"
+                :is-selected="store.selectedTaskId.value === task.id"
+                @select="store.setSelectedTaskId"
+                @start="store.startTask"
+                @stop="store.stopTask"
+                @delete="store.deleteTask"
               />
             </div>
           </div>
@@ -106,12 +111,12 @@ const statCards = [
           <div class="text-center">
             <Activity class="w-16 h-16 mx-auto mb-4 text-gray-700" />
             <p class="text-lg font-medium">监控分析面板</p>
-            <p class="text-sm mt-2">Token 使用趋势、实例负载图表等功能即将上线</p>
+            <p class="text-sm mt-2">Token 使用趋势、任务负载图表等功能即将上线</p>
           </div>
         </div>
         <div v-else class="flex items-center justify-center h-full text-gray-500">
           <div class="text-center">
-            <Layers class="w-16 h-16 mx-auto mb-4 text-gray-700" />
+            <ClipboardList class="w-16 h-16 mx-auto mb-4 text-gray-700" />
             <p class="text-lg font-medium">系统设置</p>
             <p class="text-sm mt-2">CLI 路径配置、Token 限额、通知设置等功能即将上线</p>
           </div>
@@ -119,10 +124,10 @@ const statCards = [
       </div>
     </main>
 
-    <CreateInstanceModal
+    <CreateTaskModal
       :is-open="store.isCreateModalOpen.value"
       @close="store.setIsCreateModalOpen(false)"
-      @create="store.createInstance"
+      @create="store.createTask"
     />
   </div>
 </template>

@@ -16,8 +16,8 @@ Vue 3 + TypeScript + Vite + Tailwind CSS + lucide-vue-next
 
 ## 关键文件
 
-- `store/useSwarmStore.ts` — 状态必须通过方法修改
-- `types/index.ts` — 修改前检查上下游依赖
+- `store/useSwarmStore.ts` — 状态必须通过方法修改；核心模型 AgentTask 含状态机 + PR 追踪
+- `types/index.ts` — AgentTask / LogEntry / CommandCenterStats；修改前检查上下游依赖
 
 ## 快速启动
 

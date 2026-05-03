@@ -1,70 +1,84 @@
 import { reactive, computed } from 'vue'
-import type { CliInstance, LogEntry } from '../types'
+import type { AgentTask, LogEntry } from '../types'
 
 const generateId = () => Math.random().toString(36).substring(2, 10)
 
 const mockLogs = (baseContent: string): LogEntry[] => [
   { id: generateId(), timestamp: new Date(Date.now() - 300000), type: 'system', content: 'Kimi Code CLI v2.0.0 已启动' },
-  { id: generateId(), timestamp: new Date(Date.now() - 240000), type: 'input', content: '请帮我重构这个组件', tokens: 12 },
-  { id: generateId(), timestamp: new Date(Date.now() - 180000), type: 'output', content: '好的，我将分析代码结构并开始重构...', tokens: 156 },
+  { id: generateId(), timestamp: new Date(Date.now() - 240000), type: 'input', content: '请帮我实现用户登录模块', tokens: 12 },
+  { id: generateId(), timestamp: new Date(Date.now() - 180000), type: 'output', content: '好的，我将分析需求并实现登录功能...', tokens: 156 },
   { id: generateId(), timestamp: new Date(Date.now() - 120000), type: 'output', content: baseContent.slice(0, 200), tokens: 342 },
-  { id: generateId(), timestamp: new Date(Date.now() - 60000), type: 'system', content: '文件已保存: src/components/Button.vue' },
+  { id: generateId(), timestamp: new Date(Date.now() - 60000), type: 'system', content: '文件已保存: src/auth/LoginForm.vue' },
 ]
 
-const initialInstances: CliInstance[] = [
+const branchName = (taskName: string) => {
+  const slug = taskName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+  return `agent/${slug}-${generateId().slice(0, 4)}`
+}
+
+const initialTasks: AgentTask[] = [
   {
-    id: 'inst-001',
-    name: 'Frontend Refactor #1',
-    status: 'running',
-    pid: 10234,
-    workspace: 'E:/projects/web-app',
-    model: 'kimi-k2',
+    id: 'task-001',
+    name: '登录模块开发',
+    status: 'working',
+    repoUrl: 'https://github.com/HelloWorldU/Kimi-Code-Swarm',
+    workspace: 'E:/workspace/agent-001',
+    branch: 'agent/login-module-a3f2',
+    instruction: '实现用户登录模块，包含前后端',
+    prStatus: 'none',
     tokenUsed: 12400,
-    tokenLimit: 200000,
+    tokenBudget: 50000,
     createdAt: new Date(Date.now() - 3600000),
     lastActivity: new Date(Date.now() - 30000),
-    taskDescription: '重构 Button 和 Modal 组件',
-    logs: mockLogs('已完成 Button 组件的 props 接口重构，添加了 defineExpose 支持...'),
+    logs: mockLogs('已完成 LoginForm 组件和 auth API 接口...'),
   },
   {
-    id: 'inst-002',
-    name: 'API Integration #2',
-    status: 'running',
-    pid: 10256,
-    workspace: 'E:/projects/backend',
-    model: 'kimi-k2',
+    id: 'task-002',
+    name: '支付网关对接',
+    status: 'reviewing',
+    repoUrl: 'https://github.com/HelloWorldU/Kimi-Code-Swarm',
+    workspace: 'E:/workspace/agent-002',
+    branch: 'agent/payment-gateway-b7e1',
+    instruction: '对接 Stripe 支付网关',
+    prStatus: 'open',
+    prNumber: 42,
+    prUrl: 'https://github.com/HelloWorldU/Kimi-Code-Swarm/pull/42',
     tokenUsed: 8900,
-    tokenLimit: 200000,
+    tokenBudget: 50000,
     createdAt: new Date(Date.now() - 2400000),
     lastActivity: new Date(Date.now() - 120000),
-    taskDescription: '对接支付网关 API',
-    logs: mockLogs('正在编写 Stripe webhook handler，需要验证签名...'),
+    logs: mockLogs('Stripe webhook handler 已编写完成...'),
   },
   {
-    id: 'inst-003',
-    name: 'Doc Generator #3',
-    status: 'idle',
-    workspace: 'E:/projects/docs',
-    model: 'kimi-k2',
+    id: 'task-003',
+    name: 'API 文档生成',
+    status: 'completed',
+    repoUrl: 'https://github.com/HelloWorldU/Kimi-Code-Swarm',
+    workspace: 'E:/workspace/agent-003',
+    branch: 'agent/api-docs-c5d8',
+    instruction: '生成 OpenAPI 文档',
+    prStatus: 'merged',
+    prNumber: 38,
+    prUrl: 'https://github.com/HelloWorldU/Kimi-Code-Swarm/pull/38',
     tokenUsed: 3200,
-    tokenLimit: 200000,
+    tokenBudget: 30000,
     createdAt: new Date(Date.now() - 7200000),
     lastActivity: new Date(Date.now() - 600000),
-    taskDescription: '生成 API 文档',
-    logs: mockLogs('文档生成完毕，等待下一次指令...'),
+    logs: mockLogs('文档生成完毕，PR 已合并'),
   },
   {
-    id: 'inst-004',
-    name: 'Bug Fix #4',
-    status: 'error',
-    pid: 10301,
-    workspace: 'E:/projects/mobile',
-    model: 'kimi-k2',
+    id: 'task-004',
+    name: 'iOS 崩溃修复',
+    status: 'stopped',
+    repoUrl: 'https://github.com/HelloWorldU/Kimi-Code-Swarm',
+    workspace: 'E:/workspace/agent-004',
+    branch: 'agent/ios-crash-fix-d2a4',
+    instruction: '修复 iOS 上的内存泄漏导致的崩溃',
+    prStatus: 'none',
     tokenUsed: 5600,
-    tokenLimit: 200000,
+    tokenBudget: 40000,
     createdAt: new Date(Date.now() - 1800000),
     lastActivity: new Date(Date.now() - 300000),
-    taskDescription: '修复 iOS 崩溃问题',
     logs: [
       ...mockLogs('分析 crash log...'),
       { id: generateId(), timestamp: new Date(Date.now() - 300000), type: 'error', content: 'Error: Connection timeout after 30000ms' },
@@ -72,117 +86,142 @@ const initialInstances: CliInstance[] = [
   },
 ]
 
-// Global reactive state (singleton pattern)
+// Global reactive state
 const state = reactive({
-  instances: initialInstances,
-  selectedId: null as string | null,
+  tasks: initialTasks,
+  selectedTaskId: null as string | null,
   isCreateModalOpen: false,
 })
 
-// Simulate token consumption
+// Simulate token consumption for working tasks
 setInterval(() => {
-  state.instances.forEach((i) => {
-    if (i.status === 'running') {
+  state.tasks.forEach((t) => {
+    if (t.status === 'working') {
       const increment = Math.floor(Math.random() * 50) + 10
-      i.tokenUsed = Math.min(i.tokenUsed + increment, i.tokenLimit)
-      i.lastActivity = new Date()
+      t.tokenUsed = Math.min(t.tokenUsed + increment, t.tokenBudget)
+      t.lastActivity = new Date()
     }
   })
 }, 3000)
 
 export function useSwarmStore() {
   const stats = computed(() => ({
-    totalInstances: state.instances.length,
-    activeInstances: state.instances.filter(i => i.status === 'running').length,
-    totalTokensUsed: state.instances.reduce((sum, i) => sum + i.tokenUsed, 0),
-    totalTokenLimit: state.instances.reduce((sum, i) => sum + i.tokenLimit, 0),
-    queueLength: state.instances.filter(i => i.status === 'queued').length,
+    totalTasks: state.tasks.length,
+    activeTasks: state.tasks.filter(t => t.status === 'working' || t.status === 'cloning').length,
+    completedTasks: state.tasks.filter(t => t.status === 'completed').length,
+    totalTokensUsed: state.tasks.reduce((sum, t) => sum + t.tokenUsed, 0),
+    totalTokenBudget: state.tasks.reduce((sum, t) => sum + t.tokenBudget, 0),
   }))
 
-  const selectedInstance = computed(() =>
-    state.instances.find(i => i.id === state.selectedId) || null
+  const selectedTask = computed(() =>
+    state.tasks.find(t => t.id === state.selectedTaskId) || null
   )
 
-  function createInstance(name: string, workspace: string, task: string) {
-    const newInstance: CliInstance = {
-      id: `inst-${generateId()}`,
+  function createTask(name: string, repoUrl: string, instruction: string, tokenBudget: number) {
+    const newTask: AgentTask = {
+      id: `task-${generateId()}`,
       name,
-      status: 'queued',
-      workspace,
-      model: 'kimi-k2',
+      status: 'pending',
+      repoUrl,
+      workspace: '',
+      branch: branchName(name),
+      instruction,
+      prStatus: 'none',
       tokenUsed: 0,
-      tokenLimit: 200000,
+      tokenBudget,
       createdAt: new Date(),
       lastActivity: new Date(),
-      taskDescription: task,
       logs: [
-        { id: generateId(), timestamp: new Date(), type: 'system', content: '实例已创建，等待启动...' },
+        { id: generateId(), timestamp: new Date(), type: 'system', content: '任务已创建，等待启动...' },
       ],
     }
-    state.instances.push(newInstance)
-    setTimeout(() => {
-      const inst = state.instances.find(i => i.id === newInstance.id)
-      if (inst) {
-        inst.status = 'running'
-        inst.pid = Math.floor(Math.random() * 50000) + 10000
-        inst.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: 'CLI 进程已启动' })
-      }
-    }, 1500)
+    state.tasks.push(newTask)
   }
 
-  function stopInstance(id: string) {
-    const inst = state.instances.find(i => i.id === id)
-    if (inst) {
-      inst.status = 'stopped'
-      inst.pid = undefined
-      inst.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: '实例已停止' })
-    }
-  }
+  function startTask(id: string) {
+    const task = state.tasks.find(t => t.id === id)
+    if (!task || task.status !== 'pending') return
 
-  function restartInstance(id: string) {
-    const inst = state.instances.find(i => i.id === id)
-    if (inst) {
-      inst.status = 'running'
-      inst.pid = Math.floor(Math.random() * 50000) + 10000
-      inst.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: '实例已重启' })
-    }
-  }
-
-  function deleteInstance(id: string) {
-    state.instances = state.instances.filter(i => i.id !== id)
-    if (state.selectedId === id) state.selectedId = null
-  }
-
-  function sendCommand(id: string, command: string) {
-    const inst = state.instances.find(i => i.id === id)
-    if (!inst) return
-    const newLog: LogEntry = { id: generateId(), timestamp: new Date(), type: 'input', content: command, tokens: Math.floor(command.length / 2) }
-    inst.logs.push(newLog)
-    inst.lastActivity = new Date()
-    inst.tokenUsed += Math.floor(command.length / 2)
+    task.status = 'cloning'
+    task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: '开始克隆仓库...' })
 
     setTimeout(() => {
-      const current = state.instances.find(i => i.id === id)
-      if (!current) return
-      const responseLog: LogEntry = { id: generateId(), timestamp: new Date(), type: 'output', content: `收到指令: "${command}"，正在处理...`, tokens: 45 }
-      current.logs.push(responseLog)
-      current.lastActivity = new Date()
-      current.tokenUsed += 45
-    }, 800)
+      const t = state.tasks.find(x => x.id === id)
+      if (!t) return
+      t.workspace = `E:/workspace/${t.id}`
+      t.status = 'ready'
+      t.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `仓库已克隆到 ${t.workspace}` })
+      t.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `已创建分支: ${t.branch}` })
+      t.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: 'CLI 进程已就绪，等待指令' })
+    }, 2000)
+  }
+
+  function sendInstruction(id: string, instruction: string) {
+    const task = state.tasks.find(t => t.id === id)
+    if (!task || task.status !== 'ready') return
+
+    task.status = 'working'
+    task.instruction = instruction
+    task.logs.push({ id: generateId(), timestamp: new Date(), type: 'input', content: instruction, tokens: Math.floor(instruction.length / 2) })
+    task.tokenUsed += Math.floor(instruction.length / 2)
+    task.lastActivity = new Date()
+
+    task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: 'Agent 开始执行任务...' })
+  }
+
+  function stopTask(id: string) {
+    const task = state.tasks.find(t => t.id === id)
+    if (!task) return
+    task.status = 'stopped'
+    task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: '任务已停止' })
+  }
+
+  function submitForReview(id: string) {
+    const task = state.tasks.find(t => t.id === id)
+    if (!task || task.status !== 'working') return
+    task.status = 'reviewing'
+    task.prStatus = 'open'
+    task.prNumber = Math.floor(Math.random() * 100) + 1
+    task.prUrl = `https://github.com/HelloWorldU/Kimi-Code-Swarm/pull/${task.prNumber}`
+    task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `分支已推送，PR #${task.prNumber} 已创建` })
+  }
+
+  function mergePr(id: string) {
+    const task = state.tasks.find(t => t.id === id)
+    if (!task || task.status !== 'reviewing') return
+    task.status = 'completed'
+    task.prStatus = 'merged'
+    task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `PR #${task.prNumber} 已合并到 main` })
+  }
+
+  function rejectPr(id: string) {
+    const task = state.tasks.find(t => t.id === id)
+    if (!task || task.status !== 'reviewing') return
+    task.status = 'working'
+    task.prStatus = 'none'
+    task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: 'PR 被打回，Agent 继续修改' })
+  }
+
+  function deleteTask(id: string) {
+    state.tasks = state.tasks.filter(t => t.id !== id)
+    if (state.selectedTaskId === id) state.selectedTaskId = null
   }
 
   return {
-    instances: computed(() => state.instances),
+    tasks: computed(() => state.tasks),
     stats,
-    selectedId: computed(() => state.selectedId),
-    selectedInstance,
+    selectedTaskId: computed(() => state.selectedTaskId),
+    selectedTask,
     isCreateModalOpen: computed(() => state.isCreateModalOpen),
-    setSelectedId: (id: string | null) => { state.selectedId = id },
+    setSelectedTaskId: (id: string | null) => { state.selectedTaskId = id },
     setIsCreateModalOpen: (v: boolean) => { state.isCreateModalOpen = v },
-    createInstance,
-    stopInstance,
-    restartInstance,
-    deleteInstance,
-    sendCommand,
+    createTask,
+    startTask,
+    sendInstruction,
+    stopTask,
+    submitForReview,
+    mergePr,
+    rejectPr,
+    deleteTask,
   }
 }

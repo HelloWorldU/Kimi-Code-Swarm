@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Hexagon, LayoutDashboard, Terminal, BarChart3, Settings } from 'lucide-vue-next'
+import { Hexagon, LayoutDashboard, ClipboardList, BarChart3, Settings } from 'lucide-vue-next'
 
 const props = defineProps<{
   activeTab: string
@@ -10,8 +10,8 @@ const emit = defineEmits<{
 }>()
 
 const navItems = [
-  { id: 'dashboard', label: '总览', icon: LayoutDashboard },
-  { id: 'instances', label: '实例管理', icon: Terminal },
+  { id: 'dashboard', label: '任务总览', icon: LayoutDashboard },
+  { id: 'tasks', label: '任务管理', icon: ClipboardList },
   { id: 'analytics', label: '监控分析', icon: BarChart3 },
   { id: 'settings', label: '系统设置', icon: Settings },
 ]
@@ -25,7 +25,7 @@ const navItems = [
       </div>
       <div>
         <h1 class="text-lg font-bold text-white tracking-tight">Kimi-Code-Swarm</h1>
-        <p class="text-xs text-gray-500">CLI 集群控制台</p>
+        <p class="text-xs text-gray-500">本地 Agent 指挥中心</p>
       </div>
     </div>
 

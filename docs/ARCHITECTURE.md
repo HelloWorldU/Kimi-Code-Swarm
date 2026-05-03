@@ -3,7 +3,7 @@
 ## 数据流
 
 ```
-UI (Vue) ←→ useSwarmStore ←→ IPC ←→ Desktop Shell ←→ node-pty ←→ CLI Processes
+UI (Vue) ←→ useSwarmStore (AgentTask[]) ←→ IPC ←→ Desktop Shell ←→ node-pty ←→ CLI Processes
 ```
 
 ## 状态分层
