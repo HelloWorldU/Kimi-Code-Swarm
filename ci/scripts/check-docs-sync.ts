@@ -35,10 +35,11 @@ const MODE = process.argv.includes('--all') ? 'all' : 'staged'
 
 function getChangedFiles(): string[] {
   let output: string
+  // --diff-filter=d: 排除已删除的文件（删除废弃文件不需要同步文档）
   if (MODE === 'staged') {
-    output = execSync('git diff --cached --name-only', { encoding: 'utf-8', cwd: process.cwd() })
+    output = execSync('git diff --cached --diff-filter=d --name-only', { encoding: 'utf-8', cwd: process.cwd() })
   } else {
-    output = execSync('git diff --name-only HEAD', { encoding: 'utf-8', cwd: process.cwd() })
+    output = execSync('git diff --diff-filter=d --name-only HEAD', { encoding: 'utf-8', cwd: process.cwd() })
   }
   return output.split('\n').filter(f => f.trim() !== '')
 }

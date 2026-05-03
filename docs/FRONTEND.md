@@ -28,6 +28,11 @@ npm run typecheck   # TypeScript 类型检查
 npm run lint        # ESLint 代码检查
 npm run lint:fix    # ESLint 自动修复
 npm run analyze     # AST 结构分析
-npm run ci          # 完整流水线：typecheck → lint → analyze → build
+npm run check-docs  # 文档同步检测
+npm run ci          # 完整流水线：typecheck → lint → analyze → check-docs → build
 npm run build       # 生产构建
 ```
+
+## 提交前检查
+
+`git commit` 会自动触发 pre-commit hook（`ci/hooks/pre-commit.cmd`），运行 typecheck → lint → analyze → check-docs。任一阶段失败将阻断提交。
