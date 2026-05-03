@@ -1,6 +1,6 @@
 # Kimi-Code-Swarm
 
-> Agent = Model + Harness.  
+> **本地 Agent 指挥中心 App**。指挥官通过 UI 派任务、监进度、审 PR。  
 > 本文档是**地图**，不是手册。Agent 每次启动先读这张地图，细节按需去 `docs/` 加载。
 
 ---
@@ -11,6 +11,7 @@
 |-------|--------|
 | 理解系统设计哲学 | [`docs/DESIGN.md`](docs/DESIGN.md) |
 | 了解系统架构 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
+| 了解产品规格 | [`docs/product-specs/index.md`](docs/product-specs/index.md) |
 | 写前端代码 | [`docs/FRONTEND.md`](docs/FRONTEND.md) |
 | 接入 CLI 进程 | [`docs/CLI_HARNESS.md`](docs/CLI_HARNESS.md) |
 | 组件规范 | [`docs/COMPONENT_PATTERNS.md`](docs/COMPONENT_PATTERNS.md) |
@@ -56,6 +57,7 @@ Kimi-Code-Swarm/
 │   ├── design-docs/         设计决策记录
 │   ├── exec-plans/          活跃/已完成计划 + 技术债务
 │   ├── product-specs/       产品规格
+│   └── index.md             本地 Agent 指挥中心 App 规格
 │   └── references/          外部参考资料
 │
 ├── ast/                   ← 🔧 AST 结构约束代码
@@ -74,7 +76,8 @@ Kimi-Code-Swarm/
 │
 ├── harness/               ← 📋 工作流模板
 │   ├── new-instance.yaml    新建 CLI 实例模板
-│   └── bug-fix.yaml         修复 Bug 模板
+│   ├── bug-fix.yaml         修复 Bug 模板
+│   └── new-task.yaml        新建任务模板（指挥官派任务）
 │
 └── kimi-code-swarm/       ← 💻 前端应用（Vue3 + Vite + Tailwind）
     ├── src/

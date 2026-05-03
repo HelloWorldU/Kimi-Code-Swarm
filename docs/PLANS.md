@@ -6,8 +6,8 @@
 
 | 计划 | 状态 | 文档 |
 |------|------|------|
-| P0: 桌面壳层接入 | 🔄 进行中 | `exec-plans/active/desktop-shell.md` |
-| P1: 仓库一致性检查器 | ⏳ 待启动 | 见下方「定期检查机制」 |
+| P0: 任务系统与 CLI 接入 | 🔄 进行中 | `exec-plans/active/task-system.md` |
+| P1: 仓库一致性检查器 | ✅ 已实现 | `scripts/health-check.ts` |
 
 ## 已完成
 
