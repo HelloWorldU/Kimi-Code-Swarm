@@ -41,6 +41,12 @@
       "paths": ["scripts/*.ts"],
       "docs": ["docs/DESIGN.md"],
       "reason": "自动化脚本变更需同步设计文档"
+    },
+    {
+      "id": "constraints",
+      "paths": ["ast/**/*.ts", "ci/**/*", "eslint.config.mjs", "kimi-code-swarm/package.json"],
+      "docs": ["docs/CONSTRAINTS.md"],
+      "reason": "约束体系变更需同步约束文档"
     }
   ]
 }

@@ -20,6 +20,7 @@
 | 检查代码 AST 结构 | `ast/analyzer.ts` |
 | 使用工作流模板 | `harness/*.yaml` |
 | 运行清理脚本 | `scripts/cleanup.ts` |
+| 查看约束体系 | [`docs/CONSTRAINTS.md`](docs/CONSTRAINTS.md) |
 | 跑 CI 流水线 | `npm run ci` |
 | 检查文档同步 | `npm run check-docs` |
 
@@ -31,6 +32,7 @@
 2. **机械化约束优先** —— 代码必须过 CI：类型 → Linter → **AST** → 构建
 3. **仓库是唯一事实源** —— Slack/口头约定对 Agent 等于不存在
 4. **执行即更新文档** —— **每次代码变更后，必须同步更新相关文档**。改 AST 规则 → 更新 `docs/DESIGN.md`；改 CI 配置 → 更新相关说明；新增功能 → 更新 `docs/PLANS.md`。代码和文档不一致是 Harness 退化。
+5. **约束即代码** —— 所有规则必须机械可执行。不能自动检查的约定等于不存在。详见 [`docs/CONSTRAINTS.md`](docs/CONSTRAINTS.md)。
 
 ---
 
@@ -95,7 +97,7 @@ Kimi-Code-Swarm/
 | 层 | 知识文档 | 代码/配置 |
 |--|----------|----------|
 | L1 Context | `AGENTS.md` + `docs/` | — |
-| L2 Constraints | `docs/DESIGN.md` | `ast/`, `ci/` |
+| L2 Constraints | `docs/DESIGN.md` + `docs/CONSTRAINTS.md` | `ast/`, `ci/` |
 | L3 Observability | `docs/OBSERVABILITY.md` | UI 面板 |
 | L4 Entropy Mgmt | `docs/DESIGN.md` | `scripts/cleanup.ts` |
 | L5 Source of Truth | 仓库即唯一知识源 | — |
