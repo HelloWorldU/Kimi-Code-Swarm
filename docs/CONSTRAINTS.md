@@ -116,6 +116,7 @@ typecheck → lint → analyze → check-docs → build
 | 工程约定 | check-docs-sync.ts 扩展禁止模式检测 | P2 |
 | 运行时边界验证 | 引入 zod / io-ts | P1 |
 | 循环清理 | `scripts/cleanup.ts` 实现 | P1 |
+| 仓库一致性检查器 | `scripts/health-check.ts`（信息供给型） | ✅ |
 
 ---
 

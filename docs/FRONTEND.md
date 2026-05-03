@@ -38,8 +38,9 @@ npm run typecheck   # TypeScript 类型检查
 npm run lint        # ESLint 代码检查
 npm run lint:fix    # ESLint 自动修复
 npm run analyze     # AST 结构分析
-npm run check-docs  # 文档同步检测
-npm run ci          # 完整流水线：typecheck → lint → analyze → check-docs → build
+npm run check-docs    # 文档同步检测（硬约束）
+npm run health-check  # 仓库一致性检查（信息供给型）
+npm run ci            # 完整流水线：typecheck → lint → analyze → check-docs → build
 npm run build       # 生产构建
 ```
 
