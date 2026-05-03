@@ -52,6 +52,12 @@ typecheck → lint → analyze → check-docs → build
 - 执行：`npm run ci`
 - 效果：未过 CI 无法合入 main
 
+### 6. Hook 自动配置
+
+- `npm install` 自动运行 `scripts/setup-hooks.js`，配置 `core.hooksPath = ci/hooks`
+- 跨平台（Windows/macOS/Linux），非 Git 仓库时静默跳过
+- 如果手动跳过 `npm install`，需自行执行 `git config core.hooksPath ci/hooks`
+
 ---
 
 ## 📖 软性约束（文档、约定）

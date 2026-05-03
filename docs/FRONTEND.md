@@ -19,6 +19,16 @@ Vue 3 + TypeScript + Vite + Tailwind CSS + lucide-vue-next
 - `store/useSwarmStore.ts` — 状态必须通过方法修改
 - `types/index.ts` — 修改前检查上下游依赖
 
+## 快速启动
+
+```bash
+cd kimi-code-swarm
+npm install         # 自动配置 Git hooks (core.hooksPath = ci/hooks)
+npm run dev         # 开发服务器
+```
+
+> `npm install` 会自动运行 `postinstall` 脚本配置 Git hooks。如果跳过此步骤，需手动执行 `git config core.hooksPath ci/hooks`。
+
 ## 命令
 
 ```bash
