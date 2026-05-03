@@ -32,6 +32,7 @@ Agent 运行 `npm run health-check`（或类似命令）即可触发扫描，发
 | **规则失效** | ast/rules/ 中的规则是否覆盖了当前代码库 | AST 规则 vs 实际源码 |
 | **死代码检测** | 导出但未使用的函数/组件 | 静态分析 |
 | **文档过时** | AGENTS.md 中的目录结构描述是否与实际一致 | `AGENTS.md` vs `tree` |
+| **doc-map 覆盖盲区** | 哪些代码路径变更不受任何规则约束 | `doc-map.json` paths vs 仓库实际文件 |
 
 ### 设计原则
 
