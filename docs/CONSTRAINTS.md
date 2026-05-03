@@ -44,7 +44,7 @@ typecheck → lint → analyze → check-docs → build
 - 触发：pre-commit hook + CI
 - 规则：代码路径变更 → 关联文档必须同步变更
 - 边界处理：**已删除的文件不触发文档同步要求**（`--diff-filter=d`）
-- 失败：报错阻断提交/合入
+- 失败：报错阻断提交/合入，Agent 自行回顾已读文档或查阅 AGENTS.md 定位关联文档
 
 ### 5. GitHub Actions
 

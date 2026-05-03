@@ -119,19 +119,15 @@ function main() {
   for (const issue of issues) {
     console.log(`  📄 代码变更: ${issue.changedFile}`)
     console.log(`     规则: [${issue.rule}] ${issue.reason}`)
-    console.log(`     需要同步更新:`)
-    for (const doc of issue.missingDocs) {
-      console.log(`       - ${doc}`)
-    }
     console.log()
   }
 
-  console.log('💡 修复方法：')
-  console.log('   1. 修改对应文档，说明本次代码变更的影响')
-  console.log('   2. git add 文档文件')
-  console.log('   3. 重新提交')
+  console.log('💡 文档同步要求：')
+  console.log('   代码变更后，相关文档必须同步更新。')
+  console.log('   请回顾本次会话中查阅过的文档，或参考 AGENTS.md 地图定位关联文档。')
+  console.log('   修改后重新 add 并提交。')
   console.log()
-  console.log('   如果确认无需更新文档，使用 --no-verify 跳过（不推荐）')
+  console.log('   确认无需更新时使用 --no-verify 跳过（不推荐）')
 
   process.exit(1)
 }

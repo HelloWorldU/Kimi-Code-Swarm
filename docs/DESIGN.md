@@ -13,7 +13,7 @@ Agent 表现 = f(Model, Harness)
 | 层 | 目录 | 职责 | 当前状态 |
 |--|------|------|---------|
 | L1 Context | `AGENTS.md` + `docs/` | 上下文分层，按需加载 | ✅ 完整 |
-| L2 Constraints | `docs/CONSTRAINTS.md` + `ci/` + `ast/` | 机械化约束（类型/Linter/AST/文档同步） | ✅ CI 流水线 + pre-commit hook（npm install 自动配置）：typecheck → lint → analyze → check-docs → build |
+| L2 Constraints | `docs/CONSTRAINTS.md` + `ci/` + `ast/` | 机械化约束（类型/Linter/AST/文档同步，报错地图式自定位） | ✅ CI 流水线 + pre-commit hook（npm install 自动配置）：typecheck → lint → analyze → check-docs → build |
 | L3 Observability | `docs/OBSERVABILITY.md` + UI 面板 | 实时监控 + 质量等级 | ✅ UI 面板已就绪 |
 | L4 Entropy Mgmt | `scripts/cleanup.ts` | 循环清理：扫描偏差、发起重构 | ⏳ 框架就绪，逻辑待实现 |
 | L5 Source of Truth | 仓库即唯一知识源 | 所有决策写入文件 | ✅ 文档与代码同步更新 |
