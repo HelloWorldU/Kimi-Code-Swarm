@@ -29,6 +29,8 @@ PR 创建时，Store 自动生成 `ReviewEntry[]`，包含所有其他 Agent 作
 
 ## 实现状态速查
 
+> 完整矩阵见 [`docs/STATUS.md`](STATUS.md)。
+
 | 模块 | 状态 |
 |------|------|
 | Tauri IPC (`exec_git`, `exec_command`, `spawn_process`, `kill_process`) | ✅ 真实 |

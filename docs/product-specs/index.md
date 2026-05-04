@@ -124,22 +124,7 @@ PR 创建后，所有**其他 Agent** 必须审阅通过，指挥官才能合并
 
 ## 功能实现状态
 
-> 以下矩阵标明各功能当前是 **真实实现**、**Mock/双模式** 还是 **未实现**。
-
-| 功能模块 | 状态 | 说明 |
-|----------|------|------|
-| Vue 前端 Dashboard | ✅ 真实 | 浏览器可完整运行 |
-| Tauri v2 桌面壳 | ✅ 真实 | Rust IPC + 4 个命令已实现，需 `npx tauri dev` 运行 |
-| Git 自动化（clone/checkout/commit/push） | ✅ 真实 | Tauri 环境通过 `exec_git` / `exec_command` 执行 |
-| GitHub API（PR 创建/合并） | ⚡ 双模式 | 配置 Token 后走真实 API，否则 Mock |
-| 全员审阅门控 | ⚡ 双模式 | 逻辑真实实现，Mock 模式 3 秒自动通过 |
-| Kimi CLI 接入 | ❌ 未实现 | 接口协议未确认，当前为模拟日志 |
-| Token 预算控制 | ⚡ 部分 | 有字段和 UI 展示，无真实限额拦截逻辑 |
-| AST 结构分析器 | ✅ 真实 | `ast/analyzer.ts` 3 套规则，CI 强制运行 |
-| 文档同步检测 | ✅ 真实 | `check-docs-sync.ts` pre-commit 硬约束 |
-| 定期健康检查 | ✅ 真实 | `health-check.ts` 信息供给型 |
-| `evals/` 回归测试 | ❌ 预留 | 目录存在，用例待填充 |
-| `tests/` 单元测试 | 🚧 框架 | 目录和占位测试已建，待接入 Vitest |
+> 完整功能状态矩阵见 [`docs/STATUS.md`](../STATUS.md)。以下仅列出版本规划，状态详情去 STATUS.md 查阅。
 
 ## 后续版本规划
 

@@ -22,6 +22,7 @@
 | 使用工作流模板 | `harness/*.yaml` |
 | 运行清理脚本 | `scripts/cleanup.ts` |
 | 查看约束体系 | [`docs/CONSTRAINTS.md`](docs/CONSTRAINTS.md) |
+| **查看功能实现状态** | **[`docs/STATUS.md`](docs/STATUS.md)** |
 | 跑 CI 流水线 | `npm run ci` |
 | 检查文档同步 | `npm run check-docs` |
 
@@ -33,6 +34,7 @@
 2. **机械化约束优先** —— 代码必须过 CI：类型 → Linter → **AST** → 构建
 3. **仓库是唯一事实源** —— Slack/口头约定对 Agent 等于不存在
 4. **执行即更新文档** —— **每次代码变更后，必须同步更新相关文档**。被 check-docs 阻断时，回顾本次会话查阅过的文档并更新；不确定关联文档时，回到 AGENTS.md 地图重新定位。代码和文档不一致是 Harness 退化。
+5. **功能状态必须披露** —— 任何功能实现后，必须在 [`docs/STATUS.md`](docs/STATUS.md) 中标记其真实状态（✅ 真实 / ⚡ 双模式 / 🚧 框架 / ❌ 未实现）。Agent 遗忘上下文时，STATUS.md 是第一恢复点。
 5. **约束即代码** —— 所有规则必须机械可执行。不能自动检查的约定等于不存在。详见 [`docs/CONSTRAINTS.md`](docs/CONSTRAINTS.md)。
 
 ---
