@@ -22,6 +22,7 @@ export interface AgentTask {
   prUrl?: string
   tokenUsed: number
   tokenBudget: number
+  pid?: number
   createdAt: Date
   lastActivity: Date
   logs: LogEntry[]

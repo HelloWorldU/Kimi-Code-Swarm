@@ -4,7 +4,7 @@
 
 ## 技术栈
 
-Vue 3 + TypeScript + Vite + Tailwind CSS + lucide-vue-next
+Vue 3 + TypeScript + Vite + Tailwind CSS + lucide-vue-next + Tauri v2
 
 ## 编码规范
 

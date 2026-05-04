@@ -117,6 +117,7 @@ typecheck → lint → analyze → check-docs → build
 | 运行时边界验证 | 引入 zod / io-ts | P1 |
 | 循环清理 | `scripts/cleanup.ts` 实现 | P1 |
 | 仓库一致性检查器 | `scripts/health-check.ts`（信息供给型） | ✅ |
+| Tauri v2 桌面壳层 | `src-tauri/` Rust 主进程 + Vue 渲染进程 | ✅ |
 
 ---
 

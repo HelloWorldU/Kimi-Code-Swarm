@@ -3,7 +3,9 @@
 ## 数据流
 
 ```
-UI (Vue) ←→ useSwarmStore (AgentTask[]) ←→ IPC ←→ Desktop Shell ←→ node-pty ←→ CLI Processes
+UI (Vue) ←→ useSwarmStore (AgentTask[])
+  ←→ Tauri IPC ←→ Rust Main Process ←→ git / spawn CLI
+  ←→ GitHub API (PR create/merge)
 ```
 
 ## 状态分层

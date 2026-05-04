@@ -1,5 +1,6 @@
 import { reactive, computed } from 'vue'
 import type { AgentTask, LogEntry } from '../types'
+import { isTauri, execGit, execCommand, killProcess } from '../api/ipc'
 
 const generateId = () => Math.random().toString(36).substring(2, 10)
 
@@ -138,22 +139,43 @@ export function useSwarmStore() {
     state.tasks.push(newTask)
   }
 
-  function startTask(id: string) {
+  async function startTask(id: string) {
     const task = state.tasks.find(t => t.id === id)
     if (!task || task.status !== 'pending') return
 
     task.status = 'cloning'
     task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: '开始克隆仓库...' })
 
-    setTimeout(() => {
-      const t = state.tasks.find(x => x.id === id)
-      if (!t) return
-      t.workspace = `E:/workspace/${t.id}`
-      t.status = 'ready'
-      t.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `仓库已克隆到 ${t.workspace}` })
-      t.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `已创建分支: ${t.branch}` })
-      t.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: 'CLI 进程已就绪，等待指令' })
-    }, 2000)
+    if (isTauri) {
+      try {
+        const parentDir = 'E:/workspace'
+        const targetDir = `${parentDir}/${task.id}`
+        await execCommand('git', ['clone', task.repoUrl, targetDir], parentDir)
+        task.workspace = targetDir
+        task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `仓库已克隆到 ${targetDir}` })
+
+        await execGit(targetDir, ['checkout', '-b', task.branch])
+        task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `已创建分支: ${task.branch}` })
+
+        // TODO: spawn real Kimi CLI when interface is confirmed
+        task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: 'CLI 进程已启动（模拟）' })
+        task.status = 'ready'
+      } catch (err) {
+        task.status = 'stopped'
+        task.logs.push({ id: generateId(), timestamp: new Date(), type: 'error', content: `启动失败: ${String(err)}` })
+      }
+    } else {
+      // Mock mode for browser dev
+      setTimeout(() => {
+        const t = state.tasks.find(x => x.id === id)
+        if (!t) return
+        t.workspace = `E:/workspace/${t.id}`
+        t.status = 'ready'
+        t.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `仓库已克隆到 ${t.workspace}` })
+        t.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `已创建分支: ${t.branch}` })
+        t.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: 'CLI 进程已就绪，等待指令' })
+      }, 2000)
+    }
   }
 
   function sendInstruction(id: string, instruction: string) {
@@ -169,21 +191,38 @@ export function useSwarmStore() {
     task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: 'Agent 开始执行任务...' })
   }
 
-  function stopTask(id: string) {
+  async function stopTask(id: string) {
     const task = state.tasks.find(t => t.id === id)
     if (!task) return
+    if (isTauri && task.pid) {
+      try { await killProcess(task.pid) } catch { /* ignore */ }
+    }
     task.status = 'stopped'
+    task.pid = undefined
     task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: '任务已停止' })
   }
 
-  function submitForReview(id: string) {
+  async function submitForReview(id: string) {
     const task = state.tasks.find(t => t.id === id)
     if (!task || task.status !== 'working') return
+
+    if (isTauri && task.workspace) {
+      try {
+        await execGit(task.workspace, ['add', '.'])
+        await execGit(task.workspace, ['commit', '-m', `feat: ${task.name}`])
+        await execGit(task.workspace, ['push', 'origin', task.branch])
+        task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: '代码已推送至远程' })
+      } catch (err) {
+        task.logs.push({ id: generateId(), timestamp: new Date(), type: 'error', content: `推送失败: ${String(err)}` })
+        return
+      }
+    }
+
     task.status = 'reviewing'
     task.prStatus = 'open'
     task.prNumber = Math.floor(Math.random() * 100) + 1
     task.prUrl = `https://github.com/HelloWorldU/Kimi-Code-Swarm/pull/${task.prNumber}`
-    task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `分支已推送，PR #${task.prNumber} 已创建` })
+    task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `PR #${task.prNumber} 已创建（${isTauri ? '真实' : '模拟'}）` })
   }
 
   function mergePr(id: string) {
