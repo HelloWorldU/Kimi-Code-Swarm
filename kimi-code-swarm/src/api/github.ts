@@ -1,6 +1,6 @@
 const GITHUB_API = 'https://api.github.com'
 
-function getToken(): string | null {
+export function getToken(): string | null {
   return localStorage.getItem('github-token')
 }
 
@@ -12,7 +12,7 @@ export function hasToken(): boolean {
   return !!getToken()
 }
 
-function parseRepoUrl(url: string): { owner: string; repo: string } | null {
+export function parseRepoUrl(url: string): { owner: string; repo: string } | null {
   try {
     const match = url.match(/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?$/)
     if (!match) return null
