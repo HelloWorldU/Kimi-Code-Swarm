@@ -1,5 +1,5 @@
 import { reactive, computed } from 'vue'
-import type { AgentTask, LogEntry } from '../types'
+import type { AgentTask, LogEntry, ReviewEntry } from '../types'
 import { isTauri, execGit, execCommand, killProcess } from '../api/ipc'
 import { createPullRequest, mergePullRequest, hasToken } from '../api/github'
 
@@ -33,6 +33,7 @@ const initialTasks: AgentTask[] = [
     createdAt: new Date(Date.now() - 3600000),
     lastActivity: new Date(Date.now() - 30000),
     logs: mockLogs('已完成 LoginForm 组件和 auth API 接口...'),
+    reviews: [],
   },
   {
     id: 'task-002',
@@ -50,6 +51,11 @@ const initialTasks: AgentTask[] = [
     createdAt: new Date(Date.now() - 2400000),
     lastActivity: new Date(Date.now() - 120000),
     logs: mockLogs('Stripe webhook handler 已编写完成...'),
+    reviews: [
+      { reviewerTaskId: 'task-001', reviewerName: '登录模块开发', status: 'approved', reviewedAt: new Date(Date.now() - 60000) },
+      { reviewerTaskId: 'task-003', reviewerName: 'API 文档生成', status: 'pending' },
+      { reviewerTaskId: 'task-004', reviewerName: 'iOS 崩溃修复', status: 'approved', reviewedAt: new Date(Date.now() - 90000) },
+    ],
   },
   {
     id: 'task-003',
@@ -67,6 +73,7 @@ const initialTasks: AgentTask[] = [
     createdAt: new Date(Date.now() - 7200000),
     lastActivity: new Date(Date.now() - 600000),
     logs: mockLogs('文档生成完毕，PR 已合并'),
+    reviews: [],
   },
   {
     id: 'task-004',
@@ -85,6 +92,7 @@ const initialTasks: AgentTask[] = [
       ...mockLogs('分析 crash log...'),
       { id: generateId(), timestamp: new Date(Date.now() - 300000), type: 'error', content: 'Error: Connection timeout after 30000ms' },
     ],
+    reviews: [],
   },
 ]
 
@@ -136,6 +144,7 @@ export function useSwarmStore() {
       logs: [
         { id: generateId(), timestamp: new Date(), type: 'system', content: '任务已创建，等待启动...' },
       ],
+      reviews: [],
     }
     state.tasks.push(newTask)
   }
@@ -219,6 +228,20 @@ export function useSwarmStore() {
       }
     }
 
+    // Generate reviewer list from all other tasks
+    const reviewers: ReviewEntry[] = state.tasks
+      .filter(t => t.id !== task.id)
+      .map(t => ({
+        reviewerTaskId: t.id,
+        reviewerName: t.name,
+        status: 'pending' as const,
+      }))
+    task.reviews = reviewers
+
+    if (reviewers.length > 0) {
+      task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `已指派 ${reviewers.length} 个 Agent 进行审阅` })
+    }
+
     if (hasToken()) {
       try {
         const pr = await createPullRequest(task.repoUrl, `feat: ${task.name}`, task.branch)
@@ -236,18 +259,44 @@ export function useSwarmStore() {
       task.prNumber = Math.floor(Math.random() * 100) + 1
       task.prUrl = `${task.repoUrl.replace(/\.git$/, '')}/pull/${task.prNumber}`
       task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `PR #${task.prNumber} 已创建（模拟，未配置 GitHub Token）` })
+
+      // Mock mode: auto-approve all reviews after delay for quick demo
+      if (!isTauri && reviewers.length > 0) {
+        setTimeout(() => {
+          const t = state.tasks.find(x => x.id === id)
+          if (!t || t.status !== 'reviewing') return
+          t.reviews.forEach(r => {
+            r.status = 'approved'
+            r.reviewedAt = new Date()
+          })
+          t.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `全员审阅通过（${reviewers.length}/${reviewers.length}），等待指挥官合并` })
+          t.lastActivity = new Date()
+        }, 3000)
+      }
     }
+  }
+
+  function canMerge(task: AgentTask): boolean {
+    if (task.reviews.length === 0) return true
+    return task.reviews.every(r => r.status === 'approved')
   }
 
   async function mergePr(id: string) {
     const task = state.tasks.find(t => t.id === id)
     if (!task || task.status !== 'reviewing') return
 
+    if (!canMerge(task)) {
+      const approved = task.reviews.filter(r => r.status === 'approved').length
+      task.logs.push({ id: generateId(), timestamp: new Date(), type: 'error', content: `合并被拒绝：需等待全员审阅通过（${approved}/${task.reviews.length}）` })
+      return
+    }
+
     if (hasToken() && task.prNumber) {
       try {
         await mergePullRequest(task.repoUrl, task.prNumber)
         task.status = 'completed'
         task.prStatus = 'merged'
+        task.reviews = []
         task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `PR #${task.prNumber} 已合并到 main` })
       } catch (err) {
         task.logs.push({ id: generateId(), timestamp: new Date(), type: 'error', content: `合并失败: ${String(err)}` })
@@ -255,6 +304,7 @@ export function useSwarmStore() {
     } else {
       task.status = 'completed'
       task.prStatus = 'merged'
+      task.reviews = []
       task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `PR #${task.prNumber} 已合并到 main（模拟）` })
     }
   }
@@ -264,7 +314,27 @@ export function useSwarmStore() {
     if (!task || task.status !== 'reviewing') return
     task.status = 'working'
     task.prStatus = 'none'
+    task.reviews = []
     task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: 'PR 被打回，Agent 继续修改' })
+  }
+
+  function submitReview(taskId: string, reviewerTaskId: string, approved: boolean) {
+    const task = state.tasks.find(t => t.id === taskId)
+    if (!task || task.status !== 'reviewing') return
+
+    const review = task.reviews.find(r => r.reviewerTaskId === reviewerTaskId)
+    if (!review) return
+
+    review.status = approved ? 'approved' : 'rejected'
+    review.reviewedAt = new Date()
+    const action = approved ? '通过' : '拒绝'
+    task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `Agent「${review.reviewerName}」审阅${action}了此 PR` })
+    task.lastActivity = new Date()
+
+    const approvedCount = task.reviews.filter(r => r.status === 'approved').length
+    if (approvedCount === task.reviews.length) {
+      task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: '全员审阅通过，等待指挥官合并' })
+    }
   }
 
   function deleteTask(id: string) {
@@ -287,6 +357,7 @@ export function useSwarmStore() {
     submitForReview,
     mergePr,
     rejectPr,
+    submitReview,
     deleteTask,
   }
 }

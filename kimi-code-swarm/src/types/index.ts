@@ -9,6 +9,13 @@ export type TaskStatus =
 
 export type PrStatus = 'none' | 'open' | 'merged' | 'closed'
 
+export interface ReviewEntry {
+  reviewerTaskId: string
+  reviewerName: string
+  status: 'pending' | 'approved' | 'rejected'
+  reviewedAt?: Date
+}
+
 export interface AgentTask {
   id: string
   name: string
@@ -26,6 +33,7 @@ export interface AgentTask {
   createdAt: Date
   lastActivity: Date
   logs: LogEntry[]
+  reviews: ReviewEntry[]
 }
 
 export interface LogEntry {

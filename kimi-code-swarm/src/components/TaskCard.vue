@@ -35,6 +35,11 @@ const prConfig = {
 const status = computed(() => statusConfig[props.task.status])
 const pr = computed(() => prConfig[props.task.prStatus])
 const tokenPercent = computed(() => (props.task.tokenUsed / props.task.tokenBudget) * 100)
+const reviewProgress = computed(() => {
+  if (props.task.status !== 'reviewing' || props.task.reviews.length === 0) return null
+  const approved = props.task.reviews.filter(r => r.status === 'approved').length
+  return { approved, total: props.task.reviews.length }
+})
 </script>
 
 <template>
@@ -51,6 +56,16 @@ const tokenPercent = computed(() => (props.task.tokenUsed / props.task.tokenBudg
       <div class="flex items-center gap-2">
         <div :class="['w-2 h-2 rounded-full', status.dot]" />
         <h3 class="font-semibold text-sm text-white truncate max-w-[140px]">{{ task.name }}</h3>
+        <span
+          v-if="reviewProgress" :class="[
+            'text-[10px] px-1.5 py-0.5 rounded-full font-medium',
+            reviewProgress.approved === reviewProgress.total
+              ? 'bg-emerald-500/10 text-emerald-400'
+              : 'bg-purple-500/10 text-purple-400'
+          ]"
+        >
+          {{ reviewProgress.approved }}/{{ reviewProgress.total }}
+        </span>
       </div>
       <span :class="['text-xs px-2 py-0.5 rounded-full', status.bg, status.color, 'border', status.border]">
         {{ status.label }}

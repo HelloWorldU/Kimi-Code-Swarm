@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, type Component } from 'vue'
-import { ArrowLeft, Send, Terminal, AlertCircle, CheckCircle, MessageSquare, Play, GitPullRequest, GitMerge, RotateCcw, Square } from 'lucide-vue-next'
+import { ArrowLeft, Send, Terminal, AlertCircle, CheckCircle, MessageSquare, Play, GitPullRequest, GitMerge, RotateCcw, Square, Clock, XCircle } from 'lucide-vue-next'
 import type { AgentTask } from '../types'
 
 const props = defineProps<{
@@ -15,12 +15,16 @@ const emit = defineEmits<{
   (e: 'submitForReview', id: string): void
   (e: 'mergePr', id: string): void
   (e: 'rejectPr', id: string): void
+  (e: 'submitReview', taskId: string, reviewerTaskId: string, approved: boolean): void
 }>()
 
 const instruction = ref('')
 const scrollRef = ref<HTMLDivElement>()
 
 const tokenPercent = computed(() => (props.task.tokenUsed / props.task.tokenBudget) * 100)
+
+const approvedCount = computed(() => props.task.reviews.filter(r => r.status === 'approved').length)
+const canMerge = computed(() => props.task.reviews.length === 0 || props.task.reviews.every(r => r.status === 'approved'))
 
 const statusText = computed(() => {
   const map: Record<string, string> = {
@@ -100,7 +104,8 @@ watch(() => props.task.logs.length, async () => {
     </div>
 
     <!-- PR Panel (reviewing/completed) -->
-    <div v-if="task.prStatus !== 'none'" class="mb-4 px-4 py-3 rounded-lg bg-purple-500/5 border border-purple-500/20">
+    <div v-if="task.prStatus !== 'none'" class="mb-4 px-4 py-3 rounded-lg bg-purple-500/5 border border-purple-500/20 space-y-3">
+      <!-- PR Header -->
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2">
           <GitPullRequest class="w-4 h-4 text-purple-400" />
@@ -118,7 +123,14 @@ watch(() => props.task.logs.length, async () => {
         </div>
         <div v-if="task.status === 'reviewing'" class="flex items-center gap-2">
           <button
-            class="px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors text-xs font-medium flex items-center gap-1"
+            :disabled="!canMerge"
+            :class="[
+              'px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1 transition-colors',
+              canMerge
+                ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'
+                : 'bg-gray-700/50 text-gray-500 cursor-not-allowed'
+            ]"
+            :title="canMerge ? '全员审阅通过，可合并' : `需等待审阅通过 (${approvedCount}/${task.reviews.length})`"
             @click="emit('mergePr', task.id)"
           >
             <GitMerge class="w-3 h-3" /> 合并
@@ -131,7 +143,65 @@ watch(() => props.task.logs.length, async () => {
           </button>
         </div>
       </div>
-      <a v-if="task.prUrl" :href="task.prUrl" target="_blank" class="text-xs text-gray-500 hover:text-swarm-400 mt-1 block">{{ task.prUrl }}</a>
+
+      <!-- Review Progress -->
+      <div v-if="task.reviews.length > 0 && task.status === 'reviewing'">
+        <div class="flex items-center justify-between text-xs mb-1.5">
+          <span class="text-gray-400">审阅进度</span>
+          <span :class="approvedCount === task.reviews.length ? 'text-emerald-400' : 'text-gray-300'">
+            {{ approvedCount }}/{{ task.reviews.length }} 通过
+          </span>
+        </div>
+        <div class="w-full bg-gray-700/50 rounded-full h-1.5">
+          <div
+            :class="[
+              'h-1.5 rounded-full transition-all',
+              approvedCount === task.reviews.length ? 'bg-emerald-500' : 'bg-purple-500'
+            ]"
+            :style="{ width: (approvedCount / task.reviews.length * 100) + '%' }"
+          />
+        </div>
+        <!-- Reviewer List -->
+        <div class="mt-2 space-y-1.5">
+          <div
+            v-for="review in task.reviews"
+            :key="review.reviewerTaskId"
+            class="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-gray-800/40 text-xs"
+          >
+            <div class="flex items-center gap-2">
+              <Clock v-if="review.status === 'pending'" class="w-3.5 h-3.5 text-gray-500" />
+              <CheckCircle v-else-if="review.status === 'approved'" class="w-3.5 h-3.5 text-emerald-400" />
+              <XCircle v-else class="w-3.5 h-3.5 text-red-400" />
+              <span class="text-gray-300">{{ review.reviewerName }}</span>
+              <span v-if="review.reviewedAt" class="text-gray-600">{{ review.reviewedAt.toLocaleTimeString() }}</span>
+            </div>
+            <div v-if="review.status === 'pending'" class="flex items-center gap-1">
+              <button
+                class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+                @click="emit('submitReview', task.id, review.reviewerTaskId, true)"
+              >
+                通过
+              </button>
+              <button
+                class="px-2 py-0.5 rounded bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
+                @click="emit('submitReview', task.id, review.reviewerTaskId, false)"
+              >
+                拒绝
+              </button>
+            </div>
+            <span
+              v-else :class="[
+                'text-xs px-2 py-0.5 rounded-full',
+                review.status === 'approved' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
+              ]"
+            >
+              {{ review.status === 'approved' ? '已通过' : '已拒绝' }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <a v-if="task.prUrl" :href="task.prUrl" target="_blank" class="text-xs text-gray-500 hover:text-swarm-400 block">{{ task.prUrl }}</a>
     </div>
 
     <!-- Action Panel (pending / ready / working) -->

@@ -21,6 +21,8 @@ Vue 3 + TypeScript + Vite + Tailwind CSS + lucide-vue-next + Tauri v2
 - `api/github.ts` — GitHub API 封装（PR 创建/合并/查询）
 - `api/ipc.ts` — Tauri IPC 适配层
 - `components/SettingsPanel.vue` — 系统设置（GitHub Token 配置）
+- `components/TaskDetail.vue` — PR 审阅面板：审阅者列表、进度条、合并门控
+- `components/TaskCard.vue` — 任务卡片：审阅进度徽章
 
 ## 快速启动
 

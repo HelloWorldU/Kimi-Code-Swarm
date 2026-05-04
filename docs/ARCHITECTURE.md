@@ -3,10 +3,15 @@
 ## 数据流
 
 ```
-UI (Vue) ←→ useSwarmStore (AgentTask[])
+UI (Vue) ←→ useSwarmStore (AgentTask[] + ReviewEntry[])
   ←→ Tauri IPC ←→ Rust Main Process ←→ git / spawn CLI
   ←→ GitHub API (PR create/merge/review)
   ←→ localStorage (GitHub Token)
+
+## 审阅门控
+
+PR 创建时，Store 自动生成 `ReviewEntry[]`，包含所有其他 Agent 作为 pending 审阅者。
+`mergePr()` 执行前检查 `reviews.every(r => r.status === 'approved')`，未通过则拒绝合并。
 ```
 
 ## 状态分层

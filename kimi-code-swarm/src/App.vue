@@ -60,6 +60,7 @@ const statCards = [
           @submit-for-review="store.submitForReview"
           @merge-pr="store.mergePr"
           @reject-pr="store.rejectPr"
+          @submit-review="store.submitReview"
         />
 
         <!-- Dashboard / Tasks -->
