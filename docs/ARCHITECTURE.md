@@ -5,7 +5,8 @@
 ```
 UI (Vue) ←→ useSwarmStore (AgentTask[])
   ←→ Tauri IPC ←→ Rust Main Process ←→ git / spawn CLI
-  ←→ GitHub API (PR create/merge)
+  ←→ GitHub API (PR create/merge/review)
+  ←→ localStorage (GitHub Token)
 ```
 
 ## 状态分层

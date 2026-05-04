@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Plus, Activity, ClipboardList, Coins, CheckCircle } from 'lucide-vue-next'
+import { Plus, Activity, ClipboardList, Coins, CheckCircle, Github } from 'lucide-vue-next'
 import Sidebar from './components/Sidebar.vue'
 import TaskCard from './components/TaskCard.vue'
 import CreateTaskModal from './components/CreateTaskModal.vue'
 import TaskDetail from './components/TaskDetail.vue'
+import SettingsPanel from './components/SettingsPanel.vue'
 import { useSwarmStore } from './store/useSwarmStore'
 
 const store = useSwarmStore()
@@ -114,11 +115,15 @@ const statCards = [
             <p class="text-sm mt-2">Token 使用趋势、任务负载图表等功能即将上线</p>
           </div>
         </div>
-        <div v-else class="flex items-center justify-center h-full text-gray-500">
-          <div class="text-center">
-            <ClipboardList class="w-16 h-16 mx-auto mb-4 text-gray-700" />
-            <p class="text-lg font-medium">系统设置</p>
-            <p class="text-sm mt-2">CLI 路径配置、Token 限额、通知设置等功能即将上线</p>
+        <div v-else class="h-full max-w-2xl mx-auto">
+          <h3 class="text-lg font-semibold text-white mb-6">系统设置</h3>
+          <div class="space-y-6">
+            <div class="bg-gray-800/40 border border-gray-700/50 rounded-xl p-6">
+              <h4 class="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+                <Github class="w-4 h-4" /> GitHub 配置
+              </h4>
+              <SettingsPanel />
+            </div>
           </div>
         </div>
       </div>

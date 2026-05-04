@@ -18,6 +18,9 @@ Vue 3 + TypeScript + Vite + Tailwind CSS + lucide-vue-next + Tauri v2
 
 - `store/useSwarmStore.ts` — 状态必须通过方法修改；核心模型 AgentTask 含状态机 + PR 追踪
 - `types/index.ts` — AgentTask / LogEntry / CommandCenterStats；修改前检查上下游依赖
+- `api/github.ts` — GitHub API 封装（PR 创建/合并/查询）
+- `api/ipc.ts` — Tauri IPC 适配层
+- `components/SettingsPanel.vue` — 系统设置（GitHub Token 配置）
 
 ## 快速启动
 

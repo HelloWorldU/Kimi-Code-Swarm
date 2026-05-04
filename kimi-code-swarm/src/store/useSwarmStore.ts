@@ -1,6 +1,7 @@
 import { reactive, computed } from 'vue'
 import type { AgentTask, LogEntry } from '../types'
 import { isTauri, execGit, execCommand, killProcess } from '../api/ipc'
+import { createPullRequest, mergePullRequest, hasToken } from '../api/github'
 
 const generateId = () => Math.random().toString(36).substring(2, 10)
 
@@ -218,19 +219,44 @@ export function useSwarmStore() {
       }
     }
 
-    task.status = 'reviewing'
-    task.prStatus = 'open'
-    task.prNumber = Math.floor(Math.random() * 100) + 1
-    task.prUrl = `https://github.com/HelloWorldU/Kimi-Code-Swarm/pull/${task.prNumber}`
-    task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `PR #${task.prNumber} 已创建（${isTauri ? '真实' : '模拟'}）` })
+    if (hasToken()) {
+      try {
+        const pr = await createPullRequest(task.repoUrl, `feat: ${task.name}`, task.branch)
+        task.status = 'reviewing'
+        task.prStatus = 'open'
+        task.prNumber = pr.number
+        task.prUrl = pr.html_url
+        task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `PR #${pr.number} 已创建: ${pr.html_url}` })
+      } catch (err) {
+        task.logs.push({ id: generateId(), timestamp: new Date(), type: 'error', content: `创建 PR 失败: ${String(err)}` })
+      }
+    } else {
+      task.status = 'reviewing'
+      task.prStatus = 'open'
+      task.prNumber = Math.floor(Math.random() * 100) + 1
+      task.prUrl = `${task.repoUrl.replace(/\.git$/, '')}/pull/${task.prNumber}`
+      task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `PR #${task.prNumber} 已创建（模拟，未配置 GitHub Token）` })
+    }
   }
 
-  function mergePr(id: string) {
+  async function mergePr(id: string) {
     const task = state.tasks.find(t => t.id === id)
     if (!task || task.status !== 'reviewing') return
-    task.status = 'completed'
-    task.prStatus = 'merged'
-    task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `PR #${task.prNumber} 已合并到 main` })
+
+    if (hasToken() && task.prNumber) {
+      try {
+        await mergePullRequest(task.repoUrl, task.prNumber)
+        task.status = 'completed'
+        task.prStatus = 'merged'
+        task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `PR #${task.prNumber} 已合并到 main` })
+      } catch (err) {
+        task.logs.push({ id: generateId(), timestamp: new Date(), type: 'error', content: `合并失败: ${String(err)}` })
+      }
+    } else {
+      task.status = 'completed'
+      task.prStatus = 'merged'
+      task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `PR #${task.prNumber} 已合并到 main（模拟）` })
+    }
   }
 
   function rejectPr(id: string) {
