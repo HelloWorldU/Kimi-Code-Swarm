@@ -25,4 +25,13 @@ PR 创建时，Store 自动生成 `ReviewEntry[]`，包含所有其他 Agent 作
 ## 模块边界
 
 - `kimi-code-swarm/src/` —— 纯前端，禁止直接操作进程
-- 桌面壳层（未来）—— 唯一有权 spawn 进程
+- `src-tauri/` —— 唯一有权 spawn 进程的 Rust 后端
+
+## 实现状态速查
+
+| 模块 | 状态 |
+|------|------|
+| Tauri IPC (`exec_git`, `exec_command`, `spawn_process`, `kill_process`) | ✅ 真实 |
+| GitHub API 封装 | ⚡ 双模式（Token 可选） |
+| 审阅门控逻辑 | ✅ 真实 |
+| Kimi CLI spawn | ❌ 未实现（等待接口确认） |

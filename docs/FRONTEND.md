@@ -53,4 +53,15 @@ npm run build       # 生产构建
 
 `git commit` 会自动触发 pre-commit hook（`ci/hooks/pre-commit.cmd`），运行 typecheck → lint → analyze → check-docs。任一阶段失败将阻断提交。
 
+## 前端功能状态
+
+| 功能 | 状态 | 备注 |
+|------|------|------|
+| 任务列表 / 卡片 / 详情 | ✅ 真实 | 完整交互 |
+| 新建任务弹窗 | ✅ 真实 | |
+| 实时日志流 | ⚡ 模拟 | 真实 CLI 接入后变为真实 |
+| PR 审阅面板 | ✅ 真实 | 含审阅者列表、进度、门控 |
+| SettingsPanel（Token 配置） | ✅ 真实 | localStorage 持久化 |
+| 监控分析页 | ❌ 占位 | Tab 存在，内容待实现 |
+
 文档同步检测被阻断时，不直接告知需要更新哪个文档——Agent 需回顾本次会话已读文档，或查阅 AGENTS.md 地图自行定位关联文档。
