@@ -5,6 +5,7 @@
 ```
 UI (Vue) ←→ useSwarmStore (AgentTask[] + ReviewEntry[])
   ←→ Tauri IPC ←→ Rust Main Process ←→ git / spawn CLI
+  ←→ Real-time stdout events (process-output / process-exit)
   ←→ GitHub API (PR create/merge/review)
   ←→ localStorage (GitHub Token)
 

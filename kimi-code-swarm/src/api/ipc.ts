@@ -1,30 +1,55 @@
 import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
 
-const isTauri = typeof window !== 'undefined' && '__TAURI__' in window
+export const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 
 export async function execGit(dir: string, args: string[]): Promise<string> {
-  if (!isTauri) throw new Error('execGit requires Tauri environment')
+  if (!isTauri) return `mock: git ${args.join(' ')}`
   return invoke('exec_git', { dir, args })
 }
 
-export async function execCommand(cmd: string, args: string[], cwd: string): Promise<string> {
-  if (!isTauri) throw new Error('execCommand requires Tauri environment')
-  return invoke('exec_command', { cmd, args, cwd })
+export async function execCommand(command: string, args?: string[], cwd?: string): Promise<string> {
+  if (!isTauri) return `mock: ${command} ${(args || []).join(' ')}`
+  return invoke('exec_command', { cmd: command, args: args || [], cwd: cwd || '.' })
 }
 
-export async function spawnProcess(cmd: string, args: string[], cwd: string): Promise<number> {
-  if (!isTauri) throw new Error('spawnProcess requires Tauri environment')
-  return invoke('spawn_process', { cmd, args, cwd })
+export async function spawnProcess(command: string, args?: string[], cwd?: string): Promise<number> {
+  if (!isTauri) return Math.floor(Math.random() * 10000)
+  return invoke('spawn_process', { cmd: command, args: args || [], cwd: cwd || '.' })
 }
 
 export async function killProcess(pid: number): Promise<void> {
-  if (!isTauri) throw new Error('killProcess requires Tauri environment')
+  if (!isTauri) return
   return invoke('kill_process', { pid })
 }
 
-export async function sendToProcess(pid: number, message: string): Promise<void> {
-  if (!isTauri) throw new Error('sendToProcess requires Tauri environment')
-  return invoke('send_to_process', { pid, message })
+export interface ProcessOutputPayload {
+  pid: number
+  line: string
+  is_stderr: boolean
 }
 
-export { isTauri }
+export interface ProcessExitPayload {
+  pid: number
+  code: number | null
+}
+
+export async function listenProcessOutput(
+  callback: (payload: ProcessOutputPayload) => void,
+): Promise<() => void> {
+  if (!isTauri) return () => {}
+  const unlisten = await listen<ProcessOutputPayload>('process-output', (event) => {
+    callback(event.payload)
+  })
+  return unlisten
+}
+
+export async function listenProcessExit(
+  callback: (payload: ProcessExitPayload) => void,
+): Promise<() => void> {
+  if (!isTauri) return () => {}
+  const unlisten = await listen<ProcessExitPayload>('process-exit', (event) => {
+    callback(event.payload)
+  })
+  return unlisten
+}

@@ -1,9 +1,24 @@
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::sync::Mutex;
-use std::collections::HashMap;
+use std::collections::HashSet;
+use std::io::{BufRead, BufReader};
+use tauri::Emitter;
 
-// Global process table for spawned CLI processes
-static PROCESSES: Mutex<HashMap<u32, std::process::Child>> = Mutex::new(HashMap::new());
+// Global set of active PIDs spawned by this app
+static ACTIVE_PIDS: Mutex<HashSet<u32>> = Mutex::new(HashSet::new());
+
+#[derive(serde::Serialize, Clone)]
+struct ProcessOutputEvent {
+    pid: u32,
+    line: String,
+    is_stderr: bool,
+}
+
+#[derive(serde::Serialize, Clone)]
+struct ProcessExitEvent {
+    pid: u32,
+    code: Option<i32>,
+}
 
 /// Execute a git command in the specified directory
 #[tauri::command]
@@ -41,27 +56,77 @@ fn exec_command(cmd: String, args: Vec<String>, cwd: String) -> Result<String, S
     Ok(stdout.trim().to_string())
 }
 
-/// Spawn a long-running process (e.g., Kimi CLI)
+/// Spawn a long-running process with real-time stdout/stderr capture
 #[tauri::command]
-fn spawn_process(cmd: String, args: Vec<String>, cwd: String) -> Result<u32, String> {
-    let child = Command::new(&cmd)
+fn spawn_process(
+    app: tauri::AppHandle,
+    cmd: String,
+    args: Vec<String>,
+    cwd: String,
+) -> Result<u32, String> {
+    let mut child = Command::new(&cmd)
         .args(&args)
         .current_dir(&cwd)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| format!("Failed to spawn {}: {}", cmd, e))?;
 
     let pid = child.id();
-    PROCESSES.lock().unwrap().insert(pid, child);
+    ACTIVE_PIDS.lock().unwrap().insert(pid);
+
+    let stdout = child.stdout.take().unwrap();
+    let stderr = child.stderr.take().unwrap();
+
+    let app_stdout = app.clone();
+    let app_stderr = app.clone();
+    let app_exit = app.clone();
+
+    // Thread: read stdout line by line
+    std::thread::spawn(move || {
+        let reader = BufReader::new(stdout);
+        for line in reader.lines() {
+            if let Ok(line) = line {
+                let _ = app_stdout.emit("process-output", ProcessOutputEvent {
+                    pid,
+                    line,
+                    is_stderr: false,
+                });
+            }
+        }
+    });
+
+    // Thread: read stderr line by line
+    std::thread::spawn(move || {
+        let reader = BufReader::new(stderr);
+        for line in reader.lines() {
+            if let Ok(line) = line {
+                let _ = app_stderr.emit("process-output", ProcessOutputEvent {
+                    pid,
+                    line,
+                    is_stderr: true,
+                });
+            }
+        }
+    });
+
+    // Thread: wait for process exit
+    std::thread::spawn(move || {
+        let code = child.wait().ok().and_then(|s| s.code());
+        ACTIVE_PIDS.lock().unwrap().remove(&pid);
+        let _ = app_exit.emit("process-exit", ProcessExitEvent { pid, code });
+    });
+
     Ok(pid)
 }
 
-/// Kill a spawned process by PID
+/// Kill a spawned process by PID (and its children on Windows)
 #[tauri::command]
 fn kill_process(pid: u32) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
         let _ = Command::new("taskkill")
-            .args(["/PID", &pid.to_string(), "/F"])
+            .args(["/PID", &pid.to_string(), "/T", "/F"])
             .output();
     }
     #[cfg(not(target_os = "windows"))]
@@ -71,7 +136,7 @@ fn kill_process(pid: u32) -> Result<(), String> {
             .output();
     }
 
-    PROCESSES.lock().unwrap().remove(&pid);
+    ACTIVE_PIDS.lock().unwrap().remove(&pid);
     Ok(())
 }
 
@@ -80,7 +145,6 @@ fn kill_process(pid: u32) -> Result<(), String> {
 #[tauri::command]
 fn send_to_process(pid: u32, message: String) -> Result<(), String> {
     // TODO: Implement PTY-based stdin writing
-    // For now, this is a placeholder until we integrate node-pty or similar
     println!("[send_to_process] pid={} message={}", pid, message);
     Ok(())
 }

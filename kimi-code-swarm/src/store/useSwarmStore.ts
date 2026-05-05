@@ -1,10 +1,55 @@
 import { reactive, computed } from 'vue'
 import type { AgentTask, LogEntry, ReviewEntry } from '../types'
-import { isTauri, execGit, execCommand, killProcess } from '../api/ipc'
+import { isTauri, execGit, execCommand, killProcess, spawnProcess, listenProcessOutput, listenProcessExit } from '../api/ipc'
 import { createPullRequest, mergePullRequest, hasToken } from '../api/github'
 
 // Cached Kimi CLI path (detected once per session)
 let cachedKimiPath: string | null | undefined = undefined
+
+// PID → taskId mapping for routing process output
+const pidToTaskId = new Map<number, string>()
+
+// Global process listeners (initialized once per session)
+let processListenersInitialized = false
+async function initProcessListeners() {
+  if (processListenersInitialized) return
+  processListenersInitialized = true
+
+  await listenProcessOutput((payload) => {
+    const taskId = pidToTaskId.get(payload.pid)
+    if (!taskId) return
+    const task = state.tasks.find(t => t.id === taskId)
+    if (!task) return
+    task.logs.push({
+      id: generateId(),
+      timestamp: new Date(),
+      type: payload.is_stderr ? 'error' : 'output',
+      content: payload.line,
+    })
+    task.lastActivity = new Date()
+  })
+
+  await listenProcessExit((payload) => {
+    const taskId = pidToTaskId.get(payload.pid)
+    if (!taskId) return
+    pidToTaskId.delete(payload.pid)
+    const task = state.tasks.find(t => t.id === taskId)
+    if (!task) return
+    if (task.status === 'working') {
+      task.status = 'ready'
+      task.pid = undefined
+      task.logs.push({
+        id: generateId(),
+        timestamp: new Date(),
+        type: 'system',
+        content: payload.code === 0
+          ? 'Agent 执行完毕，可以继续发送指令或提交审阅'
+          : `Agent 进程退出 (code: ${payload.code ?? 'unknown'})`,
+      })
+      task.lastActivity = new Date()
+    }
+  })
+}
 
 async function detectKimiCli(): Promise<string | null> {
   if (cachedKimiPath !== undefined) return cachedKimiPath
@@ -222,40 +267,17 @@ export function useSwarmStore() {
         return
       }
 
-      task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `启动 Kimi CLI: ${kimiPath}` })
-
-      // Simulate progress while waiting for CLI
-      const progressMessages = [
-        'Agent 正在分析代码库...',
-        'Agent 正在规划实现方案...',
-        'Agent 正在编写代码...',
-        'Agent 正在验证修改...',
-      ]
-      let progressIdx = 0
-      const progressInterval = setInterval(() => {
-        if (task.status !== 'working') {
-          clearInterval(progressInterval)
-          return
-        }
-        const msg = progressMessages[progressIdx % progressMessages.length]
-        task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: msg })
-        progressIdx++
-      }, 8000)
+      await initProcessListeners()
 
       try {
-        const output = await execCommand(kimiPath, ['--print', '--quiet', '-w', task.workspace, '-y', instruction], task.workspace)
-        clearInterval(progressInterval)
-        const tokens = Math.floor(output.length / 4)
-        task.tokenUsed += tokens
-        task.logs.push({ id: generateId(), timestamp: new Date(), type: 'output', content: output || '任务执行完成（无输出）', tokens })
-        task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: 'Agent 执行完毕，可以继续发送指令或提交审阅' })
+        const pid = await spawnProcess(kimiPath, ['--print', '--quiet', '-w', task.workspace, '-y', instruction], task.workspace)
+        task.pid = pid
+        pidToTaskId.set(pid, task.id)
+        task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `Kimi CLI 已启动 (PID: ${pid})` })
       } catch (err) {
-        clearInterval(progressInterval)
-        task.logs.push({ id: generateId(), timestamp: new Date(), type: 'error', content: `执行失败: ${String(err)}` })
+        task.status = 'ready'
+        task.logs.push({ id: generateId(), timestamp: new Date(), type: 'error', content: `启动失败: ${String(err)}` })
       }
-
-      task.status = 'ready'
-      task.lastActivity = new Date()
     } else {
       // Mock mode for browser dev
       task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: 'Agent 开始执行任务（模拟）...' })
@@ -274,6 +296,7 @@ export function useSwarmStore() {
     if (!task) return
     if (isTauri && task.pid) {
       try { await killProcess(task.pid) } catch { /* ignore */ }
+      pidToTaskId.delete(task.pid)
     }
     task.status = 'stopped'
     task.pid = undefined
