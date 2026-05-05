@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, type Component } from 'vue'
-import { ArrowLeft, Send, Terminal, AlertCircle, CheckCircle, MessageSquare, Play, GitPullRequest, GitMerge, RotateCcw, Square, Clock, XCircle } from 'lucide-vue-next'
+import { ArrowLeft, Send, Terminal, AlertCircle, CheckCircle, MessageSquare, Play, GitPullRequest, GitMerge, RotateCcw, Square, Clock, XCircle, FileCode } from 'lucide-vue-next'
 import type { AgentTask } from '../types'
 
 const props = defineProps<{
@@ -16,6 +16,7 @@ const emit = defineEmits<{
   (e: 'mergePr', id: string): void
   (e: 'rejectPr', id: string): void
   (e: 'submitReview', taskId: string, reviewerTaskId: string, approved: boolean): void
+  (e: 'showFileDiff', taskId: string, filePath: string): void
 }>()
 
 const instruction = ref('')
@@ -245,6 +246,25 @@ watch(() => props.task.logs.length, async () => {
       >
         <Square class="w-4 h-4" /> 停止
       </button>
+    </div>
+
+    <!-- Changed Files -->
+    <div v-if="task.changedFiles && task.changedFiles.length > 0" class="mb-4">
+      <div class="flex items-center gap-2 mb-2">
+        <FileCode class="w-3.5 h-3.5 text-swarm-400" />
+        <span class="text-xs font-medium text-gray-400">文件变更 ({{ task.changedFiles.length }})</span>
+      </div>
+      <div class="flex flex-wrap gap-1.5">
+        <button
+          v-for="file in task.changedFiles"
+          :key="file"
+          class="px-2 py-1 rounded-md bg-gray-800/80 border border-gray-700/50 text-xs text-gray-300 hover:text-swarm-400 hover:border-swarm-500/30 transition-colors truncate max-w-[200px]"
+          :title="file"
+          @click="emit('showFileDiff', task.id, file)"
+        >
+          {{ file }}
+        </button>
+      </div>
     </div>
 
     <!-- Logs -->

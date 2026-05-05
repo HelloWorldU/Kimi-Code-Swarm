@@ -16,6 +16,18 @@ function handleTabChange(tab: string) {
   store.setSelectedTaskId(null)
 }
 
+async function handleShowFileDiff(taskId: string, filePath: string) {
+  const diff = await store.getFileDiff(taskId, filePath)
+  const task = store.tasks.value.find(t => t.id === taskId)
+  if (!task) return
+  task.logs.push({
+    id: Math.random().toString(36).substring(2, 10),
+    timestamp: new Date(),
+    type: 'system',
+    content: `=== ${filePath} ===\n${diff || '无变更内容'}`,
+  })
+}
+
 const statCards = [
   { label: '活跃任务', value: () => store.stats.value.activeTasks.toString(), sub: () => `共 ${store.stats.value.totalTasks} 个任务`, icon: ClipboardList, color: 'bg-amber-600' },
   { label: '已完成', value: () => store.stats.value.completedTasks.toString(), sub: () => '累计交付', icon: CheckCircle, color: 'bg-emerald-600' },
@@ -61,6 +73,7 @@ const statCards = [
           @merge-pr="store.mergePr"
           @reject-pr="store.rejectPr"
           @submit-review="store.submitReview"
+          @show-file-diff="handleShowFileDiff"
         />
 
         <!-- Dashboard / Tasks -->

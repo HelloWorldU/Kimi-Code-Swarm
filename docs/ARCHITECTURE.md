@@ -3,9 +3,10 @@
 ## 数据流
 
 ```
-UI (Vue) ←→ useSwarmStore (AgentTask[] + ReviewEntry[])
+UI (Vue) ←→ useSwarmStore (AgentTask[] + ReviewEntry[] + changedFiles)
   ←→ Tauri IPC ←→ Rust Main Process ←→ git / spawn CLI
   ←→ Real-time stdout events (process-output / process-exit)
+  ←→ Git diff detection (post-execution file change tracking)
   ←→ GitHub API (PR create/merge/review)
   ←→ localStorage (GitHub Token)
 

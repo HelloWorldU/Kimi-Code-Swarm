@@ -47,6 +47,18 @@ async function initProcessListeners() {
           : `Agent 进程退出 (code: ${payload.code ?? 'unknown'})`,
       })
       task.lastActivity = new Date()
+      // Detect changed files after execution
+      if (isTauri && task.workspace) {
+        execGit(task.workspace, ['diff', '--name-only'])
+          .then((files) => {
+            const changed = files.split('\n').filter(f => f.trim())
+            task.changedFiles = changed
+            if (changed.length > 0) {
+              task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `文件变更: ${changed.length} 个文件` })
+            }
+          })
+          .catch(() => { /* ignore git diff errors */ })
+      }
     }
   })
 }
@@ -428,6 +440,17 @@ export function useSwarmStore() {
     }
   }
 
+  async function getFileDiff(taskId: string, filePath: string): Promise<string> {
+    const task = state.tasks.find(t => t.id === taskId)
+    if (!task || !task.workspace) return ''
+    if (!isTauri) return `mock diff for ${filePath}`
+    try {
+      return await execGit(task.workspace, ['diff', '--', filePath])
+    } catch {
+      return ''
+    }
+  }
+
   function deleteTask(id: string) {
     state.tasks = state.tasks.filter(t => t.id !== id)
     if (state.selectedTaskId === id) state.selectedTaskId = null
@@ -449,6 +472,7 @@ export function useSwarmStore() {
     mergePr,
     rejectPr,
     submitReview,
+    getFileDiff,
     deleteTask,
   }
 }

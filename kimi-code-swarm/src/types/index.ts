@@ -34,6 +34,7 @@ export interface AgentTask {
   lastActivity: Date
   logs: LogEntry[]
   reviews: ReviewEntry[]
+  changedFiles?: string[]
 }
 
 export interface LogEntry {
