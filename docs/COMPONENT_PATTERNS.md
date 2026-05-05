@@ -31,4 +31,5 @@ const emit = defineEmits<{...}>()
 ## 组件类型示例
 
 - `TaskDetail.vue` — 复合面板组件：Header + Info + PR 审阅 + 文件变更 + Action + Logs
+- `AnalyticsPanel.vue` — 数据展示型组件：状态分布、Token 排行、任务列表
 - `SettingsPanel.vue` — 纯信息展示型设置面板，使用 lucide 图标 + code 标签展示命令指引

@@ -6,6 +6,7 @@ import TaskCard from './components/TaskCard.vue'
 import CreateTaskModal from './components/CreateTaskModal.vue'
 import TaskDetail from './components/TaskDetail.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
+import AnalyticsPanel from './components/AnalyticsPanel.vue'
 import { useSwarmStore } from './store/useSwarmStore'
 
 const store = useSwarmStore()
@@ -122,12 +123,8 @@ const statCards = [
         </div>
 
         <!-- Placeholder Tabs -->
-        <div v-else-if="activeTab === 'analytics'" class="flex items-center justify-center h-full text-gray-500">
-          <div class="text-center">
-            <Activity class="w-16 h-16 mx-auto mb-4 text-gray-700" />
-            <p class="text-lg font-medium">监控分析面板</p>
-            <p class="text-sm mt-2">Token 使用趋势、任务负载图表等功能即将上线</p>
-          </div>
+        <div v-else-if="activeTab === 'analytics'" class="h-full">
+          <AnalyticsPanel :tasks="store.tasks.value" />
         </div>
         <div v-else class="h-full max-w-2xl mx-auto">
           <h3 class="text-lg font-semibold text-white mb-6">系统设置</h3>

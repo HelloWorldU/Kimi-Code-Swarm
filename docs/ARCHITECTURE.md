@@ -27,6 +27,8 @@ PR 创建时，Store 自动生成 `ReviewEntry[]`，包含所有其他 Agent 作
 ## 模块边界
 
 - `kimi-code-swarm/src/` —— 纯前端，禁止直接操作进程
+  - `components/AnalyticsPanel.vue` — 数据可视化（只读聚合）
+  - `components/TaskDetail.vue` — 交互面板（输入 + 审阅 + diff）
 - `src-tauri/` —— 唯一有权 spawn 进程的 Rust 后端
 
 ## 实现状态速查

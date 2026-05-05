@@ -22,6 +22,7 @@ Vue 3 + TypeScript + Vite + Tailwind CSS + lucide-vue-next + Tauri v2
 - `api/ipc.ts` — Tauri IPC 适配层
 - `components/SettingsPanel.vue` — 系统设置（GitHub Token + Kimi CLI 安装指引）
 - `components/TaskDetail.vue` — PR 审阅面板 + 文件变更列表（点击查看 diff）
+- `components/AnalyticsPanel.vue` — 监控分析：状态分布、Token 排行、活跃/审阅任务
 - `components/TaskCard.vue` — 任务卡片：审阅进度徽章
 
 ## 快速启动
