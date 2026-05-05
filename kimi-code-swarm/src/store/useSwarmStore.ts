@@ -20,6 +20,27 @@ async function initProcessListeners() {
     if (!taskId) return
     const task = state.tasks.find(t => t.id === taskId)
     if (!task) return
+
+    // Track token consumption from real output
+    const estimatedTokens = Math.max(1, Math.floor(payload.line.length / 4))
+    task.tokenUsed = Math.min(task.tokenUsed + estimatedTokens, task.tokenBudget)
+
+    // Budget exhausted → kill process
+    if (task.tokenUsed >= task.tokenBudget && task.pid) {
+      killProcess(task.pid).catch(() => {})
+      pidToTaskId.delete(task.pid)
+      task.pid = undefined
+      task.status = 'ready'
+      task.logs.push({
+        id: generateId(),
+        timestamp: new Date(),
+        type: 'error',
+        content: 'Token 预算已耗尽，Agent 执行被中断',
+      })
+      task.lastActivity = new Date()
+      return
+    }
+
     task.logs.push({
       id: generateId(),
       timestamp: new Date(),
@@ -177,16 +198,18 @@ const state = reactive({
   isCreateModalOpen: false,
 })
 
-// Simulate token consumption for working tasks
-setInterval(() => {
-  state.tasks.forEach((t) => {
-    if (t.status === 'working') {
-      const increment = Math.floor(Math.random() * 50) + 10
-      t.tokenUsed = Math.min(t.tokenUsed + increment, t.tokenBudget)
-      t.lastActivity = new Date()
-    }
-  })
-}, 3000)
+// Simulate token consumption for working tasks (browser mock mode only)
+if (!isTauri) {
+  setInterval(() => {
+    state.tasks.forEach((t) => {
+      if (t.status === 'working') {
+        const increment = Math.floor(Math.random() * 50) + 10
+        t.tokenUsed = Math.min(t.tokenUsed + increment, t.tokenBudget)
+        t.lastActivity = new Date()
+      }
+    })
+  }, 3000)
+}
 
 export function useSwarmStore() {
   const stats = computed(() => ({
@@ -270,6 +293,11 @@ export function useSwarmStore() {
     task.logs.push({ id: generateId(), timestamp: new Date(), type: 'input', content: instruction, tokens: Math.floor(instruction.length / 2) })
     task.tokenUsed += Math.floor(instruction.length / 2)
     task.lastActivity = new Date()
+
+    if (task.tokenUsed >= task.tokenBudget) {
+      task.logs.push({ id: generateId(), timestamp: new Date(), type: 'error', content: 'Token 预算已耗尽，无法执行新指令' })
+      return
+    }
 
     if (isTauri && task.workspace) {
       const kimiPath = await detectKimiCli()

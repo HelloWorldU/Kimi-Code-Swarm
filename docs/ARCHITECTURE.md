@@ -40,4 +40,4 @@ PR 创建时，Store 自动生成 `ReviewEntry[]`，包含所有其他 Agent 作
 | Tauri IPC (`exec_git`, `exec_command`, `spawn_process`, `kill_process`) | ✅ 真实 |
 | GitHub API 封装 | ⚡ 双模式（Token 可选） |
 | 审阅门控逻辑 | ✅ 真实 |
-| Kimi CLI 接入 (`detectKimiCli` + `exec_command`) | ✅ 真实 |
+| Kimi CLI 接入 (`detectKimiCli` + `spawn_process` + 实时事件) | ✅ 真实 |
