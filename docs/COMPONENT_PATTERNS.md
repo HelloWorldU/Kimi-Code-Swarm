@@ -27,3 +27,7 @@ const emit = defineEmits<{...}>()
 | 组件 | PascalCase.vue | `TaskCard.vue`, `TaskDetail.vue`, `SettingsPanel.vue` |
 | Composable | camelCase.ts | `useSwarmStore.ts` |
 | 事件 | kebab-case | `@send-command` |
+
+## 组件类型示例
+
+- `SettingsPanel.vue` — 纯信息展示型设置面板，使用 lucide 图标 + code 标签展示命令指引

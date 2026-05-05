@@ -20,7 +20,7 @@ Vue 3 + TypeScript + Vite + Tailwind CSS + lucide-vue-next + Tauri v2
 - `types/index.ts` — AgentTask / LogEntry / CommandCenterStats；修改前检查上下游依赖
 - `api/github.ts` — GitHub API 封装（PR 创建/合并/查询）
 - `api/ipc.ts` — Tauri IPC 适配层
-- `components/SettingsPanel.vue` — 系统设置（GitHub Token 配置）
+- `components/SettingsPanel.vue` — 系统设置（GitHub Token + Kimi CLI 安装指引）
 - `components/TaskDetail.vue` — PR 审阅面板：审阅者列表、进度条、合并门控
 - `components/TaskCard.vue` — 任务卡片：审阅进度徽章
 

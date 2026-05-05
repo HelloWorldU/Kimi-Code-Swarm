@@ -3,6 +3,23 @@ import type { AgentTask, LogEntry, ReviewEntry } from '../types'
 import { isTauri, execGit, execCommand, killProcess } from '../api/ipc'
 import { createPullRequest, mergePullRequest, hasToken } from '../api/github'
 
+// Cached Kimi CLI path (detected once per session)
+let cachedKimiPath: string | null | undefined = undefined
+
+async function detectKimiCli(): Promise<string | null> {
+  if (cachedKimiPath !== undefined) return cachedKimiPath
+  const candidates = ['kimi', 'C:\\Python312\\Scripts\\kimi.exe']
+  for (const cmd of candidates) {
+    try {
+      await execCommand(cmd, ['--version'], '.')
+      cachedKimiPath = cmd
+      return cmd
+    } catch { /* try next */ }
+  }
+  cachedKimiPath = null
+  return null
+}
+
 const generateId = () => Math.random().toString(36).substring(2, 10)
 
 const mockLogs = (baseContent: string): LogEntry[] => [
@@ -167,8 +184,7 @@ export function useSwarmStore() {
         await execGit(targetDir, ['checkout', '-b', task.branch])
         task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `已创建分支: ${task.branch}` })
 
-        // TODO: spawn real Kimi CLI when interface is confirmed
-        task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: 'CLI 进程已启动（模拟）' })
+        task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: '工作空间就绪，等待指令' })
         task.status = 'ready'
       } catch (err) {
         task.status = 'stopped'
@@ -188,7 +204,7 @@ export function useSwarmStore() {
     }
   }
 
-  function sendInstruction(id: string, instruction: string) {
+  async function sendInstruction(id: string, instruction: string) {
     const task = state.tasks.find(t => t.id === id)
     if (!task || task.status !== 'ready') return
 
@@ -198,7 +214,59 @@ export function useSwarmStore() {
     task.tokenUsed += Math.floor(instruction.length / 2)
     task.lastActivity = new Date()
 
-    task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: 'Agent 开始执行任务...' })
+    if (isTauri && task.workspace) {
+      const kimiPath = await detectKimiCli()
+      if (!kimiPath) {
+        task.logs.push({ id: generateId(), timestamp: new Date(), type: 'error', content: 'Kimi CLI 未找到。请安装: py -3.12 -m pip install kimi-cli' })
+        task.status = 'ready'
+        return
+      }
+
+      task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `启动 Kimi CLI: ${kimiPath}` })
+
+      // Simulate progress while waiting for CLI
+      const progressMessages = [
+        'Agent 正在分析代码库...',
+        'Agent 正在规划实现方案...',
+        'Agent 正在编写代码...',
+        'Agent 正在验证修改...',
+      ]
+      let progressIdx = 0
+      const progressInterval = setInterval(() => {
+        if (task.status !== 'working') {
+          clearInterval(progressInterval)
+          return
+        }
+        const msg = progressMessages[progressIdx % progressMessages.length]
+        task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: msg })
+        progressIdx++
+      }, 8000)
+
+      try {
+        const output = await execCommand(kimiPath, ['--print', '--quiet', '-w', task.workspace, '-y', instruction], task.workspace)
+        clearInterval(progressInterval)
+        const tokens = Math.floor(output.length / 4)
+        task.tokenUsed += tokens
+        task.logs.push({ id: generateId(), timestamp: new Date(), type: 'output', content: output || '任务执行完成（无输出）', tokens })
+        task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: 'Agent 执行完毕，可以继续发送指令或提交审阅' })
+      } catch (err) {
+        clearInterval(progressInterval)
+        task.logs.push({ id: generateId(), timestamp: new Date(), type: 'error', content: `执行失败: ${String(err)}` })
+      }
+
+      task.status = 'ready'
+      task.lastActivity = new Date()
+    } else {
+      // Mock mode for browser dev
+      task.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: 'Agent 开始执行任务（模拟）...' })
+      setTimeout(() => {
+        const t = state.tasks.find(x => x.id === id)
+        if (!t || t.status !== 'working') return
+        t.logs.push({ id: generateId(), timestamp: new Date(), type: 'output', content: '模拟执行完成。在 Tauri 桌面模式下将调用真实 Kimi CLI。', tokens: 42 })
+        t.status = 'ready'
+        t.lastActivity = new Date()
+      }, 3000)
+    }
   }
 
   async function stopTask(id: string) {

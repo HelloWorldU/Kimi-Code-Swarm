@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { Github, KeyRound, Check, AlertCircle } from 'lucide-vue-next'
+import { Github, KeyRound, Check, AlertCircle, Terminal } from 'lucide-vue-next'
 import { setToken, hasToken } from '../api/github'
 
 const token = ref('')
@@ -79,5 +79,34 @@ function handleClear() {
       在 GitHub Settings → Developer settings → Personal access tokens → Tokens (classic) 中创建。
       需要 <code class="text-gray-400 bg-gray-800 px-1 py-0.5 rounded">repo</code> 权限。
     </p>
+
+    <div class="border-t border-gray-700/50 pt-4 mt-4">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="w-10 h-10 rounded-lg bg-gray-700/50 flex items-center justify-center">
+          <Terminal class="w-5 h-5 text-gray-400" />
+        </div>
+        <div>
+          <p class="text-sm font-medium text-white">Kimi CLI</p>
+          <p class="text-xs text-gray-500">Agent 执行依赖 Kimi Code CLI</p>
+        </div>
+      </div>
+
+      <div class="flex items-start gap-2 text-sm text-gray-300 bg-gray-800/50 border border-gray-700/50 rounded-lg px-3 py-2.5">
+        <Terminal class="w-4 h-4 mt-0.5 shrink-0 text-gray-500" />
+        <div class="space-y-1.5 text-xs">
+          <p>
+            <span class="text-gray-400">安装:</span>
+            <code class="text-swarm-400 bg-gray-800 px-1.5 py-0.5 rounded ml-1">py -3.12 -m pip install kimi-cli</code>
+          </p>
+          <p>
+            <span class="text-gray-400">配置 API Key:</span>
+            <code class="text-swarm-400 bg-gray-800 px-1.5 py-0.5 rounded ml-1">kimi /setup</code>
+            <span class="text-gray-500">或设置环境变量</span>
+            <code class="text-swarm-400 bg-gray-800 px-1.5 py-0.5 rounded ml-1">MOONSHOT_API_KEY</code>
+          </p>
+          <p class="text-gray-500">安装完成后重启 App 即可调用真实 Agent。</p>
+        </div>
+      </div>
+    </div>
   </div>
 </template>

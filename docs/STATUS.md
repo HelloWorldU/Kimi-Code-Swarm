@@ -25,7 +25,7 @@
 | Git 自动化（clone/checkout/commit/push） | ✅ | Tauri 环境通过 IPC 执行真实 git | `src/api/ipc.ts` |
 | GitHub API（PR 创建/合并/查询） | ⚡ | 配置 Token 后走真实 API；否则 Mock | `src/api/github.ts` |
 | 全员审阅门控 | ⚡ | 逻辑真实；Mock 模式 3 秒自动通过 | `src/store/useSwarmStore.ts` |
-| Kimi CLI 接入 | ❌ | 接口协议未确认，当前为模拟日志 | — |
+| Kimi CLI 接入 | ✅ | `sendInstruction` 调用 `kimi --print --quiet`，Tauri 桌面模式真实执行 | `src/store/useSwarmStore.ts` |
 | Token 预算控制 | ⚡ | 有字段和 UI 展示，无真实限额拦截逻辑 | `src/types/index.ts` |
 
 ## 质量约束
