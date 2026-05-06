@@ -4,7 +4,7 @@
 
 ## 技术栈
 
-Vue 3 + TypeScript + Vite + Tailwind CSS + lucide-vue-next + Tauri v2
+Vue 3 + TypeScript + Vite + Tailwind CSS + lucide-vue-next + Tauri v2 + @tauri-apps/plugin-store
 
 ## 编码规范
 
@@ -20,10 +20,12 @@ Vue 3 + TypeScript + Vite + Tailwind CSS + lucide-vue-next + Tauri v2
 - `types/index.ts` — AgentTask / LogEntry / CommandCenterStats；修改前检查上下游依赖
 - `api/github.ts` — GitHub API 封装（PR 创建/合并/查询）
 - `api/ipc.ts` — Tauri IPC 适配层
+- `components/LoginView.vue` — API Key 登录页（验证 + keyring 存储）
+- `components/AgentDashboard.vue` — Agent 卡片网格（最多 5 个，点击进入详情）
+- `components/AgentDetail.vue` — Agent 详情：指令输入 + 日志流 + PR 审阅 + 文件变更
 - `components/SettingsPanel.vue` — 系统设置（GitHub Token + Kimi CLI 安装指引）
-- `components/TaskDetail.vue` — PR 审阅面板 + 文件变更列表（点击查看 diff）
 - `components/AnalyticsPanel.vue` — 监控分析：状态分布、Token 排行、活跃/审阅任务
-- `components/TaskCard.vue` — 任务卡片：审阅进度徽章
+- `components/TaskCard.vue` — Agent 卡片：状态 + Token 进度 + 审阅徽章
 
 ## 快速启动
 
@@ -62,11 +64,14 @@ npm run build         # 生产构建
 
 | 功能 | 状态 | 备注 |
 |------|------|------|
-| 任务列表 / 卡片 / 详情 | ✅ 真实 | 完整交互 |
-| 新建任务弹窗 | ✅ 真实 | |
-| 实时日志流 | ⚡ 模拟 | 真实 CLI 接入后变为真实 |
+| API Key 登录 | ✅ 真实 | keyring 安全存储，Kimi API 验证 |
+| Agent Dashboard（最多5个） | ✅ 真实 | 卡片网格，数量限制，点击进入详情 |
+| Agent 详情页 | ✅ 真实 | 指令输入 + 实时日志 + PR 审阅 + 文件变更 |
+| 新建 Agent 弹窗 | ✅ 真实 | |
+| 实时日志流 | ✅ 真实 | spawn_process + process-output 事件推送 |
 | PR 审阅面板 | ✅ 真实 | 含审阅者列表、进度、门控 |
 | SettingsPanel（Token 配置） | ✅ 真实 | localStorage 持久化 |
-| 监控分析页 | ❌ 占位 | Tab 存在，内容待实现 |
+| 监控分析页 | ✅ 真实 | 状态分布、Token 排行、活跃/审阅任务 |
+| Agent 状态持久化 | ✅ 真实 | tauri-plugin-store 自动保存/恢复 |
 
 文档同步检测被阻断时，不直接告知需要更新哪个文档——Agent 需回顾本次会话已读文档，或查阅 AGENTS.md 地图自行定位关联文档。

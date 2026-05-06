@@ -52,3 +52,7 @@ export interface CommandCenterStats {
   totalTokensUsed: number
   totalTokenBudget: number
 }
+
+export interface AppPersistedState {
+  agents: AgentTask[]
+}

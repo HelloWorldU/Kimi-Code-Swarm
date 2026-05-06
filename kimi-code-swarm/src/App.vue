@@ -1,27 +1,42 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { Plus, Activity, ClipboardList, Coins, CheckCircle, Github } from 'lucide-vue-next'
-import Sidebar from './components/Sidebar.vue'
-import TaskCard from './components/TaskCard.vue'
+import { ref, watch } from 'vue'
+import { Plus, LogOut, Settings } from 'lucide-vue-next'
+import LoginView from './components/LoginView.vue'
+import AgentDashboard from './components/AgentDashboard.vue'
+import AgentDetail from './components/AgentDetail.vue'
 import CreateTaskModal from './components/CreateTaskModal.vue'
-import TaskDetail from './components/TaskDetail.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
 import AnalyticsPanel from './components/AnalyticsPanel.vue'
 import { useSwarmStore } from './store/useSwarmStore'
 
 const store = useSwarmStore()
-const activeTab = ref('dashboard')
 
-function handleTabChange(tab: string) {
-  activeTab.value = tab
-  store.setSelectedTaskId(null)
+type View = 'dashboard' | 'agent-detail' | 'settings' | 'analytics'
+const view = ref<View>('dashboard')
+
+watch(() => store.isLoggedIn.value, (loggedIn) => {
+  if (!loggedIn) view.value = 'dashboard'
+})
+
+function handleLogin(key: string) {
+  store.login(key)
 }
 
-async function handleShowFileDiff(taskId: string, filePath: string) {
-  const diff = await store.getFileDiff(taskId, filePath)
-  const task = store.tasks.value.find(t => t.id === taskId)
-  if (!task) return
-  task.logs.push({
+function handleSelectAgent(id: string) {
+  store.setSelectedAgentId(id)
+  view.value = 'agent-detail'
+}
+
+function handleBackToDashboard() {
+  store.setSelectedAgentId(null)
+  view.value = 'dashboard'
+}
+
+async function handleShowFileDiff(agentId: string, filePath: string) {
+  const diff = await store.getFileDiff(agentId, filePath)
+  const agent = store.agents.value.find((a) => a.id === agentId)
+  if (!agent) return
+  agent.logs.push({
     id: Math.random().toString(36).substring(2, 10),
     timestamp: new Date(),
     type: 'system',
@@ -29,46 +44,108 @@ async function handleShowFileDiff(taskId: string, filePath: string) {
   })
 }
 
-const statCards = [
-  { label: '活跃任务', value: () => store.stats.value.activeTasks.toString(), sub: () => `共 ${store.stats.value.totalTasks} 个任务`, icon: ClipboardList, color: 'bg-amber-600' },
-  { label: '已完成', value: () => store.stats.value.completedTasks.toString(), sub: () => '累计交付', icon: CheckCircle, color: 'bg-emerald-600' },
-  { label: 'Token 消耗', value: () => `${(store.stats.value.totalTokensUsed / 1000).toFixed(1)}K`, sub: () => `预算 ${(store.stats.value.totalTokenBudget / 1000).toFixed(0)}K`, icon: Coins, color: 'bg-blue-600' },
-  { label: '系统状态', value: () => '正常', sub: () => '所有节点在线', icon: Activity, color: 'bg-swarm-600' },
-]
+function handleLogout() {
+  store.logout()
+}
 </script>
 
 <template>
-  <div class="flex h-screen w-screen overflow-hidden bg-gray-950">
-    <Sidebar :active-tab="activeTab" @change="handleTabChange" />
+  <!-- Login View -->
+  <LoginView
+    v-if="!store.isLoggedIn.value"
+    :is-loading="store.isAuthLoading.value"
+    :error="store.authError.value"
+    @login="handleLogin"
+  />
 
+  <!-- Main App -->
+  <div v-else class="flex h-screen w-screen overflow-hidden bg-gray-950">
+    <!-- Sidebar -->
+    <aside class="w-16 flex flex-col items-center py-4 border-r border-gray-800 bg-gray-900/30 shrink-0">
+      <div class="mb-6">
+        <div class="w-9 h-9 rounded-xl bg-swarm-600 flex items-center justify-center">
+          <span class="text-white font-bold text-sm">K</span>
+        </div>
+      </div>
+
+      <nav class="flex-1 flex flex-col items-center gap-2">
+        <button
+          :class="[
+            'w-10 h-10 rounded-xl flex items-center justify-center transition-colors',
+            view === 'dashboard' ? 'bg-swarm-500/10 text-swarm-400' : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/50'
+          ]"
+          title="Agent 管理"
+          @click="view = 'dashboard'"
+        >
+          <Plus class="w-5 h-5" />
+        </button>
+        <button
+          :class="[
+            'w-10 h-10 rounded-xl flex items-center justify-center transition-colors',
+            view === 'analytics' ? 'bg-swarm-500/10 text-swarm-400' : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/50'
+          ]"
+          title="监控分析"
+          @click="view = 'analytics'"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18" /><path d="m19 9-5 5-4-4-3 3" /></svg>
+        </button>
+        <button
+          :class="[
+            'w-10 h-10 rounded-xl flex items-center justify-center transition-colors',
+            view === 'settings' ? 'bg-swarm-500/10 text-swarm-400' : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/50'
+          ]"
+          title="设置"
+          @click="view = 'settings'"
+        >
+          <Settings class="w-5 h-5" />
+        </button>
+      </nav>
+
+      <div class="mt-auto flex flex-col items-center gap-2">
+        <button
+          class="w-10 h-10 rounded-xl flex items-center justify-center text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+          title="退出登录"
+          @click="handleLogout"
+        >
+          <LogOut class="w-5 h-5" />
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
     <main class="flex-1 flex flex-col min-w-0">
       <!-- Top Bar -->
-      <header class="h-16 border-b border-gray-800 flex items-center justify-between px-6 bg-gray-900/50 backdrop-blur">
-        <div>
-          <h2 class="text-lg font-semibold text-white">
-            <span v-if="activeTab === 'dashboard'">任务总览</span>
-            <span v-else-if="activeTab === 'tasks'">任务管理</span>
-            <span v-else-if="activeTab === 'analytics'">监控分析</span>
+      <header class="h-14 border-b border-gray-800 flex items-center justify-between px-6 bg-gray-900/50 backdrop-blur shrink-0">
+        <div class="flex items-center gap-3">
+          <h2 class="text-base font-semibold text-white">
+            <span v-if="view === 'dashboard'">Agent 管理</span>
+            <span v-else-if="view === 'agent-detail'">Agent 详情</span>
+            <span v-else-if="view === 'analytics'">监控分析</span>
             <span v-else>系统设置</span>
           </h2>
+          <span v-if="view === 'dashboard'" class="text-xs text-gray-600 bg-gray-800/60 px-2 py-0.5 rounded-full">
+            {{ store.agents.value.length }} / {{ store.maxAgents }}
+          </span>
         </div>
         <button
-          class="px-4 py-2 bg-swarm-600 hover:bg-swarm-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+          v-if="view === 'dashboard'"
+          :disabled="!store.canCreateAgent.value"
+          class="px-3 py-1.5 bg-swarm-600 hover:bg-swarm-500 disabled:opacity-30 disabled:cursor-not-allowed text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
           @click="store.setIsCreateModalOpen(true)"
         >
-          <Plus class="w-4 h-4" /> 新建任务
+          <Plus class="w-3.5 h-3.5" /> 新建 Agent
         </button>
       </header>
 
-      <!-- Content -->
+      <!-- Content Area -->
       <div class="flex-1 overflow-hidden p-6">
-        <!-- Task Detail -->
-        <TaskDetail
-          v-if="store.selectedTaskId.value && store.selectedTask.value"
-          :task="store.selectedTask.value"
-          @back="store.setSelectedTaskId(null)"
-          @start="store.startTask"
-          @stop="store.stopTask"
+        <!-- Agent Detail -->
+        <AgentDetail
+          v-if="view === 'agent-detail' && store.selectedAgent.value"
+          :agent="store.selectedAgent.value"
+          @back="handleBackToDashboard"
+          @start="store.startAgent"
+          @stop="store.stopAgent"
           @send-instruction="store.sendInstruction"
           @submit-for-review="store.submitForReview"
           @merge-pr="store.mergePr"
@@ -77,61 +154,32 @@ const statCards = [
           @show-file-diff="handleShowFileDiff"
         />
 
-        <!-- Dashboard / Tasks -->
-        <div v-else-if="activeTab === 'dashboard' || activeTab === 'tasks'" class="h-full flex flex-col">
-          <!-- Stats Grid -->
-          <div class="grid grid-cols-4 gap-4 mb-6">
-            <div
-              v-for="stat in statCards"
-              :key="stat.label"
-              class="bg-gray-800/40 border border-gray-700/50 rounded-xl p-4 flex items-center gap-4"
-            >
-              <div :class="['w-12 h-12 rounded-xl flex items-center justify-center', stat.color]">
-                <component :is="stat.icon" class="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <p class="text-xs text-gray-500 font-medium">{{ stat.label }}</p>
-                <p class="text-2xl font-bold text-white">{{ stat.value() }}</p>
-                <p class="text-xs text-gray-500">{{ stat.sub() }}</p>
-              </div>
-            </div>
-          </div>
+        <!-- Dashboard -->
+        <AgentDashboard
+          v-else-if="view === 'dashboard'"
+          :agents="store.agents.value"
+          :can-create="store.canCreateAgent.value"
+          :max-agents="store.maxAgents"
+          @select="handleSelectAgent"
+          @create="store.setIsCreateModalOpen(true)"
+          @start="store.startAgent"
+          @stop="store.stopAgent"
+          @delete="store.deleteAgent"
+        />
 
-          <!-- Tasks Grid -->
-          <div class="flex items-center justify-between mb-4">
-            <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">任务列表</h3>
-            <div class="flex items-center gap-2 text-xs text-gray-500">
-              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-400" /> 工作中</span>
-              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-purple-400" /> 待审阅</span>
-              <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-400" /> 已完成</span>
-            </div>
-          </div>
-          <div class="flex-1 overflow-y-auto scrollbar-thin">
-            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 pb-4">
-              <TaskCard
-                v-for="task in store.tasks.value"
-                :key="task.id"
-                :task="task"
-                :is-selected="store.selectedTaskId.value === task.id"
-                @select="store.setSelectedTaskId"
-                @start="store.startTask"
-                @stop="store.stopTask"
-                @delete="store.deleteTask"
-              />
-            </div>
-          </div>
+        <!-- Analytics -->
+        <div v-else-if="view === 'analytics'" class="h-full">
+          <AnalyticsPanel :tasks="store.agents.value" />
         </div>
 
-        <!-- Placeholder Tabs -->
-        <div v-else-if="activeTab === 'analytics'" class="h-full">
-          <AnalyticsPanel :tasks="store.tasks.value" />
-        </div>
+        <!-- Settings -->
         <div v-else class="h-full max-w-2xl mx-auto">
           <h3 class="text-lg font-semibold text-white mb-6">系统设置</h3>
           <div class="space-y-6">
             <div class="bg-gray-800/40 border border-gray-700/50 rounded-xl p-6">
               <h4 class="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-                <Github class="w-4 h-4" /> GitHub 配置
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4" /><path d="M9 18c-4.51 2-5-2-7-2" /></svg>
+                GitHub 配置
               </h4>
               <SettingsPanel />
             </div>
@@ -140,10 +188,11 @@ const statCards = [
       </div>
     </main>
 
+    <!-- Create Modal -->
     <CreateTaskModal
       :is-open="store.isCreateModalOpen.value"
       @close="store.setIsCreateModalOpen(false)"
-      @create="store.createTask"
+      @create="store.createAgent"
     />
   </div>
 </template>

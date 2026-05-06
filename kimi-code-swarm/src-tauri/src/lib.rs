@@ -1,11 +1,14 @@
 use std::process::{Command, Stdio};
-use std::sync::Mutex;
+use std::sync::{Mutex, LazyLock};
 use std::collections::HashSet;
 use std::io::{BufRead, BufReader};
 use tauri::Emitter;
 
+const KEYRING_SERVICE: &str = "kimi-code-swarm";
+const KEYRING_ACCOUNT: &str = "api-key";
+
 // Global set of active PIDs spawned by this app
-static ACTIVE_PIDS: Mutex<HashSet<u32>> = Mutex::new(HashSet::new());
+static ACTIVE_PIDS: LazyLock<Mutex<HashSet<u32>>> = LazyLock::new(|| Mutex::new(HashSet::new()));
 
 #[derive(serde::Serialize, Clone)]
 struct ProcessOutputEvent {
@@ -149,16 +152,52 @@ fn send_to_process(pid: u32, message: String) -> Result<(), String> {
     Ok(())
 }
 
+/// Save API key to OS keyring
+#[tauri::command]
+fn save_api_key(password: String) -> Result<(), String> {
+    let entry = keyring::Entry::new(KEYRING_SERVICE, KEYRING_ACCOUNT)
+        .map_err(|e| format!("Keyring entry creation failed: {}", e))?;
+    entry.set_password(&password)
+        .map_err(|e| format!("Failed to save API key: {}", e))?;
+    Ok(())
+}
+
+/// Get API key from OS keyring
+#[tauri::command]
+fn get_api_key() -> Result<Option<String>, String> {
+    let entry = keyring::Entry::new(KEYRING_SERVICE, KEYRING_ACCOUNT)
+        .map_err(|e| format!("Keyring entry creation failed: {}", e))?;
+    match entry.get_password() {
+        Ok(pw) => Ok(Some(pw)),
+        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(e) => Err(format!("Failed to get API key: {}", e)),
+    }
+}
+
+/// Delete API key from OS keyring
+#[tauri::command]
+fn delete_api_key() -> Result<(), String> {
+    let entry = keyring::Entry::new(KEYRING_SERVICE, KEYRING_ACCOUNT)
+        .map_err(|e| format!("Keyring entry creation failed: {}", e))?;
+    entry.delete_credential()
+        .map_err(|e| format!("Failed to delete API key: {}", e))?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_log::Builder::default().build())
+        .plugin(tauri_plugin_store::Builder::default().build())
         .invoke_handler(tauri::generate_handler![
             exec_git,
             exec_command,
             spawn_process,
             kill_process,
             send_to_process,
+            save_api_key,
+            get_api_key,
+            delete_api_key,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
