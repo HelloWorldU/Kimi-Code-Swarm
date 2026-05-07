@@ -226,15 +226,20 @@ fn delete_api_key() -> Result<(), String> {
 /// Verify Kimi API key by calling /v1/models endpoint
 #[tauri::command]
 fn verify_api_key(key: String) -> Result<bool, String> {
+    log::info!("[verify_api_key] received key length={} prefix={:?}", key.len(), &key[..key.len().min(10)]);
     let resp = ureq::get("https://api.moonshot.cn/v1/models")
         .set("Authorization", &format!("Bearer {}", key))
         .call();
     match resp {
-        Ok(r) => Ok(r.status() == 200),
+        Ok(r) => {
+            log::info!("[verify_api_key] success status={}", r.status());
+            Ok(r.status() == 200)
+        }
         Err(ureq::Error::Status(code, r)) => {
             let body = r.into_string().unwrap_or_default();
+            log::warn!("[verify_api_key] failed code={} body={}", code, body);
             if code == 401 {
-                Err("API Key 无效或已过期".to_string())
+                Err(format!("API Key 无效或已过期 (长度:{} 前缀:{})", key.len(), &key[..key.len().min(10)]))
             } else {
                 Err(format!("验证失败 (HTTP {}): {}", code, body))
             }
