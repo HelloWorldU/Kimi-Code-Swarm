@@ -38,7 +38,7 @@ async function handleShowFileDiff(agentId: string, filePath: string) {
   if (!agent) return
   agent.logs.push({
     id: Math.random().toString(36).substring(2, 10),
-    timestamp: new Date(),
+    timestamp: new Date().toISOString(),
     type: 'system',
     content: `=== ${filePath} ===\n${diff || '无变更内容'}`,
   })

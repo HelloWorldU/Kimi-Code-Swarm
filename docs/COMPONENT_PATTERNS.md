@@ -32,6 +32,6 @@ const emit = defineEmits<{...}>()
 
 - `LoginView.vue` — 独立页面组件：登录表单 + 验证状态 + 外部链接
 - `AgentDashboard.vue` — 列表容器组件：统计卡片 + Agent 网格 + 空状态
-- `AgentDetail.vue` — 复合面板组件：Header + Info + PR 审阅 + 文件变更 + Action + Logs
+- `AgentDetail.vue` — 复合面板组件：Header + Info + PR 审阅 + 文件变更 + Action + Logs（日期字段通过 new Date(string).toLocaleTimeString() 显示）
 - `AnalyticsPanel.vue` — 数据展示型组件：状态分布、Token 排行、任务列表
 - `SettingsPanel.vue` — 纯信息展示型设置面板，使用 lucide 图标 + code 标签展示命令指引

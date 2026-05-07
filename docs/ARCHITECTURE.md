@@ -3,12 +3,13 @@
 ## 数据流
 
 ```
-UI (Vue) ←→ useSwarmStore (AgentTask[] + ReviewEntry[] + changedFiles)
-  ←→ Tauri IPC ←→ Rust Main Process ←→ git / spawn CLI
-  ←→ Real-time stdout events (process-output / process-exit)
-  ←→ Git diff detection (post-execution file change tracking)
-  ←→ GitHub API (PR create/merge/review)
-  ←→ OS Keyring (Kimi API Key)
+UI (Vue) ←→ useSwarmStore (UI state only)
+  ←→ Tauri IPC ←→ Rust Main Process
+    ←→ stdin/stdout JSON Lines ←→ Node.js Agent Engine
+      ←→ spawn Kimi CLI (real-time stdout capture)
+      ←→ Git operations (clone/commit/push)
+      ←→ Token budget monitoring
+  ←→ Tauri IPC ←→ OS Keyring (Kimi API Key)
   ←→ tauri-plugin-store (Agent 列表持久化)
   ←→ localStorage (GitHub Token, browser fallback)
 
@@ -27,6 +28,7 @@ PR 创建时，Store 自动生成 `ReviewEntry[]`，包含所有其他 Agent 作
 | Persistent | localStorage | 跨会话保留（浏览器 fallback） |
 | Secure | OS Keyring | 跨会话保留，系统级加密 |
 | App State | tauri-plugin-store (JSON) | 跨会话保留（Agent 列表等） |
+| Agent Engine | Node.js process (JSON Lines over stdio) | 常驻进程，管理所有 Agent 生命周期 |
 
 ## 模块边界
 

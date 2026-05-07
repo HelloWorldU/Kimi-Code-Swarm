@@ -1,13 +1,11 @@
 import { reactive, computed } from 'vue'
-import type { AgentTask, ReviewEntry, AppPersistedState } from '../types'
+import type { AgentTask, ReviewEntry } from '../types'
 import {
   isTauri,
-  execGit,
-  execCommand,
-  killProcess,
-  spawnProcess,
-  listenProcessOutput,
-  listenProcessExit,
+  spawnAgentEngine,
+  sendToEngine,
+  listenAgentEngineEvent,
+  listenAgentEngineExit,
   saveApiKey,
   getApiKey,
   deleteApiKey,
@@ -15,169 +13,10 @@ import {
   loadStoreValue,
   saveStoreValue,
 } from '../api/ipc'
-import { createPullRequest, mergePullRequest, hasToken } from '../api/github'
+// import { hasToken } from '../api/github'
 
-// ── Constants ──
 const MAX_AGENTS = 5
 const STORE_KEY = 'agents'
-
-// ── Kimi CLI path cache ──
-let cachedKimiPath: string | null | undefined = undefined
-
-// PID → agentId mapping for routing process output
-const pidToAgentId = new Map<number, string>()
-
-// Global process listeners (initialized once per session)
-let processListenersInitialized = false
-async function initProcessListeners() {
-  if (processListenersInitialized) return
-  processListenersInitialized = true
-
-  await listenProcessOutput((payload) => {
-    const agentId = pidToAgentId.get(payload.pid)
-    if (!agentId) return
-    const agent = state.agents.find((a) => a.id === agentId)
-    if (!agent) return
-
-    const estimatedTokens = Math.max(1, Math.floor(payload.line.length / 4))
-    agent.tokenUsed = Math.min(agent.tokenUsed + estimatedTokens, agent.tokenBudget)
-
-    if (agent.tokenUsed >= agent.tokenBudget && agent.pid) {
-      killProcess(agent.pid).catch(() => {})
-      pidToAgentId.delete(agent.pid)
-      agent.pid = undefined
-      agent.status = 'ready'
-      agent.logs.push({
-        id: generateId(),
-        timestamp: new Date(),
-        type: 'error',
-        content: 'Token 预算已耗尽，Agent 执行被中断',
-      })
-      agent.lastActivity = new Date()
-      persistAgents()
-      return
-    }
-
-    agent.logs.push({
-      id: generateId(),
-      timestamp: new Date(),
-      type: payload.is_stderr ? 'error' : 'output',
-      content: payload.line,
-    })
-    agent.lastActivity = new Date()
-    persistAgents()
-  })
-
-  await listenProcessExit((payload) => {
-    const agentId = pidToAgentId.get(payload.pid)
-    if (!agentId) return
-    pidToAgentId.delete(payload.pid)
-    const agent = state.agents.find((a) => a.id === agentId)
-    if (!agent) return
-    if (agent.status === 'working') {
-      agent.status = 'ready'
-      agent.pid = undefined
-      agent.logs.push({
-        id: generateId(),
-        timestamp: new Date(),
-        type: 'system',
-        content:
-          payload.code === 0
-            ? 'Agent 执行完毕，可以继续发送指令或提交审阅'
-            : `Agent 进程退出 (code: ${payload.code ?? 'unknown'})`,
-      })
-      agent.lastActivity = new Date()
-      if (isTauri && agent.workspace) {
-        execGit(agent.workspace, ['diff', '--name-only'])
-          .then((files) => {
-            const changed = files.split('\n').filter((f) => f.trim())
-            agent.changedFiles = changed
-            if (changed.length > 0) {
-              agent.logs.push({
-                id: generateId(),
-                timestamp: new Date(),
-                type: 'system',
-                content: `文件变更: ${changed.length} 个文件`,
-              })
-            }
-            persistAgents()
-          })
-          .catch(() => {
-            /* ignore git diff errors */
-          })
-      }
-      persistAgents()
-    }
-  })
-}
-
-async function detectKimiCli(): Promise<string | null> {
-  if (cachedKimiPath !== undefined) return cachedKimiPath
-  const candidates = ['kimi', 'C:\\Python312\\Scripts\\kimi.exe']
-  for (const cmd of candidates) {
-    try {
-      await execCommand(cmd, ['--version'], '.')
-      cachedKimiPath = cmd
-      return cmd
-    } catch {
-      /* try next */
-    }
-  }
-  cachedKimiPath = null
-  return null
-}
-
-const generateId = () => Math.random().toString(36).substring(2, 10)
-
-const branchName = (agentName: string) => {
-  const slug = agentName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
-  return `agent/${slug}-${generateId().slice(0, 4)}`
-}
-
-// ── Persistence ──
-async function persistAgents() {
-  const payload: AppPersistedState = { agents: state.agents }
-  await saveStoreValue(STORE_KEY, payload)
-}
-
-async function loadPersistedAgents(): Promise<AgentTask[]> {
-  const data = await loadStoreValue<AppPersistedState>(STORE_KEY)
-  if (!data || !data.agents) return []
-  // Rehydrate Date objects from JSON
-  return data.agents.map((a) => ({
-    ...a,
-    createdAt: new Date(a.createdAt),
-    lastActivity: new Date(a.lastActivity),
-    logs: a.logs.map((l) => ({ ...l, timestamp: new Date(l.timestamp) })),
-    reviews: a.reviews.map((r) => ({
-      ...r,
-      reviewedAt: r.reviewedAt ? new Date(r.reviewedAt) : undefined,
-    })),
-  }))
-}
-
-// ── Global reactive state ──
-const state = reactive({
-  agents: [] as AgentTask[],
-  selectedAgentId: null as string | null,
-  isCreateModalOpen: false,
-  isLoggedIn: false,
-  isAuthLoading: false,
-  authError: '',
-})
-
-// Simulate token consumption for working agents (browser mock mode only)
-if (!isTauri) {
-  setInterval(() => {
-    state.agents.forEach((a) => {
-      if (a.status === 'working') {
-        const increment = Math.floor(Math.random() * 50) + 10
-        a.tokenUsed = Math.min(a.tokenUsed + increment, a.tokenBudget)
-        a.lastActivity = new Date()
-      }
-    })
-  }, 3000)
-}
 
 // ── Bootstrap: check auth on load ──
 let bootstrapped = false
@@ -191,9 +30,161 @@ async function bootstrap() {
     if (persisted.length > 0) {
       state.agents = persisted
     }
+    // Auto-start agent engine if logged in
+    startAgentEngine()
   }
 }
+
+async function startAgentEngine() {
+  if (!isTauri) return
+  try {
+    const running = await (await import('../api/ipc')).isEngineRunning()
+    if (running) return
+    const cwd = 'agent-engine' // relative to app dir
+    await spawnAgentEngine(cwd)
+    initEngineListeners()
+  } catch (e) {
+    console.error('Failed to start agent engine:', e)
+  }
+}
+
+// ── Engine event listener ──
+let engineListenersInitialized = false
+function initEngineListeners() {
+  if (engineListenersInitialized) return
+  engineListenersInitialized = true
+
+  listenAgentEngineEvent((payload) => {
+    try {
+      const event = JSON.parse(payload.line)
+      handleEngineEvent(event)
+    } catch {
+      // ignore non-JSON lines
+    }
+  })
+
+  listenAgentEngineExit(() => {
+    engineListenersInitialized = false
+    state.engineConnected = false
+  })
+}
+
+function handleEngineEvent(event: Record<string, unknown>) {
+  const type = event.type as string
+
+  switch (type) {
+    case 'agent-created': {
+      const agent = event.agent as AgentTask
+      state.agents.push(agent)
+      persistAgents()
+      break
+    }
+    case 'agent-output': {
+      const agent = state.agents.find((a) => a.id === event.agentId)
+      if (!agent) return
+      // Token estimation handled by engine, just append log if needed
+      break
+    }
+    case 'agent-exit': {
+      const agent = state.agents.find((a) => a.id === event.agentId)
+      if (!agent) return
+      agent.pid = undefined
+      if (agent.status === 'working') {
+        agent.status = 'ready'
+        agent.logs.push({
+          id: generateId(),
+          timestamp: new Date().toISOString(),
+          type: 'system',
+          content: event.code === 0
+            ? 'Agent 执行完毕，可以继续发送指令或提交审阅'
+            : `Agent 进程退出 (code: ${event.code ?? 'unknown'})`,
+        })
+      }
+      persistAgents()
+      break
+    }
+    case 'agent-status': {
+      const agent = state.agents.find((a) => a.id === event.agentId)
+      if (agent) {
+        agent.status = event.status as AgentTask['status']
+        persistAgents()
+      }
+      break
+    }
+    case 'log': {
+      const agent = state.agents.find((a) => a.id === event.agentId)
+      if (agent) {
+        agent.logs.push(event.entry as AgentTask['logs'][0])
+        agent.lastActivity = new Date().toISOString()
+        persistAgents()
+      }
+      break
+    }
+    case 'file-changed': {
+      const agent = state.agents.find((a) => a.id === event.agentId)
+      if (agent) {
+        agent.changedFiles = event.files as string[]
+        persistAgents()
+      }
+      break
+    }
+    case 'diff-result': {
+      // handled by caller
+      break
+    }
+    case 'pong': {
+      state.engineConnected = true
+      break
+    }
+    case 'error': {
+      console.error('Agent engine error:', event.message)
+      break
+    }
+  }
+}
+
+// ── Persistence ──
+async function persistAgents() {
+  await saveStoreValue(STORE_KEY, { agents: state.agents })
+}
+
+async function loadPersistedAgents(): Promise<AgentTask[]> {
+  const data = await loadStoreValue<{ agents: AgentTask[] }>(STORE_KEY)
+  if (!data || !data.agents) return []
+  return data.agents.map((a) => ({
+    ...a,
+    createdAt: typeof a.createdAt === 'string' ? a.createdAt : new Date(a.createdAt).toISOString(),
+    lastActivity: typeof a.lastActivity === 'string' ? a.lastActivity : new Date(a.lastActivity).toISOString(),
+  }))
+}
+
+const generateId = () => Math.random().toString(36).substring(2, 10)
+
+// ── Global reactive state ──
+const state = reactive({
+  agents: [] as AgentTask[],
+  selectedAgentId: null as string | null,
+  isCreateModalOpen: false,
+  isLoggedIn: false,
+  isAuthLoading: false,
+  authError: '',
+  engineConnected: false,
+})
+
 bootstrap()
+
+// ── Browser mock mode: simulate token consumption ──
+if (!isTauri) {
+  setInterval(() => {
+    state.agents.forEach((a) => {
+      if (a.status === 'working') {
+        const increment = Math.floor(Math.random() * 50) + 10
+        a.tokenUsed = Math.min(a.tokenUsed + increment, a.tokenBudget)
+        a.lastActivity = new Date().toISOString()
+      }
+    })
+  }, 3000)
+}
 
 export function useSwarmStore() {
   const stats = computed(() => ({
@@ -227,6 +218,7 @@ export function useSwarmStore() {
       if (persisted.length > 0) {
         state.agents = persisted
       }
+      await startAgentEngine()
       state.isAuthLoading = false
       return true
     } catch (e) {
@@ -242,292 +234,192 @@ export function useSwarmStore() {
     state.agents = []
     state.selectedAgentId = null
     state.authError = ''
-    // Reload to clear all reactive state
     if (isTauri) {
       window.location.reload()
     }
   }
 
-  // ── Agent CRUD ──
+  // ── Agent CRUD (delegated to Node.js engine) ──
   function createAgent(name: string, repoUrl: string, instruction: string, tokenBudget: number) {
     if (state.agents.length >= MAX_AGENTS) return
-    const newAgent: AgentTask = {
-      id: `agent-${generateId()}`,
-      name,
-      status: 'pending',
-      repoUrl,
-      workspace: '',
-      branch: branchName(name),
-      instruction,
-      prStatus: 'none',
-      tokenUsed: 0,
-      tokenBudget,
-      createdAt: new Date(),
-      lastActivity: new Date(),
-      logs: [{ id: generateId(), timestamp: new Date(), type: 'system', content: 'Agent 已创建，等待启动...' }],
-      reviews: [],
+    if (!isTauri) {
+      // Browser mock mode: create directly
+      const newAgent: AgentTask = {
+        id: `agent-${generateId()}`,
+        name,
+        status: 'pending',
+        repoUrl,
+        workspace: '',
+        branch: `agent/${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}-${generateId().slice(0, 4)}`,
+        instruction,
+        prStatus: 'none',
+        tokenUsed: 0,
+        tokenBudget,
+        createdAt: new Date().toISOString(),
+        lastActivity: new Date().toISOString(),
+        logs: [{ id: generateId(), timestamp: new Date().toISOString(), type: 'system', content: 'Agent 已创建（模拟模式）' }],
+        reviews: [],
+      }
+      state.agents.push(newAgent)
+      persistAgents()
+      return
     }
-    state.agents.push(newAgent)
-    persistAgents()
+    sendToEngine({
+      type: 'create-agent',
+      payload: { name, repoUrl, instruction, tokenBudget },
+    })
   }
 
   function deleteAgent(id: string) {
-    const agent = state.agents.find((a) => a.id === id)
-    if (agent && agent.pid) {
-      killProcess(agent.pid).catch(() => {})
-      pidToAgentId.delete(agent.pid)
+    if (!isTauri) {
+      state.agents = state.agents.filter((a) => a.id !== id)
+      if (state.selectedAgentId === id) state.selectedAgentId = null
+      persistAgents()
+      return
     }
+    sendToEngine({ type: 'delete-agent', agentId: id })
     state.agents = state.agents.filter((a) => a.id !== id)
     if (state.selectedAgentId === id) state.selectedAgentId = null
     persistAgents()
   }
 
-  // ── Agent Lifecycle ──
-  async function startAgent(id: string) {
-    const agent = state.agents.find((a) => a.id === id)
-    if (!agent || agent.status !== 'pending') return
-
-    agent.status = 'cloning'
-    agent.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: '开始克隆仓库...' })
-
-    if (isTauri) {
-      try {
-        const parentDir = 'E:/workspace'
-        const targetDir = `${parentDir}/${agent.id}`
-        await execCommand('git', ['clone', agent.repoUrl, targetDir], parentDir)
-        agent.workspace = targetDir
-        agent.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `仓库已克隆到 ${targetDir}` })
-
-        await execGit(targetDir, ['checkout', '-b', agent.branch])
-        agent.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `已创建分支: ${agent.branch}` })
-
-        agent.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: '工作空间就绪，等待指令' })
-        agent.status = 'ready'
-        persistAgents()
-      } catch (err) {
-        agent.status = 'stopped'
-        agent.logs.push({ id: generateId(), timestamp: new Date(), type: 'error', content: `启动失败: ${String(err)}` })
-        persistAgents()
-      }
-    } else {
-      setTimeout(() => {
-        const a = state.agents.find((x) => x.id === id)
-        if (!a) return
-        a.workspace = `E:/workspace/${a.id}`
-        a.status = 'ready'
-        a.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `仓库已克隆到 ${a.workspace}` })
-        a.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `已创建分支: ${a.branch}` })
-        a.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: 'CLI 进程已就绪，等待指令' })
-        persistAgents()
-      }, 2000)
-    }
-  }
-
-  async function sendInstruction(id: string, instruction: string) {
-    const agent = state.agents.find((a) => a.id === id)
-    if (!agent || agent.status !== 'ready') return
-
-    agent.status = 'working'
-    agent.instruction = instruction
-    agent.logs.push({ id: generateId(), timestamp: new Date(), type: 'input', content: instruction, tokens: Math.floor(instruction.length / 2) })
-    agent.tokenUsed += Math.floor(instruction.length / 2)
-    agent.lastActivity = new Date()
-
-    if (agent.tokenUsed >= agent.tokenBudget) {
-      agent.logs.push({ id: generateId(), timestamp: new Date(), type: 'error', content: 'Token 预算已耗尽，无法执行新指令' })
+  function startAgent(id: string) {
+    if (!isTauri) {
+      const agent = state.agents.find((a) => a.id === id)
+      if (!agent) return
+      agent.status = 'ready'
+      agent.workspace = `E:/workspace/${agent.id}`
+      agent.logs.push({ id: generateId(), timestamp: new Date().toISOString(), type: 'system', content: '模拟：Agent 已就绪' })
       persistAgents()
       return
     }
+    sendToEngine({ type: 'start-agent', agentId: id })
+  }
 
-    if (isTauri && agent.workspace) {
-      const kimiPath = await detectKimiCli()
-      if (!kimiPath) {
-        agent.logs.push({ id: generateId(), timestamp: new Date(), type: 'error', content: 'Kimi CLI 未找到。请安装: py -3.12 -m pip install kimi-cli' })
-        agent.status = 'ready'
-        persistAgents()
-        return
-      }
-
-      await initProcessListeners()
-
-      try {
-        const pid = await spawnProcess(kimiPath, ['--print', '--quiet', '-w', agent.workspace, '-y', instruction], agent.workspace)
-        agent.pid = pid
-        pidToAgentId.set(pid, agent.id)
-        agent.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `Kimi CLI 已启动 (PID: ${pid})` })
-        persistAgents()
-      } catch (err) {
-        agent.status = 'ready'
-        agent.logs.push({ id: generateId(), timestamp: new Date(), type: 'error', content: `启动失败: ${String(err)}` })
-        persistAgents()
-      }
-    } else {
-      agent.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: 'Agent 开始执行任务（模拟）...' })
+  function sendInstruction(id: string, instruction: string) {
+    if (!isTauri) {
+      const agent = state.agents.find((a) => a.id === id)
+      if (!agent) return
+      agent.status = 'working'
+      agent.instruction = instruction
+      agent.logs.push({ id: generateId(), timestamp: new Date().toISOString(), type: 'input', content: instruction, tokens: Math.floor(instruction.length / 2) })
+      agent.tokenUsed += Math.floor(instruction.length / 2)
+      agent.lastActivity = new Date().toISOString()
       setTimeout(() => {
-        const a = state.agents.find((x) => x.id === id)
-        if (!a || a.status !== 'working') return
-        a.logs.push({ id: generateId(), timestamp: new Date(), type: 'output', content: '模拟执行完成。在 Tauri 桌面模式下将调用真实 Kimi CLI。', tokens: 42 })
-        a.status = 'ready'
-        a.lastActivity = new Date()
+        agent.status = 'ready'
+        agent.logs.push({ id: generateId(), timestamp: new Date().toISOString(), type: 'output', content: '模拟执行完成。在 Tauri 桌面模式下将调用真实 Kimi CLI。', tokens: 42 })
         persistAgents()
       }, 3000)
+      persistAgents()
+      return
     }
+    sendToEngine({ type: 'send-instruction', agentId: id, instruction })
   }
 
-  async function stopAgent(id: string) {
-    const agent = state.agents.find((a) => a.id === id)
-    if (!agent) return
-    if (isTauri && agent.pid) {
-      try {
-        await killProcess(agent.pid)
-      } catch {
-        /* ignore */
+  function stopAgent(id: string) {
+    if (!isTauri) {
+      const agent = state.agents.find((a) => a.id === id)
+      if (agent) {
+        agent.status = 'stopped'
+        agent.pid = undefined
+        agent.logs.push({ id: generateId(), timestamp: new Date().toISOString(), type: 'system', content: 'Agent 已停止' })
+        persistAgents()
       }
-      pidToAgentId.delete(agent.pid)
+      return
     }
-    agent.status = 'stopped'
-    agent.pid = undefined
-    agent.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: 'Agent 已停止' })
-    persistAgents()
+    sendToEngine({ type: 'stop-agent', agentId: id })
   }
 
-  async function submitForReview(id: string) {
-    const agent = state.agents.find((a) => a.id === id)
-    if (!agent || agent.status !== 'working') return
-
-    if (isTauri && agent.workspace) {
-      try {
-        await execGit(agent.workspace, ['add', '.'])
-        await execGit(agent.workspace, ['commit', '-m', `feat: ${agent.name}`])
-        await execGit(agent.workspace, ['push', 'origin', agent.branch])
-        agent.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: '代码已推送至远程' })
-      } catch (err) {
-        agent.logs.push({ id: generateId(), timestamp: new Date(), type: 'error', content: `推送失败: ${String(err)}` })
-        return
-      }
-    }
-
-    const reviewers: ReviewEntry[] = state.agents
-      .filter((a) => a.id !== agent.id)
-      .map((a) => ({
-        reviewerTaskId: a.id,
-        reviewerName: a.name,
-        status: 'pending' as const,
-      }))
-    agent.reviews = reviewers
-
-    if (reviewers.length > 0) {
-      agent.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `已指派 ${reviewers.length} 个 Agent 进行审阅` })
-    }
-
-    if (hasToken()) {
-      try {
-        const pr = await createPullRequest(agent.repoUrl, `feat: ${agent.name}`, agent.branch)
-        agent.status = 'reviewing'
-        agent.prStatus = 'open'
-        agent.prNumber = pr.number
-        agent.prUrl = pr.html_url
-        agent.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `PR #${pr.number} 已创建: ${pr.html_url}` })
-      } catch (err) {
-        agent.logs.push({ id: generateId(), timestamp: new Date(), type: 'error', content: `创建 PR 失败: ${String(err)}` })
-      }
-    } else {
+  function submitForReview(id: string) {
+    if (!isTauri) {
+      const agent = state.agents.find((a) => a.id === id)
+      if (!agent || agent.status !== 'working') return
+      const reviewers: ReviewEntry[] = state.agents
+        .filter((a) => a.id !== agent.id)
+        .map((a) => ({
+          reviewerTaskId: a.id,
+          reviewerName: a.name,
+          status: 'pending' as const,
+        }))
+      agent.reviews = reviewers
       agent.status = 'reviewing'
       agent.prStatus = 'open'
       agent.prNumber = Math.floor(Math.random() * 100) + 1
       agent.prUrl = `${agent.repoUrl.replace(/\.git$/, '')}/pull/${agent.prNumber}`
-      agent.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `PR #${agent.prNumber} 已创建（模拟，未配置 GitHub Token）` })
-
-      if (!isTauri && reviewers.length > 0) {
+      agent.logs.push({ id: generateId(), timestamp: new Date().toISOString(), type: 'system', content: `PR #${agent.prNumber} 已创建（模拟）` })
+      if (reviewers.length > 0) {
         setTimeout(() => {
-          const a = state.agents.find((x) => x.id === id)
-          if (!a || a.status !== 'reviewing') return
-          a.reviews.forEach((r) => {
+          agent.reviews.forEach((r) => {
             r.status = 'approved'
-            r.reviewedAt = new Date()
+            r.reviewedAt = new Date().toISOString()
           })
-          a.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `全员审阅通过（${reviewers.length}/${reviewers.length}），等待指挥官合并` })
-          a.lastActivity = new Date()
+          agent.logs.push({ id: generateId(), timestamp: new Date().toISOString(), type: 'system', content: `全员审阅通过（${reviewers.length}/${reviewers.length}），等待指挥官合并` })
           persistAgents()
         }, 3000)
       }
-    }
-    persistAgents()
-  }
-
-  function canMerge(agent: AgentTask): boolean {
-    if (agent.reviews.length === 0) return true
-    return agent.reviews.every((r) => r.status === 'approved')
-  }
-
-  async function mergePr(id: string) {
-    const agent = state.agents.find((a) => a.id === id)
-    if (!agent || agent.status !== 'reviewing') return
-
-    if (!canMerge(agent)) {
-      const approved = agent.reviews.filter((r) => r.status === 'approved').length
-      agent.logs.push({ id: generateId(), timestamp: new Date(), type: 'error', content: `合并被拒绝：需等待全员审阅通过（${approved}/${agent.reviews.length}）` })
+      persistAgents()
       return
     }
+    sendToEngine({ type: 'submit-for-review', agentId: id })
+  }
 
-    if (hasToken() && agent.prNumber) {
-      try {
-        await mergePullRequest(agent.repoUrl, agent.prNumber)
-        agent.status = 'completed'
-        agent.prStatus = 'merged'
-        agent.reviews = []
-        agent.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `PR #${agent.prNumber} 已合并到 main` })
-      } catch (err) {
-        agent.logs.push({ id: generateId(), timestamp: new Date(), type: 'error', content: `合并失败: ${String(err)}` })
+  function mergePr(id: string) {
+    if (!isTauri) {
+      const agent = state.agents.find((a) => a.id === id)
+      if (!agent || agent.status !== 'reviewing') return
+      const canMerge = agent.reviews.length === 0 || agent.reviews.every((r) => r.status === 'approved')
+      if (!canMerge) {
+        const approved = agent.reviews.filter((r) => r.status === 'approved').length
+        agent.logs.push({ id: generateId(), timestamp: new Date().toISOString(), type: 'error', content: `合并被拒绝：需等待全员审阅通过（${approved}/${agent.reviews.length}）` })
+        persistAgents()
+        return
       }
-    } else {
       agent.status = 'completed'
       agent.prStatus = 'merged'
       agent.reviews = []
-      agent.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `PR #${agent.prNumber} 已合并到 main（模拟）` })
+      agent.logs.push({ id: generateId(), timestamp: new Date().toISOString(), type: 'system', content: `PR #${agent.prNumber} 已合并到 main（模拟）` })
+      persistAgents()
+      return
     }
-    persistAgents()
+    sendToEngine({ type: 'merge-pr', agentId: id })
   }
 
   function rejectPr(id: string) {
-    const agent = state.agents.find((a) => a.id === id)
-    if (!agent || agent.status !== 'reviewing') return
-    agent.status = 'working'
-    agent.prStatus = 'none'
-    agent.reviews = []
-    agent.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: 'PR 被打回，Agent 继续修改' })
-    persistAgents()
+    if (!isTauri) {
+      const agent = state.agents.find((a) => a.id === id)
+      if (!agent || agent.status !== 'reviewing') return
+      agent.status = 'working'
+      agent.prStatus = 'none'
+      agent.reviews = []
+      agent.logs.push({ id: generateId(), timestamp: new Date().toISOString(), type: 'system', content: 'PR 被打回，Agent 继续修改' })
+      persistAgents()
+      return
+    }
+    sendToEngine({ type: 'reject-pr', agentId: id })
   }
 
   function submitReview(agentId: string, reviewerAgentId: string, approved: boolean) {
-    const agent = state.agents.find((a) => a.id === agentId)
-    if (!agent || agent.status !== 'reviewing') return
-
-    const review = agent.reviews.find((r) => r.reviewerTaskId === reviewerAgentId)
-    if (!review) return
-
-    review.status = approved ? 'approved' : 'rejected'
-    review.reviewedAt = new Date()
-    const action = approved ? '通过' : '拒绝'
-    agent.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: `Agent「${review.reviewerName}」审阅${action}了此 PR` })
-    agent.lastActivity = new Date()
-
-    const approvedCount = agent.reviews.filter((r) => r.status === 'approved').length
-    if (approvedCount === agent.reviews.length) {
-      agent.logs.push({ id: generateId(), timestamp: new Date(), type: 'system', content: '全员审阅通过，等待指挥官合并' })
+    if (!isTauri) {
+      const agent = state.agents.find((a) => a.id === agentId)
+      if (!agent || agent.status !== 'reviewing') return
+      const review = agent.reviews.find((r) => r.reviewerTaskId === reviewerAgentId)
+      if (!review) return
+      review.status = approved ? 'approved' : 'rejected'
+      review.reviewedAt = new Date().toISOString()
+      const action = approved ? '通过' : '拒绝'
+      agent.logs.push({ id: generateId(), timestamp: new Date().toISOString(), type: 'system', content: `Agent「${review.reviewerName}」审阅${action}了此 PR` })
+      persistAgents()
+      return
     }
-    persistAgents()
+    sendToEngine({ type: 'submit-review', agentId, reviewerAgentId, approved })
   }
 
   async function getFileDiff(agentId: string, filePath: string): Promise<string> {
     const agent = state.agents.find((a) => a.id === agentId)
-    if (!agent || !agent.workspace) return ''
+    if (!agent) return ''
     if (!isTauri) return `mock diff for ${filePath}`
-    try {
-      return await execGit(agent.workspace, ['diff', '--', filePath])
-    } catch {
-      return ''
-    }
+    // TODO: implement engine-based diff retrieval
+    return ''
   }
 
   return {
@@ -540,16 +432,13 @@ export function useSwarmStore() {
     isLoggedIn: computed(() => state.isLoggedIn),
     isAuthLoading: computed(() => state.isAuthLoading),
     authError: computed(() => state.authError),
+    engineConnected: computed(() => state.engineConnected),
     canCreateAgent,
     maxAgents: MAX_AGENTS,
 
     // Actions
-    setSelectedAgentId: (id: string | null) => {
-      state.selectedAgentId = id
-    },
-    setIsCreateModalOpen: (v: boolean) => {
-      state.isCreateModalOpen = v
-    },
+    setSelectedAgentId: (id: string | null) => { state.selectedAgentId = id },
+    setIsCreateModalOpen: (v: boolean) => { state.isCreateModalOpen = v },
     login,
     logout,
     createAgent,

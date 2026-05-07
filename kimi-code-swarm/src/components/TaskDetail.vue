@@ -174,7 +174,7 @@ watch(() => props.task.logs.length, async () => {
               <CheckCircle v-else-if="review.status === 'approved'" class="w-3.5 h-3.5 text-emerald-400" />
               <XCircle v-else class="w-3.5 h-3.5 text-red-400" />
               <span class="text-gray-300">{{ review.reviewerName }}</span>
-              <span v-if="review.reviewedAt" class="text-gray-600">{{ review.reviewedAt.toLocaleTimeString() }}</span>
+              <span v-if="review.reviewedAt" class="text-gray-600">{{ new Date(review.reviewedAt).toLocaleTimeString() }}</span>
             </div>
             <div v-if="review.status === 'pending'" class="flex items-center gap-1">
               <button
@@ -280,7 +280,7 @@ watch(() => props.task.logs.length, async () => {
         <component :is="logTypeConfig[log.type].icon" :class="['w-4 h-4 mt-0.5 shrink-0', logTypeConfig[log.type].color]" />
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 mb-0.5">
-            <span class="text-xs text-gray-500">{{ log.timestamp.toLocaleTimeString() }}</span>
+            <span class="text-xs text-gray-500">{{ new Date(log.timestamp).toLocaleTimeString() }}</span>
             <span v-if="log.tokens" class="text-xs text-gray-600">{{ log.tokens }} tokens</span>
           </div>
           <p :class="['text-sm whitespace-pre-wrap break-words', log.type === 'error' ? 'text-red-300' : 'text-gray-300']">

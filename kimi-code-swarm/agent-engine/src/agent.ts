@@ -1,0 +1,268 @@
+import type { AgentState, LogEntry, ReviewEntry, TaskStatus, EngineEvent } from './types.js'
+import { runKimi, detectKimiCli, type KimiProcess } from './kimi.js'
+import { getChangedFiles, getFileDiff, gitAdd, gitCommit, gitPush, createBranch, cloneRepo } from './git.js'
+
+let idCounter = 0
+const generateId = () => `agent-${Date.now().toString(36)}${(idCounter++).toString(36)}`
+
+const branchName = (name: string) => {
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+  return `agent/${slug}-${generateId().slice(-4)}`
+}
+
+export class Agent {
+  state: AgentState
+  private process?: KimiProcess
+  private emit: (event: EngineEvent) => void
+  private running = false
+
+  constructor(
+    name: string,
+    repoUrl: string,
+    instruction: string,
+    tokenBudget: number,
+    emit: (event: EngineEvent) => void,
+  ) {
+    this.emit = emit
+    this.state = {
+      id: generateId(),
+      name,
+      status: 'pending',
+      repoUrl,
+      workspace: '',
+      branch: branchName(name),
+      instruction,
+      prStatus: 'none',
+      tokenUsed: 0,
+      tokenBudget,
+      createdAt: new Date().toISOString(),
+      lastActivity: new Date().toISOString(),
+      logs: [this.makeLog('system', 'Agent 已创建，等待启动...')],
+      reviews: [],
+    }
+  }
+
+  private makeLog(type: LogEntry['type'], content: string, tokens?: number): LogEntry {
+    return {
+      id: generateId(),
+      timestamp: new Date().toISOString(),
+      type,
+      content,
+      tokens,
+    }
+  }
+
+  private log(type: LogEntry['type'], content: string, tokens?: number) {
+    const entry = this.makeLog(type, content, tokens)
+    this.state.logs.push(entry)
+    this.state.lastActivity = new Date().toISOString()
+    this.emit({ type: 'log', agentId: this.state.id, entry })
+  }
+
+  private setStatus(status: TaskStatus) {
+    this.state.status = status
+    this.emit({ type: 'agent-status', agentId: this.state.id, status })
+  }
+
+  async start() {
+    if (this.state.status !== 'pending') return
+    this.setStatus('cloning')
+    this.log('system', '开始克隆仓库...')
+
+    try {
+      const parentDir = 'E:/workspace'
+      const targetDir = `${parentDir}/${this.state.id}`
+      await cloneRepo(this.state.repoUrl, targetDir, parentDir)
+      this.state.workspace = targetDir
+      this.log('system', `仓库已克隆到 ${targetDir}`)
+
+      await createBranch(targetDir, this.state.branch)
+      this.log('system', `已创建分支: ${this.state.branch}`)
+
+      this.log('system', '工作空间就绪，等待指令')
+      this.setStatus('ready')
+    } catch (err) {
+      this.setStatus('stopped')
+      this.log('error', `启动失败: ${String(err)}`)
+    }
+  }
+
+  async sendInstruction(instruction: string) {
+    if (this.state.status !== 'ready') return
+
+    this.setStatus('working')
+    this.state.instruction = instruction
+    const inputTokens = Math.floor(instruction.length / 2)
+    this.state.tokenUsed += inputTokens
+    this.log('input', instruction, inputTokens)
+
+    if (this.state.tokenUsed >= this.state.tokenBudget) {
+      this.log('error', 'Token 预算已耗尽，无法执行新指令')
+      return
+    }
+
+    const kimiPath = await detectKimiCli()
+    if (!kimiPath) {
+      this.log('error', 'Kimi CLI 未找到。请安装: py -3.12 -m pip install kimi-cli')
+      this.setStatus('ready')
+      return
+    }
+
+    this.process = runKimi(kimiPath, this.state.workspace, instruction)
+    this.state.pid = this.process.pid
+    this.log('system', `Kimi CLI 已启动 (PID: ${this.process.pid})`)
+    this.running = true
+
+    // stdout reader
+    ;(async () => {
+      try {
+        for await (const line of this.process!.stdout) {
+          if (!this.running) break
+          const estimated = Math.max(1, Math.floor(line.length / 4))
+          this.state.tokenUsed = Math.min(this.state.tokenUsed + estimated, this.state.tokenBudget)
+          this.log('output', line)
+          this.emit({ type: 'agent-output', agentId: this.state.id, line, isStderr: false })
+
+          if (this.state.tokenUsed >= this.state.tokenBudget) {
+            this.process!.kill()
+            this.log('error', 'Token 预算已耗尽，Agent 执行被中断')
+            break
+          }
+        }
+      } catch {
+        // ignore
+      }
+    })()
+
+    // stderr reader
+    ;(async () => {
+      try {
+        for await (const line of this.process!.stderr) {
+          if (!this.running) break
+          this.log('error', line)
+          this.emit({ type: 'agent-output', agentId: this.state.id, line, isStderr: true })
+        }
+      } catch {
+        // ignore
+      }
+    })()
+
+    // wait for exit
+    const code = await this.process.wait()
+    this.running = false
+    this.state.pid = undefined
+
+    if (this.state.status === 'working') {
+      this.setStatus('ready')
+      this.log(
+        'system',
+        code === 0
+          ? 'Agent 执行完毕，可以继续发送指令或提交审阅'
+          : `Agent 进程退出 (code: ${code ?? 'unknown'})`,
+      )
+
+      // detect changed files
+      if (this.state.workspace) {
+        const files = await getChangedFiles(this.state.workspace)
+        this.state.changedFiles = files
+        if (files.length > 0) {
+          this.log('system', `文件变更: ${files.length} 个文件`)
+          this.emit({ type: 'file-changed', agentId: this.state.id, files })
+        }
+      }
+    }
+  }
+
+  stop() {
+    if (this.process) {
+      this.process.kill()
+      this.running = false
+    }
+    this.state.pid = undefined
+    this.setStatus('stopped')
+    this.log('system', 'Agent 已停止')
+  }
+
+  async submitForReview() {
+    if (this.state.status !== 'working') return
+
+    if (this.state.workspace) {
+      try {
+        await gitAdd(this.state.workspace)
+        await gitCommit(this.state.workspace, `feat: ${this.state.name}`)
+        await gitPush(this.state.workspace, this.state.branch)
+        this.log('system', '代码已推送至远程')
+      } catch (err) {
+        this.log('error', `推送失败: ${String(err)}`)
+        return
+      }
+    }
+
+    this.setStatus('reviewing')
+    this.state.prStatus = 'open'
+    this.state.prNumber = Math.floor(Math.random() * 100) + 1
+    this.state.prUrl = `${this.state.repoUrl.replace(/\.git$/, '')}/pull/${this.state.prNumber}`
+    this.log('system', `PR #${this.state.prNumber} 已创建`)
+  }
+
+  canMerge(): boolean {
+    if (this.state.reviews.length === 0) return true
+    return this.state.reviews.every((r) => r.status === 'approved')
+  }
+
+  mergePr() {
+    if (this.state.status !== 'reviewing') return
+    if (!this.canMerge()) {
+      const approved = this.state.reviews.filter((r) => r.status === 'approved').length
+      this.log('error', `合并被拒绝：需等待全员审阅通过（${approved}/${this.state.reviews.length}）`)
+      return
+    }
+    this.setStatus('completed')
+    this.state.prStatus = 'merged'
+    this.state.reviews = []
+    this.log('system', `PR #${this.state.prNumber} 已合并到 main`)
+  }
+
+  rejectPr() {
+    if (this.state.status !== 'reviewing') return
+    this.setStatus('working')
+    this.state.prStatus = 'none'
+    this.state.reviews = []
+    this.log('system', 'PR 被打回，Agent 继续修改')
+  }
+
+  submitReview(reviewerAgentId: string, approved: boolean) {
+    if (this.state.status !== 'reviewing') return
+    const review = this.state.reviews.find((r) => r.reviewerAgentId === reviewerAgentId)
+    if (!review) return
+
+    review.status = approved ? 'approved' : 'rejected'
+    review.reviewedAt = new Date().toISOString()
+    const action = approved ? '通过' : '拒绝'
+    this.log('system', `Agent「${review.reviewerName}」审阅${action}了此 PR`)
+
+    const approvedCount = this.state.reviews.filter((r) => r.status === 'approved').length
+    if (approvedCount === this.state.reviews.length) {
+      this.log('system', '全员审阅通过，等待指挥官合并')
+    }
+  }
+
+  async getFileDiff(filePath: string): Promise<string> {
+    if (!this.state.workspace) return ''
+    return getFileDiff(this.state.workspace, filePath)
+  }
+
+  assignReviewers(allAgents: Agent[]) {
+    const reviewers: ReviewEntry[] = allAgents
+      .filter((a) => a.state.id !== this.state.id)
+      .map((a) => ({
+        reviewerAgentId: a.state.id,
+        reviewerName: a.state.name,
+        status: 'pending' as const,
+      }))
+    this.state.reviews = reviewers
+    if (reviewers.length > 0) {
+      this.log('system', `已指派 ${reviewers.length} 个 Agent 进行审阅`)
+    }
+  }
+}

@@ -13,7 +13,7 @@ export interface ReviewEntry {
   reviewerTaskId: string
   reviewerName: string
   status: 'pending' | 'approved' | 'rejected'
-  reviewedAt?: Date
+  reviewedAt?: string
 }
 
 export interface AgentTask {
@@ -30,8 +30,8 @@ export interface AgentTask {
   tokenUsed: number
   tokenBudget: number
   pid?: number
-  createdAt: Date
-  lastActivity: Date
+  createdAt: string
+  lastActivity: string
   logs: LogEntry[]
   reviews: ReviewEntry[]
   changedFiles?: string[]
@@ -39,7 +39,7 @@ export interface AgentTask {
 
 export interface LogEntry {
   id: string
-  timestamp: Date
+  timestamp: string
   type: 'system' | 'input' | 'output' | 'error'
   content: string
   tokens?: number

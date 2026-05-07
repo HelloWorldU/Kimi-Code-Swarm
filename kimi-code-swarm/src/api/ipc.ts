@@ -4,6 +4,8 @@ import { load } from '@tauri-apps/plugin-store'
 
 export const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 
+// ── Legacy process commands ──
+
 export async function execGit(dir: string, args: string[]): Promise<string> {
   if (!isTauri) return `mock: git ${args.join(' ')}`
   return invoke('exec_git', { dir, args })
@@ -55,7 +57,48 @@ export async function listenProcessExit(
   return unlisten
 }
 
-// ── API Key Management (via OS keyring) ──
+// ── Agent Engine commands ──
+
+export async function spawnAgentEngine(cwd: string): Promise<number> {
+  if (!isTauri) return 0
+  return invoke('spawn_agent_engine', { cwd })
+}
+
+export async function sendToEngine(command: object): Promise<void> {
+  if (!isTauri) return
+  return invoke('send_to_engine', { command: JSON.stringify(command) })
+}
+
+export async function isEngineRunning(): Promise<boolean> {
+  if (!isTauri) return false
+  return invoke('is_engine_running')
+}
+
+export interface AgentEngineEventPayload {
+  line: string
+}
+
+export async function listenAgentEngineEvent(
+  callback: (payload: AgentEngineEventPayload) => void,
+): Promise<() => void> {
+  if (!isTauri) return () => {}
+  const unlisten = await listen<AgentEngineEventPayload>('agent-engine-event', (event) => {
+    callback(event.payload)
+  })
+  return unlisten
+}
+
+export async function listenAgentEngineExit(
+  callback: (payload: { pid: number }) => void,
+): Promise<() => void> {
+  if (!isTauri) return () => {}
+  const unlisten = await listen<{ pid: number }>('agent-engine-exit', (event) => {
+    callback(event.payload)
+  })
+  return unlisten
+}
+
+// ── API Key Management ──
 
 export async function saveApiKey(key: string): Promise<void> {
   if (!isTauri) {
@@ -80,7 +123,7 @@ export async function deleteApiKey(): Promise<void> {
   return invoke('delete_api_key')
 }
 
-// ── App State Persistence (via tauri-plugin-store) ──
+// ── App State Persistence ──
 
 const STORE_NAME = 'app-state.json'
 

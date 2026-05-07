@@ -16,7 +16,8 @@ Vue 3 + TypeScript + Vite + Tailwind CSS + lucide-vue-next + Tauri v2 + @tauri-a
 
 ## 关键文件
 
-- `store/useSwarmStore.ts` — 状态必须通过方法修改；核心模型 AgentTask 含状态机 + PR 追踪
+- `store/useSwarmStore.ts` — UI 状态管理；业务逻辑委托给 Node.js Agent 引擎
+- `agent-engine/src/engine.ts` — Node.js Agent 编排引擎（生命周期 + Kimi CLI + Token 监控）
 - `types/index.ts` — AgentTask / LogEntry / CommandCenterStats；修改前检查上下游依赖
 - `api/github.ts` — GitHub API 封装（PR 创建/合并/查询）
 - `api/ipc.ts` — Tauri IPC 适配层
