@@ -186,20 +186,9 @@ fn spawn_agent_engine(app: tauri::AppHandle) -> Result<u32, String> {
         entry.get_password().ok()
     };
 
-    // Determine entry point: prefer dist/index.js, fallback to src/index.ts
-    let entry_point = if engine_dir.join("dist/index.js").exists() {
-        "dist/index.js"
-    } else {
-        "src/index.ts"
-    };
-    let node_args = if entry_point.ends_with(".ts") {
-        vec!["--experimental-strip-types", entry_point]
-    } else {
-        vec![entry_point]
-    };
-
-    let mut cmd_builder = Command::new("node");
-    cmd_builder.args(&node_args)
+    // Use tsx to run TypeScript directly (handles .js -> .ts resolution)
+    let mut cmd_builder = Command::new("npx");
+    cmd_builder.args(["tsx", "src/index.ts"])
         .current_dir(&engine_dir)
         .stdout(Stdio::piped())
         .stdin(Stdio::piped());

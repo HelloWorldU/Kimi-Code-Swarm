@@ -62,3 +62,29 @@ PR 创建时，Store 自动生成 `ReviewEntry[]`，包含所有其他 Agent 作
 | GitHub API 封装 | ⚡ 双模式（Token 可选） |
 | 审阅门控逻辑 | ✅ 真实 |
 | Kimi CLI 接入 (`detectKimiCli` + `spawn_process` + 实时事件) | ✅ 真实 |
+
+## 引擎目录探测（开发/生产兼容性）
+
+Rust `spawn_agent_engine()` 需要找到 `agent-engine` 目录。不同环境下的位置不同：
+
+| 环境 | 当前工作目录 | agent-engine 实际位置 | 探测策略 |
+|------|-------------|----------------------|---------|
+| Tauri Dev (`cargo run`) | `src-tauri/` | `../agent-engine` | 优先检查 `../agent-engine` |
+| Tauri Prod Bundle | 应用安装目录 | 与 app bundle 同级或内部 | fallback 到 `app_local_data_dir/agent-engine` |
+
+```rust
+fn agent_engine_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    // 1. 尝试 ../agent-engine（开发模式）
+    // 2. fallback 到 app_local_data_dir/agent-engine（生产模式）
+}
+```
+
+**教训**：不要用硬编码的相对路径 `'agent-engine'`。Tauri Dev 模式下 `cargo run` 的 CWD 是 `src-tauri/`，`agent-engine` 会指向 `src-tauri/agent-engine`（不存在），必须用 `../agent-engine`。
+
+## TypeScript 执行方案
+
+Agent Engine 用 TypeScript 编写，Rust 直接启动。详见 [`docs/CLI_HARNESS.md`](CLI_HARNESS.md) 的选型记录。
+
+简要结论：
+- ❌ `node --experimental-strip-types` — Windows ESM 下 `.js`→`.ts` 映射失败
+- ✅ `npx tsx src/index.ts` — esbuild 驱动，seamless 映射，开发体验最佳
