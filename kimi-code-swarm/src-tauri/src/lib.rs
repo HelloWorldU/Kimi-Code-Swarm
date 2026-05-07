@@ -223,6 +223,28 @@ fn delete_api_key() -> Result<(), String> {
     Ok(())
 }
 
+/// Verify Kimi API key by calling /v1/models endpoint
+#[tauri::command]
+fn verify_api_key(key: String) -> Result<bool, String> {
+    let resp = ureq::get("https://api.moonshot.cn/v1/models")
+        .set("Authorization", &format!("Bearer {}", key))
+        .call();
+    match resp {
+        Ok(r) => Ok(r.status() == 200),
+        Err(ureq::Error::Status(code, r)) => {
+            let body = r.into_string().unwrap_or_default();
+            if code == 401 {
+                Err("API Key 无效或已过期".to_string())
+            } else {
+                Err(format!("验证失败 (HTTP {}): {}", code, body))
+            }
+        }
+        Err(ureq::Error::Transport(e)) => {
+            Err(format!("网络错误: {}", e.message().unwrap_or("unknown")))
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -240,6 +262,7 @@ pub fn run() {
             save_api_key,
             get_api_key,
             delete_api_key,
+            verify_api_key,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

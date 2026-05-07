@@ -152,24 +152,17 @@ export async function saveStoreValue<T>(key: string, value: T): Promise<void> {
   await store.set(key, value)
 }
 
-// ── Kimi API Verification ──
-
-const KIMI_API_BASE = 'https://api.moonshot.cn/v1'
+// ── Kimi API Verification (via Rust backend, avoids WebView fetch encoding issues) ──
 
 export async function verifyKimiApiKey(key: string): Promise<{ valid: boolean; error?: string }> {
+  if (!isTauri) {
+    // Browser mock mode: simulate validation
+    return key.startsWith('sk-') ? { valid: true } : { valid: false, error: '浏览器模式：Key 需以 sk- 开头' }
+  }
   try {
-    const resp = await fetch(`${KIMI_API_BASE}/models`, {
-      headers: { Authorization: `Bearer ${key}` },
-    })
-    if (resp.status === 401) {
-      return { valid: false, error: 'API Key 无效或已过期' }
-    }
-    if (!resp.ok) {
-      const body = await resp.text().catch(() => '')
-      return { valid: false, error: `验证失败 (HTTP ${resp.status}): ${body.slice(0, 200)}` }
-    }
-    return { valid: true }
+    const ok = await invoke<boolean>('verify_api_key', { key })
+    return { valid: ok }
   } catch (e) {
-    return { valid: false, error: `网络错误: ${e instanceof Error ? e.message : String(e)}` }
+    return { valid: false, error: e instanceof Error ? e.message : String(e) }
   }
 }
