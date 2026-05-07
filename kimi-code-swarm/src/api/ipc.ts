@@ -165,10 +165,11 @@ export async function verifyKimiApiKey(key: string): Promise<{ valid: boolean; e
       return { valid: false, error: 'API Key 无效或已过期' }
     }
     if (!resp.ok) {
-      return { valid: false, error: `验证失败 (HTTP ${resp.status})` }
+      const body = await resp.text().catch(() => '')
+      return { valid: false, error: `验证失败 (HTTP ${resp.status}): ${body.slice(0, 200)}` }
     }
     return { valid: true }
   } catch (e) {
-    return { valid: false, error: `网络错误: ${String(e)}` }
+    return { valid: false, error: `网络错误: ${e instanceof Error ? e.message : String(e)}` }
   }
 }
