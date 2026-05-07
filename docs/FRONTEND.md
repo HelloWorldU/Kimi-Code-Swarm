@@ -11,7 +11,7 @@ Vue 3 + TypeScript + Vite + Tailwind CSS + lucide-vue-next + Tauri v2 + @tauri-a
 1. `<script setup lang="ts">`，禁止 Options API
 2. Tailwind 原子类，禁止 `<style scoped>`
 3. 图标从 `lucide-vue-next` 导入
-4. 状态色：running=emerald, idle=blue, error=red, queued=amber, stopped=gray
+4. 状态色：running=emerald, idle=blue, error=red, queued=amber, stopped=gray；统一使用 `-600` 文字 + `-50` 背景，白色简约主题
 5. 新增组件必须在 App.vue 注册
 
 ## 关键文件
@@ -65,14 +65,14 @@ npm run build         # 生产构建
 
 | 功能 | 状态 | 备注 |
 |------|------|------|
-| API Key 登录 | ✅ 真实 | keyring 安全存储，Kimi API 验证 |
-| Agent Dashboard（最多5个） | ✅ 真实 | 卡片网格，数量限制，点击进入详情 |
-| Agent 详情页 | ✅ 真实 | 指令输入 + 实时日志 + PR 审阅 + 文件变更 |
-| 新建 Agent 弹窗 | ✅ 真实 | |
+| API Key 登录 | ✅ 真实 | keyring 安全存储，Kimi CLI 存在性验证，退出完整重置 |
+| Agent Dashboard（最多5个） | ✅ 真实 | 卡片网格，数量限制，点击进入详情；白色简约 UI |
+| Agent 详情页 | ✅ 真实 | 指令输入 + 实时日志 + PR 审阅 + 文件变更；白色简约 UI |
+| 新建 Agent 弹窗 | ✅ 真实 | 白色简约 UI |
 | 实时日志流 | ✅ 真实 | spawn_process + process-output 事件推送 |
-| PR 审阅面板 | ✅ 真实 | 含审阅者列表、进度、门控 |
-| SettingsPanel（Token 配置） | ✅ 真实 | localStorage 持久化 |
-| 监控分析页 | ✅ 真实 | 状态分布、Token 排行、活跃/审阅任务 |
+| PR 审阅面板 | ✅ 真实 | 含审阅者列表、进度、门控；白色简约 UI |
+| SettingsPanel（Token 配置） | ✅ 真实 | localStorage 持久化；白色简约 UI |
+| 监控分析页 | ✅ 真实 | 状态分布、Token 排行、活跃/审阅任务；白色简约 UI |
 | Agent 状态持久化 | ✅ 真实 | tauri-plugin-store 自动保存/恢复 |
 
 文档同步检测被阻断时，不直接告知需要更新哪个文档——Agent 需回顾本次会话已读文档，或查阅 AGENTS.md 地图自行定位关联文档。

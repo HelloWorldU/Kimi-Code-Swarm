@@ -4,7 +4,7 @@
 
 @layer base {
   body {
-    @apply bg-gray-950 text-gray-100 antialiased;
+    @apply bg-white text-gray-800 antialiased;
     font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
   }
 }
@@ -18,10 +18,10 @@
     background: transparent;
   }
   .scrollbar-thin::-webkit-scrollbar-thumb {
-    background: #374151;
+    background: #d1d5db;
     border-radius: 3px;
   }
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background: #4b5563;
+    background: #9ca3af;
   }
 }

@@ -25,9 +25,9 @@ const totalBudget = computed(() => props.agents.reduce((sum, a) => sum + a.token
 
 const statCards = [
   { label: 'Agent 总数', value: () => `${props.agents.length} / ${props.maxAgents}`, sub: () => '最多同时运行 5 个', icon: Users, color: 'bg-swarm-600' },
-  { label: '活跃 Agent', value: () => activeCount.value.toString(), sub: () => '正在工作中', icon: Activity, color: 'bg-amber-600' },
-  { label: '已完成', value: () => completedCount.value.toString(), sub: () => '累计交付', icon: CheckCircle, color: 'bg-emerald-600' },
-  { label: 'Token 消耗', value: () => `${(totalTokens.value / 1000).toFixed(1)}K`, sub: () => `预算 ${(totalBudget.value / 1000).toFixed(0)}K`, icon: Coins, color: 'bg-blue-600' },
+  { label: '活跃 Agent', value: () => activeCount.value.toString(), sub: () => '正在工作中', icon: Activity, color: 'bg-amber-500' },
+  { label: '已完成', value: () => completedCount.value.toString(), sub: () => '累计交付', icon: CheckCircle, color: 'bg-emerald-500' },
+  { label: 'Token 消耗', value: () => `${(totalTokens.value / 1000).toFixed(1)}K`, sub: () => `预算 ${(totalBudget.value / 1000).toFixed(0)}K`, icon: Coins, color: 'bg-blue-500' },
 ]
 </script>
 
@@ -38,15 +38,15 @@ const statCards = [
       <div
         v-for="stat in statCards"
         :key="stat.label"
-        class="bg-gray-800/40 border border-gray-700/50 rounded-xl p-4 flex items-center gap-4"
+        class="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-4 shadow-sm"
       >
         <div :class="['w-12 h-12 rounded-xl flex items-center justify-center', stat.color]">
           <component :is="stat.icon" class="w-6 h-6 text-white" />
         </div>
         <div>
-          <p class="text-xs text-gray-500 font-medium">{{ stat.label }}</p>
-          <p class="text-2xl font-bold text-white">{{ stat.value() }}</p>
-          <p class="text-xs text-gray-500">{{ stat.sub() }}</p>
+          <p class="text-xs text-gray-400 font-medium">{{ stat.label }}</p>
+          <p class="text-2xl font-bold text-gray-900">{{ stat.value() }}</p>
+          <p class="text-xs text-gray-400">{{ stat.sub() }}</p>
         </div>
       </div>
     </div>
@@ -54,22 +54,22 @@ const statCards = [
     <!-- Header -->
     <div class="flex items-center justify-between mb-4">
       <div class="flex items-center gap-3">
-        <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wider">Agent 列表</h3>
-        <span class="text-xs text-gray-600 bg-gray-800/60 px-2 py-0.5 rounded-full">
+        <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wider">Agent 列表</h3>
+        <span class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
           {{ agents.length }} / {{ maxAgents }}
         </span>
       </div>
-      <div class="flex items-center gap-2 text-xs text-gray-500">
-        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-400" /> 工作中</span>
-        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-purple-400" /> 待审阅</span>
-        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-400" /> 已完成</span>
+      <div class="flex items-center gap-2 text-xs text-gray-400">
+        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-500" /> 工作中</span>
+        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-purple-500" /> 待审阅</span>
+        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-emerald-500" /> 已完成</span>
       </div>
     </div>
 
     <!-- Agents Grid -->
     <div class="flex-1 overflow-y-auto scrollbar-thin">
-      <div v-if="agents.length === 0" class="h-full flex flex-col items-center justify-center text-gray-600">
-        <Bot class="w-12 h-12 mb-3 opacity-30" />
+      <div v-if="agents.length === 0" class="h-full flex flex-col items-center justify-center text-gray-400">
+        <Bot class="w-12 h-12 mb-3 opacity-40" />
         <p class="text-sm">还没有 Agent</p>
         <p class="text-xs mt-1">点击右上角按钮创建你的第一个 Agent</p>
       </div>

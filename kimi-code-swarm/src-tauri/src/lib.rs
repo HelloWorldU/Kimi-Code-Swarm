@@ -1,8 +1,10 @@
 use std::io::{BufRead, BufReader, Write};
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::sync::{Arc, LazyLock, Mutex};
 use std::collections::HashSet;
 use tauri::Emitter;
+use tauri::Manager;
 
 const KEYRING_SERVICE: &str = "kimi-code-swarm";
 const KEYRING_ACCOUNT: &str = "api-key";
@@ -30,6 +32,39 @@ struct ProcessExitEvent {
 #[derive(serde::Serialize, Clone)]
 struct AgentEngineEvent {
     line: String,
+}
+
+// ── Helper: find agent-engine directory ──
+fn agent_engine_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    // Try app root (development: project root)
+    let app_root = app.path().app_local_data_dir()
+        .map_err(|e| format!("Failed to get app dir: {}", e))?;
+
+    // Development layout: app binary is in target/debug/ under src-tauri/
+    // agent-engine is at ../agent-engine relative to src-tauri/
+    let dev_path = app_root.parent()
+        .and_then(|p| p.parent())
+        .map(|p| p.join("agent-engine"));
+
+    if let Some(ref p) = dev_path {
+        if p.exists() {
+            return Ok(p.clone());
+        }
+    }
+
+    // Fallback: try sibling of src-tauri (for cargo run from src-tauri dir)
+    let fallback = PathBuf::from("../agent-engine");
+    if fallback.exists() {
+        return Ok(fallback);
+    }
+
+    // Production: bundle agent-engine alongside the app
+    let prod_path = app_root.join("agent-engine");
+    if prod_path.exists() {
+        return Ok(prod_path);
+    }
+
+    Err(format!("Cannot find agent-engine directory. Tried: {:?}, {:?}, {:?}", dev_path, fallback, prod_path))
 }
 
 // ── Git / Shell commands ──
@@ -134,18 +169,47 @@ fn send_to_process(_pid: u32, message: String) -> Result<(), String> {
 
 // ── Agent Engine ──
 #[tauri::command]
-fn spawn_agent_engine(app: tauri::AppHandle, cwd: String) -> Result<u32, String> {
+fn spawn_agent_engine(app: tauri::AppHandle) -> Result<u32, String> {
+    let engine_dir = agent_engine_dir(&app)?;
+    log::info!("[spawn_agent_engine] using dir: {:?}", engine_dir);
+
     // Kill existing engine if any
     {
         let mut handle = ENGINE_HANDLE.lock().unwrap();
         *handle = None;
     }
 
-    let mut child = Command::new("node")
-        .args(["--experimental-strip-types", "src/index.ts"])
-        .current_dir(&cwd)
+    // Read API key from keyring and inject into engine environment
+    let api_key = {
+        let entry = keyring::Entry::new(KEYRING_SERVICE, KEYRING_ACCOUNT)
+            .map_err(|e| format!("Keyring entry creation failed: {}", e))?;
+        entry.get_password().ok()
+    };
+
+    // Determine entry point: prefer dist/index.js, fallback to src/index.ts
+    let entry_point = if engine_dir.join("dist/index.js").exists() {
+        "dist/index.js"
+    } else {
+        "src/index.ts"
+    };
+    let node_args = if entry_point.ends_with(".ts") {
+        vec!["--experimental-strip-types", entry_point]
+    } else {
+        vec![entry_point]
+    };
+
+    let mut cmd_builder = Command::new("node");
+    cmd_builder.args(&node_args)
+        .current_dir(&engine_dir)
         .stdout(Stdio::piped())
-        .stdin(Stdio::piped())
+        .stdin(Stdio::piped());
+
+    if let Some(key) = api_key {
+        cmd_builder.env("KIMI_API_KEY", key);
+        log::info!("[spawn_agent_engine] KIMI_API_KEY injected");
+    }
+
+    let mut child = cmd_builder
         .spawn()
         .map_err(|e| format!("Failed to spawn agent engine: {}", e))?;
 
@@ -160,7 +224,6 @@ fn spawn_agent_engine(app: tauri::AppHandle, cwd: String) -> Result<u32, String>
     let stdout = child.stdout.take().unwrap();
     let app_emit = app.clone();
 
-    // Thread: read stdout line by line and emit as agent-engine-event
     std::thread::spawn(move || {
         let reader = BufReader::new(stdout);
         for line in reader.lines() {
@@ -168,7 +231,6 @@ fn spawn_agent_engine(app: tauri::AppHandle, cwd: String) -> Result<u32, String>
                 let _ = app_emit.emit("agent-engine-event", AgentEngineEvent { line });
             }
         }
-        // Engine exited
         let _ = app_emit.emit("agent-engine-exit", serde_json::json!({"pid": pid}));
         let mut handle = ENGINE_HANDLE.lock().unwrap();
         *handle = None;
@@ -191,6 +253,17 @@ fn send_to_engine(command: String) -> Result<(), String> {
 #[tauri::command]
 fn is_engine_running() -> bool {
     ENGINE_HANDLE.lock().unwrap().is_some()
+}
+
+#[tauri::command]
+fn stop_agent_engine() -> Result<(), String> {
+    let mut handle = ENGINE_HANDLE.lock().unwrap();
+    if let Some(stdin) = handle.take() {
+        if let Ok(mut writer) = stdin.lock() {
+            let _ = writeln!(writer, "{}", serde_json::json!({"type": "shutdown"}));
+        }
+    }
+    Ok(())
 }
 
 // ── API Key Management ──
@@ -223,8 +296,8 @@ fn delete_api_key() -> Result<(), String> {
     Ok(())
 }
 
-/// Verify Kimi Code API key by running `kimi --version`.
-/// Kimi Code keys are NOT Moonshot platform keys; they cannot be verified via HTTP.
+/// Verify Kimi Code API key by checking format and detecting CLI availability.
+/// Kimi Code keys are NOT Moonshot platform keys; they authenticate via the CLI itself.
 #[tauri::command]
 fn verify_api_key(key: String) -> Result<bool, String> {
     // Basic format check
@@ -232,35 +305,22 @@ fn verify_api_key(key: String) -> Result<bool, String> {
         return Err("API Key 格式错误，必须以 sk- 开头".to_string());
     }
 
-    // Try to run kimi --version with the key as env var to verify CLI can authenticate
-    let output = Command::new("kimi")
-        .args(["--version"])
-        .env("KIMI_API_KEY", &key)
-        .output();
-
-    match output {
-        Ok(o) if o.status.success() => {
-            let ver = String::from_utf8_lossy(&o.stdout);
-            log::info!("[verify_api_key] kimi cli version: {}", ver.trim());
-            Ok(true)
-        }
-        Ok(o) => {
-            let err = String::from_utf8_lossy(&o.stderr);
-            log::warn!("[verify_api_key] kimi cli failed: {}", err.trim());
-            // CLI not installed is acceptable; key format is valid
-            if err.contains("not found") || err.contains("not recognized") {
-                log::info!("[verify_api_key] kimi cli not installed, accepting key format");
-                Ok(true)
-            } else {
-                Err(format!("Kimi CLI 错误: {}", err.trim()))
-            }
-        }
-        Err(e) => {
-            // kimi command not found — CLI not installed, accept format-only validation
-            log::info!("[verify_api_key] kimi cli not found ({}), accepting key format", e);
-            Ok(true)
+    // Try to detect kimi CLI
+    let candidates = ["kimi", "C:\\Python312\\Scripts\\kimi.exe"];
+    let mut found = false;
+    for cmd in &candidates {
+        if Command::new(cmd).args(["--version"]).output().is_ok() {
+            found = true;
+            break;
         }
     }
+
+    if !found {
+        return Err("Kimi CLI 未找到。请先安装: py -3.12 -m pip install kimi-cli".to_string());
+    }
+
+    // CLI found; accept the key. Real validation happens when CLI executes.
+    Ok(true)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -277,6 +337,7 @@ pub fn run() {
             spawn_agent_engine,
             send_to_engine,
             is_engine_running,
+            stop_agent_engine,
             save_api_key,
             get_api_key,
             delete_api_key,

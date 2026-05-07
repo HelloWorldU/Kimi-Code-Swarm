@@ -152,7 +152,9 @@ export class Agent {
     this.running = false
     this.state.pid = undefined
 
-    if (this.state.status === 'working') {
+    // Use a fresh read because setStatus mutated state but TS narrowed it earlier
+    const finalStatus = this.state.status as TaskStatus
+    if (finalStatus === 'working') {
       this.setStatus('ready')
       this.log(
         'system',

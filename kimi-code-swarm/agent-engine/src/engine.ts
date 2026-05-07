@@ -98,6 +98,16 @@ export class AgentEngine {
           this.broadcast({ type: 'pong' })
           break
         }
+
+        case 'shutdown': {
+          // Stop all agents gracefully
+          for (const agent of this.agents.values()) {
+            agent.stop()
+          }
+          this.agents.clear()
+          this.broadcast({ type: 'pong', message: 'Engine shutting down' })
+          break
+        }
       }
     } catch (err) {
       this.broadcast({ type: 'error', message: String(err) })

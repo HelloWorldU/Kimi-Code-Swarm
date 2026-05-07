@@ -29,50 +29,50 @@ function handleSubmit() {
 
 <template>
   <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center">
-    <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="emit('close')" />
-    <div class="relative bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
-      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-800">
-        <h2 class="text-lg font-semibold text-white">新建 Agent</h2>
-        <button class="text-gray-500 hover:text-gray-300 transition-colors" @click="emit('close')">
+    <div class="absolute inset-0 bg-black/30 backdrop-blur-sm" @click="emit('close')" />
+    <div class="relative bg-white border border-gray-200 rounded-2xl shadow-xl w-full max-w-lg mx-4 overflow-hidden">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <h2 class="text-lg font-semibold text-gray-900">新建 Agent</h2>
+        <button class="text-gray-400 hover:text-gray-700 transition-colors" @click="emit('close')">
           <X class="w-5 h-5" />
         </button>
       </div>
 
       <form class="p-6 space-y-4" @submit.prevent="handleSubmit">
         <div>
-          <label class="block text-sm font-medium text-gray-300 mb-1.5">Agent 名称</label>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">Agent 名称</label>
           <input
             v-model="name"
             type="text"
             placeholder="例如: 前端专家"
-            class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:border-swarm-500 focus:ring-1 focus:ring-swarm-500/30 transition-all"
+            class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-swarm-500 focus:ring-1 focus:ring-swarm-500/30 transition-all"
             autofocus
           />
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-300 mb-1.5">仓库地址</label>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">仓库地址</label>
           <input
             v-model="repoUrl"
             type="text"
             placeholder="例如: https://github.com/HelloWorldU/Kimi-Code-Swarm"
-            class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:border-swarm-500 focus:ring-1 focus:ring-swarm-500/30 transition-all"
+            class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-swarm-500 focus:ring-1 focus:ring-swarm-500/30 transition-all"
           />
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-300 mb-1.5">初始指令</label>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">初始指令</label>
           <textarea
             v-model="instruction"
             placeholder="描述这个 Agent 的职责..."
             rows="3"
-            class="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-100 placeholder-gray-500 focus:outline-none focus:border-swarm-500 focus:ring-1 focus:ring-swarm-500/30 transition-all resize-none"
+            class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-swarm-500 focus:ring-1 focus:ring-swarm-500/30 transition-all resize-none"
           />
         </div>
 
         <div>
-          <label class="block text-sm font-medium text-gray-300 mb-1.5">
-            Token 预算上限: <span class="text-swarm-400">{{ tokenBudget.toLocaleString() }}</span>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">
+            Token 预算上限: <span class="text-swarm-600">{{ tokenBudget.toLocaleString() }}</span>
           </label>
           <input
             v-model="tokenBudget"
@@ -82,7 +82,7 @@ function handleSubmit() {
             step="10000"
             class="w-full accent-swarm-500"
           />
-          <div class="flex justify-between text-xs text-gray-500 mt-1">
+          <div class="flex justify-between text-xs text-gray-400 mt-1">
             <span>10K</span>
             <span>200K</span>
           </div>
@@ -91,7 +91,7 @@ function handleSubmit() {
         <div class="pt-2 flex items-center justify-end gap-3">
           <button
             type="button"
-            class="px-4 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-gray-200 hover:bg-gray-800 transition-colors"
+            class="px-4 py-2 rounded-lg text-sm font-medium text-gray-500 hover:text-gray-800 hover:bg-gray-100 transition-colors"
             @click="emit('close')"
           >
             取消
@@ -99,7 +99,7 @@ function handleSubmit() {
           <button
             type="submit"
             :disabled="!name.trim() || !repoUrl.trim()"
-            class="px-4 py-2 rounded-lg text-sm font-medium bg-swarm-600 text-white hover:bg-swarm-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+            class="px-4 py-2 rounded-lg text-sm font-medium bg-swarm-600 text-white hover:bg-swarm-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
           >
             <Plus class="w-4 h-4" /> 创建 Agent
           </button>

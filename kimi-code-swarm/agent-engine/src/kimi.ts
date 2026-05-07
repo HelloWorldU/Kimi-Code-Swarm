@@ -4,9 +4,35 @@ import { promisify } from 'util'
 
 const execFileAsync = promisify(execFile)
 
-const CANDIDATES = ['kimi', 'C:\\Python312\\Scripts\\kimi.exe']
+const CANDIDATES = [
+  'kimi',
+  'C:\\Python312\\Scripts\\kimi.exe',
+]
+
+// Also try module invocation via specific Python versions
+const PYTHON_CANDIDATES = [
+  { python: 'py', args: ['-3.12', '-m', 'kimi'] },
+  { python: 'python3.12', args: ['-m', 'kimi'] },
+  { python: 'python312', args: ['-m', 'kimi'] },
+]
 
 let cachedPath: string | null | undefined
+let cachedModule: { python: string; args: string[] } | null | undefined
+
+async function detectKimiModule(): Promise<{ python: string; args: string[] } | null> {
+  if (cachedModule !== undefined) return cachedModule
+  for (const candidate of PYTHON_CANDIDATES) {
+    try {
+      await execFileAsync(candidate.python, [...candidate.args, '--version'])
+      cachedModule = candidate
+      return candidate
+    } catch {
+      // try next
+    }
+  }
+  cachedModule = null
+  return null
+}
 
 export async function detectKimiCli(): Promise<string | null> {
   if (cachedPath !== undefined) return cachedPath
@@ -18,6 +44,13 @@ export async function detectKimiCli(): Promise<string | null> {
     } catch {
       // try next
     }
+  }
+  // Try module invocation as fallback
+  const module = await detectKimiModule()
+  if (module) {
+    // Return a sentinel that runKimi will recognize
+    cachedPath = '__MODULE__'
+    return '__MODULE__'
   }
   cachedPath = null
   return null
@@ -36,14 +69,34 @@ export function runKimi(
   workspace: string,
   instruction: string,
 ): KimiProcess {
-  const child = spawn(kimiPath, ['--print', '--quiet', '-w', workspace, '-y', instruction], {
+  // If CLI was detected as a Python module, reconstruct the spawn args
+  let spawnCmd = kimiPath
+  let spawnArgs: string[]
+  if (kimiPath === '__MODULE__') {
+    const module = cachedModule!
+    spawnCmd = module.python
+    spawnArgs = [...module.args, '--print', '--quiet', '-w', workspace, '-y', instruction]
+  } else {
+    spawnArgs = ['--print', '--quiet', '-w', workspace, '-y', instruction]
+  }
+
+  const env = { ...process.env }
+  // Ensure KIMI_API_KEY is passed through (injected by Rust on engine spawn)
+  // If somehow missing, try to read from env directly (development fallback)
+  if (!env.KIMI_API_KEY) {
+    const fallback = process.env.KIMI_API_KEY
+    if (fallback) env.KIMI_API_KEY = fallback
+  }
+
+  const child = spawn(spawnCmd, spawnArgs, {
     cwd: workspace,
     stdio: ['ignore', 'pipe', 'pipe'],
+    env,
   })
 
   const pid = child.pid!
 
-  async function* readStream(stream: NodeJS.ReadableStream): AsyncGenerator<string> {
+  async function* readStream(stream: import('stream').Readable): AsyncGenerator<string> {
     for await (const chunk of stream) {
       const text = chunk.toString()
       for (const line of text.split('\n')) {
@@ -58,7 +111,7 @@ export function runKimi(
     stderr: readStream(child.stderr!),
     wait: () =>
       new Promise((resolve) => {
-        child.on('close', (code) => resolve(code))
+        child.on('close', (code: number | null) => resolve(code))
       }),
     kill: () => {
       child.kill('SIGTERM')

@@ -59,9 +59,14 @@ export async function listenProcessExit(
 
 // ── Agent Engine commands ──
 
-export async function spawnAgentEngine(cwd: string): Promise<number> {
+export async function spawnAgentEngine(): Promise<number> {
   if (!isTauri) return 0
-  return invoke('spawn_agent_engine', { cwd })
+  return invoke('spawn_agent_engine')
+}
+
+export async function stopAgentEngine(): Promise<void> {
+  if (!isTauri) return
+  return invoke('stop_agent_engine')
 }
 
 export async function sendToEngine(command: object): Promise<void> {

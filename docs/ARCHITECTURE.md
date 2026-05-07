@@ -39,7 +39,18 @@ PR 创建时，Store 自动生成 `ReviewEntry[]`，包含所有其他 Agent 作
   - `components/AnalyticsPanel.vue` — 数据可视化（只读聚合）
 - `src-tauri/` —— 唯一有权 spawn 进程的 Rust 后端
   - `save_api_key` / `get_api_key` / `delete_api_key` — OS Keyring 操作
-  - `verify_api_key` — Kimi API 验证
+  - `verify_api_key` — Kimi CLI 存在性检测（拒绝 fallback），启动引擎时注入 `KIMI_API_KEY`
+  - `stop_agent_engine` — 向引擎发送 shutdown 命令
+
+## 退出登录流程
+
+`logout()` 执行完整重置：
+1. `stopAgentEngine()` — 停止 Node.js Agent 引擎进程
+2. `deleteApiKey()` — 从 OS Keyring 删除 API Key
+3. `saveStoreValue(STORE_KEY, {agents:[]})` — 清空持久化 Agent 列表
+4. 重置所有 reactive state（`isLoggedIn` / `agents` / `engineConnected` 等）
+5. 重置 bootstrap 标志（`bootstrapped` / `engineListenersInitialized`）
+6. `window.location.reload()` — 强制页面重载，确保干净状态
 
 ## 实现状态速查
 

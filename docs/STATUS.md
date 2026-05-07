@@ -22,8 +22,8 @@
 |----------|------|------|----------|
 | Vue 前端 Dashboard | ✅ | 浏览器可完整运行 | `kimi-code-swarm/src/` |
 | Tauri v2 桌面壳 | ✅ | Rust IPC 命令已实现 | `src-tauri/src/lib.rs` |
-| Kimi API Key 登录 | ✅ | keyring 安全存储，/v1/models 验证，退出登录清除 | `src/components/LoginView.vue`, `src/api/ipc.ts`, `src-tauri/src/lib.rs` |
-| Agent 管理（最多5个） | ✅ | Dashboard 卡片网格，数量限制，点击进详情页 | `src/components/AgentDashboard.vue`, `src/components/AgentDetail.vue`, `src/App.vue` |
+| Kimi API Key 登录 | ✅ | keyring 安全存储，Kimi CLI 存在性验证（拒绝 fallback），退出登录完整重置（停引擎+删key+清store+reload） | `src/components/LoginView.vue`, `src/api/ipc.ts`, `src-tauri/src/lib.rs`, `src/store/useSwarmStore.ts` |
+| Agent 管理（最多5个） | ✅ | Dashboard 卡片网格，数量限制，点击进详情页；白色简约 UI | `src/components/AgentDashboard.vue`, `src/components/AgentDetail.vue`, `src/App.vue` |
 | Agent 状态持久化 | ✅ | tauri-plugin-store 自动保存/恢复 Agent 列表 | `src/store/useSwarmStore.ts` |
 | Git 自动化（clone/checkout/commit/push） | ✅ | Tauri 环境通过 IPC 执行真实 git | `src/api/ipc.ts` |
 | GitHub API（PR 创建/合并/查询） | ⚡ | 配置 Token 后走真实 API；否则 Mock | `src/api/github.ts` |
@@ -51,4 +51,4 @@
 
 ---
 
-*Last updated: 2026-05-04*
+*Last updated: 2026-05-05*

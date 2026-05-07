@@ -59,9 +59,9 @@ function handleLogout() {
   />
 
   <!-- Main App -->
-  <div v-else class="flex h-screen w-screen overflow-hidden bg-gray-950">
+  <div v-else class="flex h-screen w-screen overflow-hidden bg-gray-50">
     <!-- Sidebar -->
-    <aside class="w-16 flex flex-col items-center py-4 border-r border-gray-800 bg-gray-900/30 shrink-0">
+    <aside class="w-16 flex flex-col items-center py-4 border-r border-gray-200 bg-white shrink-0">
       <div class="mb-6">
         <div class="w-9 h-9 rounded-xl bg-swarm-600 flex items-center justify-center">
           <span class="text-white font-bold text-sm">K</span>
@@ -72,7 +72,7 @@ function handleLogout() {
         <button
           :class="[
             'w-10 h-10 rounded-xl flex items-center justify-center transition-colors',
-            view === 'dashboard' ? 'bg-swarm-500/10 text-swarm-400' : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/50'
+            view === 'dashboard' ? 'bg-swarm-50 text-swarm-600' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'
           ]"
           title="Agent 管理"
           @click="view = 'dashboard'"
@@ -82,7 +82,7 @@ function handleLogout() {
         <button
           :class="[
             'w-10 h-10 rounded-xl flex items-center justify-center transition-colors',
-            view === 'analytics' ? 'bg-swarm-500/10 text-swarm-400' : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/50'
+            view === 'analytics' ? 'bg-swarm-50 text-swarm-600' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'
           ]"
           title="监控分析"
           @click="view = 'analytics'"
@@ -92,7 +92,7 @@ function handleLogout() {
         <button
           :class="[
             'w-10 h-10 rounded-xl flex items-center justify-center transition-colors',
-            view === 'settings' ? 'bg-swarm-500/10 text-swarm-400' : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/50'
+            view === 'settings' ? 'bg-swarm-50 text-swarm-600' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'
           ]"
           title="设置"
           @click="view = 'settings'"
@@ -103,7 +103,7 @@ function handleLogout() {
 
       <div class="mt-auto flex flex-col items-center gap-2">
         <button
-          class="w-10 h-10 rounded-xl flex items-center justify-center text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+          class="w-10 h-10 rounded-xl flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
           title="退出登录"
           @click="handleLogout"
         >
@@ -115,22 +115,22 @@ function handleLogout() {
     <!-- Main Content -->
     <main class="flex-1 flex flex-col min-w-0">
       <!-- Top Bar -->
-      <header class="h-14 border-b border-gray-800 flex items-center justify-between px-6 bg-gray-900/50 backdrop-blur shrink-0">
+      <header class="h-14 border-b border-gray-200 flex items-center justify-between px-6 bg-white shrink-0">
         <div class="flex items-center gap-3">
-          <h2 class="text-base font-semibold text-white">
+          <h2 class="text-base font-semibold text-gray-900">
             <span v-if="view === 'dashboard'">Agent 管理</span>
             <span v-else-if="view === 'agent-detail'">Agent 详情</span>
             <span v-else-if="view === 'analytics'">监控分析</span>
             <span v-else>系统设置</span>
           </h2>
-          <span v-if="view === 'dashboard'" class="text-xs text-gray-600 bg-gray-800/60 px-2 py-0.5 rounded-full">
+          <span v-if="view === 'dashboard'" class="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
             {{ store.agents.value.length }} / {{ store.maxAgents }}
           </span>
         </div>
         <button
           v-if="view === 'dashboard'"
           :disabled="!store.canCreateAgent.value"
-          class="px-3 py-1.5 bg-swarm-600 hover:bg-swarm-500 disabled:opacity-30 disabled:cursor-not-allowed text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
+          class="px-3 py-1.5 bg-swarm-600 hover:bg-swarm-700 disabled:opacity-30 disabled:cursor-not-allowed text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
           @click="store.setIsCreateModalOpen(true)"
         >
           <Plus class="w-3.5 h-3.5" /> 新建 Agent
@@ -174,10 +174,10 @@ function handleLogout() {
 
         <!-- Settings -->
         <div v-else class="h-full max-w-2xl mx-auto">
-          <h3 class="text-lg font-semibold text-white mb-6">系统设置</h3>
+          <h3 class="text-lg font-semibold text-gray-900 mb-6">系统设置</h3>
           <div class="space-y-6">
-            <div class="bg-gray-800/40 border border-gray-700/50 rounded-xl p-6">
-              <h4 class="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+            <div class="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+              <h4 class="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4" /><path d="M9 18c-4.51 2-5-2-7-2" /></svg>
                 GitHub 配置
               </h4>

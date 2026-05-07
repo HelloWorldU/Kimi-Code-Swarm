@@ -35,3 +35,9 @@ const emit = defineEmits<{...}>()
 - `AgentDetail.vue` — 复合面板组件：Header + Info + PR 审阅 + 文件变更 + Action + Logs（日期字段通过 new Date(string).toLocaleTimeString() 显示）
 - `AnalyticsPanel.vue` — 数据展示型组件：状态分布、Token 排行、任务列表
 - `SettingsPanel.vue` — 纯信息展示型设置面板，使用 lucide 图标 + code 标签展示命令指引
+
+## 视觉风格
+
+- **白色简约主题**：全局白底（`bg-white` / `bg-gray-50`），深灰文字（`text-gray-900` / `text-gray-700`），浅灰边框（`border-gray-200`）
+- **状态色**：深色饱和（`-600`）+ 浅色背景（`-50`），避免半透明 overlay
+- **阴影**：仅在卡片/弹窗使用 `shadow-sm` 或 `shadow-md`，不用 heavy shadow

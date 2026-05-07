@@ -59,6 +59,7 @@ export type EngineCommand =
   | { type: 'submit-review'; agentId: string; reviewerAgentId: string; approved: boolean }
   | { type: 'get-file-diff'; agentId: string; filePath: string }
   | { type: 'ping' }
+  | { type: 'shutdown' }
 
 // ── Events from Node.js → Rust ──
 
@@ -71,4 +72,4 @@ export type EngineEvent =
   | { type: 'file-changed'; agentId: string; files: string[] }
   | { type: 'diff-result'; agentId: string; filePath: string; diff: string }
   | { type: 'error'; message: string }
-  | { type: 'pong' }
+  | { type: 'pong'; message?: string }

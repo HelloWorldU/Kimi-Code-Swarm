@@ -3,6 +3,7 @@ import type { AgentTask, ReviewEntry } from '../types'
 import {
   isTauri,
   spawnAgentEngine,
+  stopAgentEngine,
   sendToEngine,
   listenAgentEngineEvent,
   listenAgentEngineExit,
@@ -38,12 +39,13 @@ async function bootstrap() {
 async function startAgentEngine() {
   if (!isTauri) return
   try {
-    const running = await (await import('../api/ipc')).isEngineRunning()
+    const { isEngineRunning } = await import('../api/ipc')
+    const running = await isEngineRunning()
     if (running) return
-    const cwd = 'agent-engine' // relative to app dir
-    await spawnAgentEngine(cwd)
+    await spawnAgentEngine()
     initEngineListeners()
   } catch (e) {
+    // eslint-disable-next-line no-console
     console.error('Failed to start agent engine:', e)
   }
 }
@@ -137,6 +139,7 @@ function handleEngineEvent(event: Record<string, unknown>) {
       break
     }
     case 'error': {
+      // eslint-disable-next-line no-console
       console.error('Agent engine error:', event.message)
       break
     }
@@ -229,11 +232,37 @@ export function useSwarmStore() {
   }
 
   async function logout() {
-    await deleteApiKey()
+    // 1. Stop the agent engine first
+    try {
+      await stopAgentEngine()
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to stop engine during logout:', e)
+    }
+    // 2. Delete API key from keyring
+    try {
+      await deleteApiKey()
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to delete API key during logout:', e)
+    }
+    // 3. Clear persisted store data
+    try {
+      await saveStoreValue(STORE_KEY, { agents: [] })
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to clear store during logout:', e)
+    }
+    // 4. Reset all reactive state
     state.isLoggedIn = false
     state.agents = []
     state.selectedAgentId = null
     state.authError = ''
+    state.engineConnected = false
+    // 5. Reset bootstrap flags so next login re-initializes
+    bootstrapped = false
+    engineListenersInitialized = false
+    // 6. Force page reload to ensure clean slate
     if (isTauri) {
       window.location.reload()
     }

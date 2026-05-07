@@ -15,7 +15,7 @@ const rl = readline.createInterface({
 // Boot message
 console.log(JSON.stringify({ type: 'pong', message: 'Agent Engine started' }))
 
-rl.on('line', async (line) => {
+rl.on('line', async (line: string) => {
   try {
     const cmd = JSON.parse(line) as EngineCommand
     await engine.handleCommand(cmd)
