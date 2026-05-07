@@ -51,3 +51,6 @@ src-tauri/gen/
 # Misc
 *.bak
 *.tmp
+
+apikey
+
