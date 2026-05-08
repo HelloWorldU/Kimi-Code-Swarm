@@ -36,6 +36,16 @@ export default [
       'vue/html-self-closing': 'off',
       // 属性排序保留（帮助 Agent 保持一致性）
       'vue/attributes-order': 'warn',
+      // Dead Code: 模块内未使用变量 / import（由 tseslint 接管原生规则）
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': ['error', {
+        vars: 'all',
+        args: 'after-used',
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+        caughtErrorsIgnorePattern: '^_',
+        ignoreRestSiblings: true,
+      }],
     },
   },
   {

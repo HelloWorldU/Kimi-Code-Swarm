@@ -10,6 +10,7 @@ import { join, extname, relative } from 'path'
 import { checkVueStructure } from './rules/vue-structure'
 import { checkImports } from './rules/import-restrictions'
 import { checkStyle } from './rules/style-constraints'
+import { checkDeadCode } from './rules/dead-code'
 
 export interface AstIssue {
   file: string
@@ -58,6 +59,21 @@ function analyzeTsFile(filePath: string, content: string): AstIssue[] {
   return issues
 }
 
+function printIssues(issues: AstIssue[], totalRef: { value: number }, fixableRef: { value: number }) {
+  for (const issue of issues) {
+    const relPath = relative(process.cwd(), issue.file)
+    console.log(`\n📄 ${relPath}`)
+    const icon = issue.fixable ? '🔧' : '❌'
+    const loc = issue.line ? `:${issue.line}` : ''
+    console.log(`  ${icon} [${issue.rule}]${loc} ${issue.message}`)
+    if (issue.fix && SHOULD_FIX) {
+      console.log(`     💡 ${issue.fix}`)
+    }
+    totalRef.value++
+    if (issue.fixable) fixableRef.value++
+  }
+}
+
 function main() {
   const target = process.argv.find((_, i, arr) => i > 1 && !arr[i].startsWith('--'))
   if (!target) {
@@ -68,38 +84,33 @@ function main() {
   const stat = statSync(target)
   const files: string[] = stat.isDirectory() ? findFiles(target) : [target]
 
-  let total = 0
-  let fixable = 0
+  const total = { value: 0 }
+  const fixable = { value: 0 }
 
-  for (const file of files) {
-    const content = readFileSync(file, 'utf-8')
-    const ext = extname(file)
+  // 收集所有文件内容（用于跨文件 dead-code 分析）
+  const fileContents = files.map((f) => ({
+    path: f,
+    content: readFileSync(f, 'utf-8'),
+  }))
 
+  // ── 单文件规则 ──
+  for (const { path, content } of fileContents) {
+    const ext = extname(path)
     const issues = ext === '.vue'
-      ? analyzeVueFile(file, content)
-      : analyzeTsFile(file, content)
-
-    if (issues.length > 0) {
-      const relPath = relative(process.cwd(), file)
-      console.log(`\n📄 ${relPath}`)
-      for (const issue of issues) {
-        const icon = issue.fixable ? '🔧' : '❌'
-        const loc = issue.line ? `:${issue.line}` : ''
-        console.log(`  ${icon} [${issue.rule}]${loc} ${issue.message}`)
-        if (issue.fix && SHOULD_FIX) {
-          console.log(`     💡 ${issue.fix}`)
-        }
-        total++
-        if (issue.fixable) fixable++
-      }
-    }
+      ? analyzeVueFile(path, content)
+      : analyzeTsFile(path, content)
+    printIssues(issues, total, fixable)
   }
 
-  if (total === 0) {
+  // ── 跨文件规则（dead code） ──
+  const deadCodeIssues = checkDeadCode(fileContents, process.cwd())
+  printIssues(deadCodeIssues, total, fixable)
+
+  if (total.value === 0) {
     console.log('✅ 所有 AST 检查通过')
     process.exit(0)
   } else {
-    console.log(`\n📊 总计: ${total} 个问题，${fixable} 个可修复`)
+    console.log(`\n📊 总计: ${total.value} 个问题，${fixable.value} 个可修复`)
     process.exit(1)
   }
 }

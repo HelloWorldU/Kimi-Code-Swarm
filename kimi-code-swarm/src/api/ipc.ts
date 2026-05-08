@@ -5,57 +5,9 @@ import { load } from '@tauri-apps/plugin-store'
 export const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 
 // ── Legacy process commands ──
-
-export async function execGit(dir: string, args: string[]): Promise<string> {
-  if (!isTauri) return `mock: git ${args.join(' ')}`
-  return invoke('exec_git', { dir, args })
-}
-
-export async function execCommand(command: string, args?: string[], cwd?: string): Promise<string> {
-  if (!isTauri) return `mock: ${command} ${(args || []).join(' ')}`
-  return invoke('exec_command', { cmd: command, args: args || [], cwd: cwd || '.' })
-}
-
-export async function spawnProcess(command: string, args?: string[], cwd?: string): Promise<number> {
-  if (!isTauri) return Math.floor(Math.random() * 10000)
-  return invoke('spawn_process', { cmd: command, args: args || [], cwd: cwd || '.' })
-}
-
-export async function killProcess(pid: number): Promise<void> {
-  if (!isTauri) return
-  return invoke('kill_process', { pid })
-}
-
-export interface ProcessOutputPayload {
-  pid: number
-  line: string
-  is_stderr: boolean
-}
-
-export interface ProcessExitPayload {
-  pid: number
-  code: number | null
-}
-
-export async function listenProcessOutput(
-  callback: (payload: ProcessOutputPayload) => void,
-): Promise<() => void> {
-  if (!isTauri) return () => {}
-  const unlisten = await listen<ProcessOutputPayload>('process-output', (event) => {
-    callback(event.payload)
-  })
-  return unlisten
-}
-
-export async function listenProcessExit(
-  callback: (payload: ProcessExitPayload) => void,
-): Promise<() => void> {
-  if (!isTauri) return () => {}
-  const unlisten = await listen<ProcessExitPayload>('process-exit', (event) => {
-    callback(event.payload)
-  })
-  return unlisten
-}
+// (execGit / execCommand / spawnProcess / killProcess / listenProcessOutput / listenProcessExit)
+// 已清理：当前版本由 Agent Engine 统一接管进程管理，Legacy IPC 命令暂留 Rust 侧实现，
+// TypeScript 侧不再直接暴露，避免 dead code。如需恢复，从 git history 回滚即可。
 
 // ── Agent Engine commands ──
 
@@ -74,6 +26,7 @@ export async function sendToEngine(command: object): Promise<void> {
   return invoke('send_to_engine', { command: JSON.stringify(command) })
 }
 
+// isEngineRunning 被 store 动态导入使用，保留
 export async function isEngineRunning(): Promise<boolean> {
   if (!isTauri) return false
   return invoke('is_engine_running')

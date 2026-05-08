@@ -38,6 +38,7 @@
 | AST 结构分析器 | ✅ | 3 套规则，CI 强制运行 | `ast/analyzer.ts` |
 | 文档同步检测 | ✅ | pre-commit 硬约束 | `ci/scripts/check-docs-sync.ts` |
 | 定期健康检查 | ✅ | 信息供给型，不阻断 | `scripts/health-check.ts` |
+| Dead Code 检测 | ✅ | ESLint 模块内 + AST 分析器跨模块（孤立文件/未使用导出） | `ast/rules/dead-code.ts`, `eslint.config.mjs` |
 
 ## 测试与评估
 
