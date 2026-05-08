@@ -10,12 +10,17 @@ preconditions:
   - workspace 有 write 权限
 
 steps:
-  1. diagnose:  读取最后 20 条日志定位 error
-  2. isolate:   停止进程，防止继续写入
-  3. fix:       修改代码（决策点，Agent 有自由度）
-  4. verify:    重启实例，确认 60s 无 error
-  5. document:  在日志中记录修复摘要
+  1. diagnose:   读取最后 20 条日志定位 error
+  2. isolate:    停止进程，防止继续写入
+  3. instrument: 若同一 bug 反复出现，优先增加 Logger 调试日志（见 src/utils/logger.ts）
+  4. fix:        修改代码（决策点，Agent 有自由度）
+  5. verify:     重启实例，确认 60s 无 error
+  6. document:   在 docs/design-docs/ 或 exec-plans/ 记录根因与修复摘要
 
 rollback:
   fix 失败 → git checkout 恢复，重新诊断
   verify 失败 → 回滚，标记需人工介入
+
+golden-rule:
+  反复 bug 必须走 instrument → document 闭环。
+  未增加日志的修复、未记录文档的修复，视为未完成。
