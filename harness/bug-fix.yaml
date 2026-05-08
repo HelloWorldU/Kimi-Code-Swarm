@@ -15,7 +15,7 @@ steps:
   3. instrument: 若同一 bug 反复出现，优先增加 Logger 调试日志（见 src/utils/logger.ts）
   4. fix:        修改代码（决策点，Agent 有自由度）
   5. verify:     重启实例，确认 60s 无 error
-  6. document:   在 docs/design-docs/ 或 exec-plans/ 记录根因与修复摘要
+  6. document:   记录根因与修复方案（代码注释 / commit message / 设计决策均可，check-docs 会拦截未同步的文档变更）
 
 rollback:
   fix 失败 → git checkout 恢复，重新诊断
@@ -23,4 +23,4 @@ rollback:
 
 golden-rule:
   反复 bug 必须走 instrument → document 闭环。
-  未增加日志的修复、未记录文档的修复，视为未完成。
+  未加日志定位的修复 = 盲修；未留痕的修复 = 未修。

@@ -104,7 +104,7 @@ typecheck → lint → analyze → check-docs → test → build
 | 模块边界 | `kimi-code-swarm/src/` 纯前端，禁止直接操作进程 |
 | 状态色语义 | running=emerald, idle=blue, error=red, queued=amber, stopped=gray |
 | Store 修改规范 | 状态必须通过 `useSwarmStore` 方法修改 |
-| Bug 反复修复 | 同一 bug 反复出现 → 必须先加 Logger 日志 → 修复后记录到 design-docs/ 或 exec-plans/ |
+| Bug 反复修复 | 同一 bug 反复出现 → 必须先加 Logger 日志定位根因 → 修复后留痕（根因说明）。禁止盲修。 |
 
 ---
 
