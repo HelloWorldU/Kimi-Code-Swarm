@@ -56,4 +56,11 @@ export default [
       'vue/require-prop-types': 'off',
     },
   },
+  {
+    files: ['src/utils/logger.ts'],
+    rules: {
+      // logger 是唯一的 console 出口，其他文件禁止直接调用
+      'no-console': 'off',
+    },
+  },
 ]

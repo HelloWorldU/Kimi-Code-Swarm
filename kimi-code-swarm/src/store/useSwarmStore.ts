@@ -1,5 +1,6 @@
 import { reactive, computed } from 'vue'
 import type { AgentTask, ReviewEntry } from '../types'
+import { createLogger } from '../utils/logger'
 import {
   isTauri,
   spawnAgentEngine,
@@ -15,6 +16,8 @@ import {
   saveStoreValue,
 } from '../api/ipc'
 // import { hasToken } from '../api/github'
+
+const log = createLogger('SwarmStore')
 
 const MAX_AGENTS = 5
 const STORE_KEY = 'agents'
@@ -45,8 +48,7 @@ async function startAgentEngine() {
     await spawnAgentEngine()
     initEngineListeners()
   } catch (e) {
-    // eslint-disable-next-line no-console
-    console.error('Failed to start agent engine:', e)
+    log.error('Failed to start agent engine:', e)
   }
 }
 
@@ -139,8 +141,7 @@ function handleEngineEvent(event: Record<string, unknown>) {
       break
     }
     case 'error': {
-      // eslint-disable-next-line no-console
-      console.error('Agent engine error:', event.message)
+      log.error('Agent engine error:', event.message)
       break
     }
   }
@@ -236,22 +237,19 @@ export function useSwarmStore() {
     try {
       await stopAgentEngine()
     } catch (e) {
-      // eslint-disable-next-line no-console
-      console.error('Failed to stop engine during logout:', e)
+      log.error('Failed to stop engine during logout:', e)
     }
     // 2. Delete API key from keyring
     try {
       await deleteApiKey()
     } catch (e) {
-      // eslint-disable-next-line no-console
-      console.error('Failed to delete API key during logout:', e)
+      log.error('Failed to delete API key during logout:', e)
     }
     // 3. Clear persisted store data
     try {
       await saveStoreValue(STORE_KEY, { agents: [] })
     } catch (e) {
-      // eslint-disable-next-line no-console
-      console.error('Failed to clear store during logout:', e)
+      log.error('Failed to clear store during logout:', e)
     }
     // 4. Reset all reactive state
     state.isLoggedIn = false
