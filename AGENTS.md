@@ -49,6 +49,7 @@
 5. **功能状态必须披露** —— 任何功能实现后，必须在 [`docs/STATUS.md`](docs/STATUS.md) 中标记其真实状态（✅ 真实 / ⚡ 双模式 / 🚧 框架 / ❌ 未实现）。Agent 遗忘上下文时，STATUS.md 是第一恢复点。
 6. **约束即代码** —— 所有规则必须机械可执行。不能自动检查的约定等于不存在。详见 [`docs/CONSTRAINTS.md`](docs/CONSTRAINTS.md)。
 7. **反复 bug → 日志 → 留痕** —— 同一个代码层面的 bug 反复出现时，必须先增加日志（`src/utils/logger.ts`）定位根因；修复后必须在代码注释或 commit 中记录根因。盲修同一 bug 是效率灾难。
+8. **代码改动必验证** —— 任何 Agent 对代码的修改，改完后必须实际 build、启动 app、运行测试、过 lint/analyze，全部通过后才允许开 PR 合入 main。纯文档/配置改动除外。未验证的代码不得合入。
 
 ---
 

@@ -105,6 +105,7 @@ typecheck → lint → analyze → check-docs → test → build
 | 状态色语义 | running=emerald, idle=blue, error=red, queued=amber, stopped=gray |
 | Store 修改规范 | 状态必须通过 `useSwarmStore` 方法修改 |
 | Bug 反复修复 | 同一 bug 反复出现 → 必须先加 Logger 日志定位根因 → 修复后留痕（根因说明）。禁止盲修。 |
+| 代码改动验证 | 任何代码变更必须走 build → start → test → lint/analyze 闭环，全部通过才能开 PR。未验证代码禁止合入 main。 |
 
 ---
 

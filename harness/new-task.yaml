@@ -1,0 +1,37 @@
+# Harness Template: 新建任务（指挥官派任务）
+# 触发: 指挥官通过 Dashboard 创建新 Agent 任务
+
+meta:
+  name: new-task
+  version: "1.0"
+
+preconditions:
+  - 活跃 Agent 数 < MAX_AGENTS（否则拒绝或排队）
+  - 指挥官已登录（Kimi API Key 有效）
+  - 目标仓库 URL 可访问
+
+steps:
+  1. init:       创建 Agent 记录，状态 pending
+  2. clone:      执行 git clone，workspace 准备就绪
+  3. branch:     切出 feature 分支
+  4. assign:     根据任务类型绑定 Agent 角色（UI / Core / Docs / Review / Tools）
+  5. instruct:   向 Agent 下达指令（含 Harness 上下文约束）
+  6. observe:    启动 CLI，进入 working 状态，实时捕获 stdout/stderr
+
+  # ── 代码改动闭环验证（硬性要求） ──
+  7. build:      Agent 修改代码后，执行 npm run build，确保编译通过
+  8. start:      启动 App（npm run dev 或 Tauri 桌面模式），确认无运行时错误
+  9. test:       运行 npm run test，确保测试通过
+  10. lint:      运行 npm run lint && npm run analyze，确保约束通过
+  11. pr:        全部通过后，创建 PR 提交审阅队列
+  12. review:    审阅 Agent 全员通过后方可合并
+
+golden-rule:
+  步骤 7-10 任意失败 → 禁止开 PR，必须回退修复。
+  未经过 build + start + test + lint 验证的代码改动，不得合入 main。
+  纯文档/配置类改动（无代码变更）可跳过 build/start/test，但仍需 lint + check-docs。
+
+rollback:
+  build 失败 → Agent 继续修改代码，重新走 7-10
+  test 失败 → 回退到上一步稳定 commit，重新分析
+  PR 审阅被拒 → Agent 根据 review 意见修改，重新走 7-12

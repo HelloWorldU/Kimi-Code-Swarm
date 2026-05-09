@@ -42,6 +42,23 @@ PR 创建时，Store 自动生成 `ReviewEntry[]`，包含所有其他 Agent 作
   - `verify_api_key` — Kimi CLI 存在性检测（拒绝 fallback），启动引擎时注入 `KIMI_API_KEY`
   - `stop_agent_engine` — 向引擎发送 shutdown 命令
 
+## Agent 五角色分工
+
+系统固定 5 个 Agent 名额，各司其职：
+
+| 角色 | 职责范围 | 关键目录 |
+|------|---------|---------|
+| **UI Agent** (`SwarmUI`) | Vue 组件、页面布局、样式交互、前端体验优化 | `src/components/`, `src/App.vue` |
+| **Core Agent** (`SwarmCore`) | Tauri IPC、Rust 后端、Agent Engine、进程管理 | `src-tauri/`, `src/api/ipc.ts` |
+| **Docs Agent** (`SwarmDocs`) | 文档维护、STATUS 更新、check-docs 修复、知识库同步 | `docs/`, `AGENTS.md` |
+| **Review Agent** (`SwarmReview`) | PR 审阅、代码质量检查、约束合规确认 | `ci/`, `ast/`, PR 审阅队列 |
+| **Tools Agent** (`SwarmTools`) | 定期脚本执行、dead code 清理、健康检查、熵管理 | `scripts/`, `ast/rules/dead-code.ts` |
+
+**协作规则**：
+- 各 Agent 只改自己职责范围内的代码，跨边界改动需经 Review Agent 确认
+- 任何代码改动完成后必须走 `harness/new-task.yaml` 的 7-10 验证闭环（build → start → test → lint/analyze）
+- Review Agent 拥有最终合入权，但自身代码也需其他 Agent 交叉审阅
+
 ## 退出登录流程
 
 `logout()` 执行完整重置：
