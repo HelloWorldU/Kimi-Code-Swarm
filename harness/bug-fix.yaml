@@ -1,26 +1,23 @@
 # Harness Template: 修复 Bug
-# 触发: 实例状态变为 error
+# 触发: 实例状态变为 error，或同一 bug 反复出现
 
 meta:
   name: bug-fix
-  version: "1.0"
+  version: "2.0"
 
-preconditions:
-  - 实例存在且状态为 error/stopped
-  - workspace 有 write 权限
+# ── 必须遵守的红线 ──
+must:
+  - 理解根因后再动手（禁止盲修）
+  - 修复后必须留痕（根因说明，形式不限）
 
-steps:
-  1. diagnose:   读取最后 20 条日志定位 error
-  2. isolate:    停止进程，防止继续写入
-  3. instrument: 若同一 bug 反复出现，优先增加 Logger 调试日志（见 src/utils/logger.ts）
-  4. fix:        修改代码（决策点，Agent 有自由度）
-  5. verify:     重启实例，确认 60s 无 error
-  6. document:   记录根因与修复方案（代码注释 / commit message / 设计决策均可，check-docs 会拦截未同步的文档变更）
+# ── 绝对禁止的行为 ──
+must-not:
+  - 同一 bug 反复出现时仍不加日志定位
+  - 修复后不留任何痕迹
 
-rollback:
-  fix 失败 → git checkout 恢复，重新诊断
-  verify 失败 → 回滚，标记需人工介入
-
-golden-rule:
-  反复 bug 必须走 instrument → document 闭环。
-  未加日志定位的修复 = 盲修；未留痕的修复 = 未修。
+# ── 参考建议（Agent 可自由替换或调整） ──
+reference:
+  - 日志工具: src/utils/logger.ts（也可直接用 console 调试用，但提交前需清理）
+  - 留痕形式: 代码注释 / commit message / docs/design-docs/ / exec-plans/ 均可
+  - 诊断方法: 读取日志、复现步骤、二分法定位，Agent 自选最有效的方式
+  - 验证方式: 复现场景确认修复，Agent 自选验证手段

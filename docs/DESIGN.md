@@ -62,12 +62,30 @@
 
 `harness/*.yaml` 是**流程约束模板**，不是可执行代码。
 
-- **与 CI 约束的分工**：CI（`npm run ci`）验证代码质量（编译/Linter/AST/测试/构建），harness 定义 Agent 执行任务的**步骤顺序和关键决策点**
-- **与硬约束的关系**：harness 是"软性约束"的载体，Agent 按需阅读参考。关键步骤通过扩展 CI 脚本逐步硬化：
-  - `new-task.yaml` 的 build/test/lint 步骤 → 已被 CI 流水线覆盖
-  - `bug-fix.yaml` 的 instrument（加日志）→ 由 AST `error-handling` 规则硬化
-  - `bug-fix.yaml` 的 document（留痕）→ 由 `check-docs-sync` 扩展硬化
-- **当前状态**：流程约束与代码约束互补，共同构成 Harness Engineering 的完整约束体系
+### 约束分层哲学
+
+| 层级 | 抽象程度 | 自由度 | 示例 |
+|------|---------|--------|------|
+| **Must**（红线） | 高 | 0% | "禁止盲修"、"未验证代码不得合入 main" |
+| **Must-Not**（禁令） | 高 | 0% | "禁止吞没错误"、"禁止跳过审阅" |
+| **Reference**（参考） | 低 | 100% | "可用 Logger"、"建议读 20 条日志" |
+
+**核心原则**：工程师只定义方向和红线（Must/Must-Not），具体执行细节（Reference）交给 Agent 自由发挥。过度具体的约束会导致 Agent 漂移——Agent 会机械执行步骤而忽略真实目标，或在步骤间自动补全不符合设想的细节。
+
+### 与 CI 约束的分工
+
+- **CI（`npm run ci`）**：验证代码质量（编译/Linter/AST/测试/构建）—— 这些是机械可执行的硬约束
+- **harness**：定义 Agent 执行任务的**方向、红线和参考建议**—— 高抽象层的软性约束
+- **硬化路径**：只有 Must/Must-Not 中的关键节点才会被逐步编码到 CI/AST 中。Reference 层永远保持软性
+
+### 当前硬化状态
+
+| harness 准则 | 硬化方式 | 状态 |
+|-------------|---------|------|
+| bug-fix: 禁止吞没错误 | AST `error-handling/empty-catch` | ✅ 硬约束 |
+| bug-fix: 鼓励留痕 | AST `error-handling/missing-logger` (warn) + check-docs-sync | ⚡ 半硬（warn + 分支检查） |
+| new-task: 未验证代码禁止合入 | CI 流水线 + PR 门控 | ✅ 硬约束 |
+| new-task: 审阅通过才能合并 | PR review 机制 | ⚡ 半硬（Mock 模式可跳过） |
 
 ## 关键决策记录
 

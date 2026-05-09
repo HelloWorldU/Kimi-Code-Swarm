@@ -2,13 +2,12 @@
 /**
  * 错误处理规则
  *
- * 把 harness/bug-fix.yaml 的 instrument 步骤硬化为 AST 约束：
- * - catch 块为空 → error（错误被静默吞没）
- * - catch 块未使用 Logger → warning（建议留痕）
+ * 约束分层设计：
+ * - ERROR（红线）: catch 块为空 → 错误被静默吞没，绝对禁止
+ * - WARN（建议）: catch 块未记录错误 → 鼓励留痕，但不强制具体工具或格式
  *
- * 与 ESLint no-console 分工：
- * - ESLint 禁止直接 console.xxx
- * - AST 规则强制错误处理使用 Logger（或至少不空处理）
+ * Agent 可自由选择日志方式：Logger、console（调试用，提交前清理）、注释说明均可。
+ * 只要错误不被静默吞没，即满足 harness/bug-fix.yaml 的 must-not 红线。
  */
 
 import type { AstIssue } from '../analyzer'
@@ -111,13 +110,15 @@ export function checkErrorHandling(content: string, filePath: string): AstIssue[
     }
 
     if (!hasLogger(block.content) && !hasConsole(block.content)) {
+      // warning 级别：鼓励使用 Logger，但不强制具体工具或格式
+      // Agent 可自由选择日志方式，只要错误不被静默吞没即可
       issues.push({
         file: filePath,
         rule: 'error-handling/missing-logger',
-        message: 'catch 块未使用 Logger 记录错误。建议添加 log.error(\'...\', e) 以便后续排查',
+        message: 'catch 块未记录错误。建议增加日志以便后续排查（log.error / console.error / 注释说明均可）',
         line: block.startLine,
         fixable: true,
-        fix: '在 catch 块中添加 log.error(\'描述\', e)',
+        fix: '在 catch 块中记录错误信息（Logger、console 或注释均可）',
       })
     }
   }
