@@ -79,17 +79,55 @@ function isDocUpdated(docPath: string, changedFiles: string[]): boolean {
   return changedFiles.some(f => f === docPath)
 }
 
+function checkHarnessCompliance(changedFiles: string[]): SyncIssue[] {
+  const issues: SyncIssue[] = []
+
+  try {
+    const branchName = execSync('git rev-parse --abbrev-ref HEAD', {
+      encoding: 'utf-8',
+      cwd: process.cwd(),
+    }).trim()
+    const isBugFix = /fix|bug|bugfix/i.test(branchName)
+
+    if (isBugFix) {
+      const hasCodeChange = changedFiles.some(
+        (f) => f.startsWith('kimi-code-swarm/src/') || f.startsWith('src/'),
+      )
+      const hasDocTrace = changedFiles.some(
+        (f) =>
+          f.includes('design-docs/') ||
+          f.includes('exec-plans/') ||
+          f.includes('harness/bug-fix'),
+      )
+
+      if (hasCodeChange && !hasDocTrace) {
+        issues.push({
+          rule: 'harness/bug-fix-document',
+          changedFile: changedFiles.find((f) => f.startsWith('src/')) || changedFiles[0],
+          missingDocs: ['docs/design-docs/', 'exec-plans/', 'harness/bug-fix.yaml'],
+          reason: 'bug-fix 分支必须留痕。遵循 harness/bug-fix.yaml：诊断 → 日志插桩 → 修复 → 验证 → 留痕。',
+        })
+      }
+    }
+  } catch {
+    // 非 git 仓库或无法获取分支名，跳过 harness 检查
+  }
+
+  return issues
+}
+
 function checkSync(): SyncIssue[] {
   const changedFiles = getChangedFiles()
   const mappings = loadDocMap()
   const issues: SyncIssue[] = []
 
+  // 1️⃣ 文档同步检查
   for (const mapping of mappings) {
     for (const changedFile of changedFiles) {
-      const matched = mapping.paths.some(pattern => matchGlob(changedFile, pattern))
+      const matched = mapping.paths.some((pattern) => matchGlob(changedFile, pattern))
       if (!matched) continue
 
-      const missingDocs = mapping.docs.filter(doc => !isDocUpdated(doc, changedFiles))
+      const missingDocs = mapping.docs.filter((doc) => !isDocUpdated(doc, changedFiles))
       if (missingDocs.length > 0) {
         issues.push({
           rule: mapping.id,
@@ -100,6 +138,9 @@ function checkSync(): SyncIssue[] {
       }
     }
   }
+
+  // 2️⃣ Harness 流程合规检查
+  issues.push(...checkHarnessCompliance(changedFiles))
 
   return issues
 }

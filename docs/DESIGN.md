@@ -58,6 +58,17 @@
 - **反复 bug 必须留痕** — 同一 bug 反复出现时遵循 `harness/bug-fix.yaml`：诊断 → 隔离 → **日志插桩** → 修复 → 验证 → **留痕**。盲修等于没修
 - **代码改动必验证** — 任何 Agent 代码变更遵循 `harness/new-task.yaml`：build → start → test → lint/analyze → PR → 审阅 → 合并。未验证代码禁止合入 main
 
+## Harness 目录定位
+
+`harness/*.yaml` 是**流程约束模板**，不是可执行代码。
+
+- **与 CI 约束的分工**：CI（`npm run ci`）验证代码质量（编译/Linter/AST/测试/构建），harness 定义 Agent 执行任务的**步骤顺序和关键决策点**
+- **与硬约束的关系**：harness 是"软性约束"的载体，Agent 按需阅读参考。关键步骤通过扩展 CI 脚本逐步硬化：
+  - `new-task.yaml` 的 build/test/lint 步骤 → 已被 CI 流水线覆盖
+  - `bug-fix.yaml` 的 instrument（加日志）→ 由 AST `error-handling` 规则硬化
+  - `bug-fix.yaml` 的 document（留痕）→ 由 `check-docs-sync` 扩展硬化
+- **当前状态**：流程约束与代码约束互补，共同构成 Harness Engineering 的完整约束体系
+
 ## 关键决策记录
 
 1. **Vue 而不是 React**：reactive() 对高频日志流更友好

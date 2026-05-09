@@ -59,6 +59,9 @@ npm run build         # 生产构建
 
 `git commit` 会自动触发 pre-commit hook（`ci/hooks/pre-commit.cmd`），运行 typecheck → lint → analyze → check-docs。任一阶段失败将阻断提交。
 
+pre-commit 中的 `check-docs` 除文档同步外，还包含 **Harness 流程合规检查**：
+- 若当前分支名为 `fix/*` / `bugfix/*`，必须伴随 `docs/design-docs/`、`exec-plans/` 或 `harness/bug-fix.yaml` 的变更（根因留痕）
+
 ## 前端功能状态
 
 > 完整矩阵见 [`docs/STATUS.md`](../STATUS.md)。

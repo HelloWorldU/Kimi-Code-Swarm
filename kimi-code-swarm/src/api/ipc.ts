@@ -1,6 +1,9 @@
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { load } from '@tauri-apps/plugin-store'
+import { createLogger } from '../utils/logger'
+
+const log = createLogger('IPC')
 
 export const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 
@@ -121,6 +124,7 @@ export async function verifyKimiApiKey(key: string): Promise<{ valid: boolean; e
     const ok = await invoke<boolean>('verify_api_key', { key })
     return { valid: ok }
   } catch (e) {
+    log.error('verifyKimiApiKey failed:', e)
     return { valid: false, error: e instanceof Error ? e.message : String(e) }
   }
 }

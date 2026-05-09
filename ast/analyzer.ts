@@ -11,6 +11,7 @@ import { checkVueStructure } from './rules/vue-structure'
 import { checkImports } from './rules/import-restrictions'
 import { checkStyle } from './rules/style-constraints'
 import { checkDeadCode } from './rules/dead-code'
+import { checkErrorHandling } from './rules/error-handling'
 
 export interface AstIssue {
   file: string
@@ -50,12 +51,16 @@ function analyzeVueFile(filePath: string, content: string): AstIssue[] {
   // 样式约束规则
   issues.push(...checkStyle(content, filePath))
 
+  // 错误处理规则
+  issues.push(...checkErrorHandling(content, filePath))
+
   return issues
 }
 
 function analyzeTsFile(filePath: string, content: string): AstIssue[] {
   const issues: AstIssue[] = []
   issues.push(...checkImports(content, filePath))
+  issues.push(...checkErrorHandling(content, filePath))
   return issues
 }
 

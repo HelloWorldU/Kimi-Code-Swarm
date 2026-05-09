@@ -59,6 +59,16 @@ PR 创建时，Store 自动生成 `ReviewEntry[]`，包含所有其他 Agent 作
 - 任何代码改动完成后必须走 `harness/new-task.yaml` 的 7-10 验证闭环（build → start → test → lint/analyze）
 - Review Agent 拥有最终合入权，但自身代码也需其他 Agent 交叉审阅
 
+## 登录流程
+
+`login()` 执行验证链：
+1. `verifyKimiApiKey(key)` — 通过 Rust 后端验证 API Key 有效性
+2. `saveApiKey(key)` — 存入 OS Keyring
+3. `state.isLoggedIn = true` — 切换 UI 状态
+4. `loadPersistedAgents()` — 恢复持久化 Agent 列表
+5. `startAgentEngine()` — 启动 Agent 引擎（失败时通过 Logger 记录）
+6. `state.isAuthLoading = false` — 结束加载态
+
 ## 退出登录流程
 
 `logout()` 执行完整重置：

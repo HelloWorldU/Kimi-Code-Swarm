@@ -226,6 +226,7 @@ export function useSwarmStore() {
       state.isAuthLoading = false
       return true
     } catch (e) {
+      log.error('Login failed:', e)
       state.authError = `登录错误: ${String(e)}`
       state.isAuthLoading = false
       return false
