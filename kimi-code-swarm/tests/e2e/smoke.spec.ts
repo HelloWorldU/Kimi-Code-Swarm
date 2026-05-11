@@ -10,7 +10,7 @@ import { test, expect, chromium } from '@playwright/test'
  */
 
 test('login and create agent flow', async () => {
-  const browser = await chromium.launch()
+  const browser = await chromium.launch({ headless: true })
   const page = await browser.newPage()
 
   // 访问前端 dev server
