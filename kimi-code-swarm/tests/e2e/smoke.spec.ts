@@ -1,33 +1,57 @@
 import { test, expect, chromium } from '@playwright/test'
+import http from 'http'
 
 /**
  * Smoke Test: 核心流程快速验证
- * 前置条件: Tauri 应用已通过 `cargo tauri dev` 启动，且 WebView2 开启了
- *           `--remote-debugging-port=9222`
+ * 前置条件: Tauri 应用已通过 `cargo tauri dev` 启动
  */
 
-test.beforeEach(async () => {
-  // 等待 CDP 端口就绪（最多 30 秒）
-  const deadline = Date.now() + 30000
-  let lastErr: Error | null = null
+/** 从 WebView2 CDP HTTP 端点获取 WebSocket URL */
+function getWebSocketDebuggerUrl(port: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const req = http.get(`http://127.0.0.1:${port}/json/list`, (res) => {
+      let data = ''
+      res.on('data', (chunk) => { data += chunk })
+      res.on('end', () => {
+        try {
+          const pages = JSON.parse(data) as Array<{ webSocketDebuggerUrl?: string }>
+          const wsUrl = pages[0]?.webSocketDebuggerUrl
+          if (wsUrl) resolve(wsUrl)
+          else reject(new Error('CDP /json/list 返回空列表'))
+        } catch (e) {
+          console.error('解析 CDP 响应失败:', e)
+          reject(new Error(`解析 CDP 响应失败: ${String(e)}`))
+        }
+      })
+    })
+    req.on('error', (err) => reject(new Error(`CDP HTTP 请求失败: ${err.message}`)))
+    req.setTimeout(5000, () => reject(new Error('CDP HTTP 请求超时')))
+  })
+}
+
+/** 等待 CDP 端口就绪 */
+async function waitForCdp(port: number, timeoutMs: number): Promise<void> {
+  const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     try {
-      const browser = await chromium.connectOverCDP('http://localhost:9222')
-      await browser.close()
+      await getWebSocketDebuggerUrl(port)
       return
     } catch (e) {
-      lastErr = e as Error
-      console.error(`CDP 连接重试失败: ${lastErr.message}`)
-      await new Promise((r) => setTimeout(r, 500))
+      const msg = e instanceof Error ? e.message : String(e)
+      console.error(`CDP 连接重试失败: ${msg}`)
+      await new Promise((r) => setTimeout(r, 1000))
     }
   }
-  throw new Error(
-    `CDP 端口 9222 未就绪。请先运行 "cargo tauri dev"。最后错误: ${lastErr?.message}`,
-  )
+  throw new Error(`CDP 端口 ${port} 在 ${timeoutMs}ms 内未就绪`)
+}
+
+test.beforeEach(async () => {
+  await waitForCdp(9222, 30000)
 })
 
 test('login and create agent flow', async () => {
-  const browser = await chromium.connectOverCDP('http://localhost:9222')
+  const wsUrl = await getWebSocketDebuggerUrl(9222)
+  const browser = await chromium.connectOverCDP(wsUrl)
   const context = browser.contexts()[0]
   const page = context.pages()[0]
 
