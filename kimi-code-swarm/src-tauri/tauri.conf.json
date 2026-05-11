@@ -16,13 +16,13 @@
         "width": 1400,
         "height": 900,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "devtools": true
       }
     ],
     "security": {
       "csp": null
-    },
-    "devtools": true
+    }
   },
   "bundle": {
     "active": true,
