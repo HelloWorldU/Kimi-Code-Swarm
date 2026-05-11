@@ -91,7 +91,7 @@ async function main() {
 
     // 2. 启动 Tauri 应用
     log('TAURI', '后台启动 Tauri 应用...')
-    tauriProcess = spawnDetached('cargo', ['tauri', 'dev'], SWARM)
+    tauriProcess = spawnDetached('npx', ['tauri', 'dev'], SWARM)
     log('TAURI', `PID: ${tauriProcess.pid}`)
 
     // 3. 等待 CDP 就绪

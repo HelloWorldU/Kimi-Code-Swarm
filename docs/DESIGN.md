@@ -87,7 +87,7 @@
 | bug-fix: 鼓励留痕 | AST `error-handling/missing-logger` (warn) + check-docs-sync（要求 docs/ 变更） | ⚡ 半硬（warn + 分支检查） |
 | new-task: 未验证代码禁止合入 | CI 流水线 + PR 门控 | ✅ 硬约束 |
 | new-task: 审阅通过才能合并 | PR review 机制 | ⚡ 半硬（Mock 模式可跳过） |
-| auto-test: E2E 验证 | Playwright + WebView2 CDP | ✅ 硬约束（UI 改动后必须跑通 smoke test） |
+| auto-test: E2E 验证 | Playwright + WebView2 CDP (`npx tauri dev` 启动应用) | ✅ 硬约束（UI 改动后必须跑通 smoke test） |
 
 ## 关键决策记录
 
