@@ -93,23 +93,21 @@ function checkHarnessCompliance(changedFiles: string[]): SyncIssue[] {
       const hasCodeChange = changedFiles.some(
         (f) => f.startsWith('kimi-code-swarm/src/') || f.startsWith('src/'),
       )
-      // 放宽留痕判定：任何非代码文件（文档、配置、harness、脚本等）都算留痕
-      // Agent 可自由选择留痕形式：代码注释、commit message、design-docs、exec-plans 均可
-      const hasTrace = changedFiles.some(
+      // 文档是单一事实源，bug-fix 的根因和修复方案应优先收敛到 docs/
+      // 允许 exec-plans/ 和 harness/bug-fix.yaml 作为补充留痕位置
+      const hasDocTrace = changedFiles.some(
         (f) =>
-          !f.startsWith('kimi-code-swarm/src/') &&
-          !f.startsWith('src/') &&
-          !f.endsWith('.ts') &&
-          !f.endsWith('.vue') &&
-          !f.endsWith('.js'),
+          f.startsWith('docs/') ||
+          f.includes('exec-plans/') ||
+          f.includes('harness/bug-fix'),
       )
 
-      if (hasCodeChange && !hasTrace) {
+      if (hasCodeChange && !hasDocTrace) {
         issues.push({
           rule: 'harness/bug-fix-document',
           changedFile: changedFiles.find((f) => f.startsWith('src/')) || changedFiles[0],
-          missingDocs: ['任意非代码文件（文档/配置/harness/脚本等）', '或代码文件中的注释说明'],
-          reason: 'bug-fix 分支必须留痕。形式不限：代码注释 / commit message / docs/ / harness/ 均可。',
+          missingDocs: ['docs/', 'exec-plans/', 'harness/bug-fix.yaml'],
+          reason: 'bug-fix 分支必须留痕。文档是单一事实源，根因和修复方案优先收敛到 docs/ 或 exec-plans/。',
         })
       }
     }

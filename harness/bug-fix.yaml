@@ -18,6 +18,7 @@ must-not:
 # ── 参考建议（Agent 可自由替换或调整） ──
 reference:
   - 日志工具: src/utils/logger.ts（也可直接用 console 调试用，但提交前需清理）
-  - 留痕形式: 代码注释 / commit message / docs/design-docs/ / exec-plans/ 均可
+  - 留痕形式（优先）: docs/ 目录下的设计决策或 exec-plans/ 的执行记录
+  - 留痕形式（补充）: 代码注释 / commit message / harness/bug-fix.yaml 更新
   - 诊断方法: 读取日志、复现步骤、二分法定位，Agent 自选最有效的方式
   - 验证方式: 复现场景确认修复，Agent 自选验证手段
