@@ -91,7 +91,17 @@ async function main() {
 
     // 2. 启动 Tauri 应用
     log('TAURI', '后台启动 Tauri 应用...')
-    tauriProcess = spawnDetached('npx', ['tauri', 'dev'], SWARM)
+    // Windows: WebView2 CDP port must be set via env var, not additionalBrowserArgs
+    tauriProcess = spawn('npx', ['tauri', 'dev'], {
+      cwd: SWARM,
+      detached: true,
+      stdio: 'ignore',
+      shell: true,
+      env: {
+        ...process.env,
+        WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: '--remote-debugging-port=9222',
+      },
+    })
     log('TAURI', `PID: ${tauriProcess.pid}`)
 
     // 3. 等待 CDP 就绪
