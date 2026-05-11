@@ -295,6 +295,9 @@ export function useSwarmStore() {
     sendToEngine({
       type: 'create-agent',
       payload: { name, repoUrl, instruction, tokenBudget },
+    }).catch((e) => {
+      log.error('createAgent failed:', e)
+      alert(`创建 Agent 失败: ${e instanceof Error ? e.message : String(e)}\n\n可能原因: Agent 引擎未启动。请检查终端日志。`)
     })
   }
 

@@ -59,6 +59,12 @@ PR 创建时，Store 自动生成 `ReviewEntry[]`，包含所有其他 Agent 作
 - 任何代码改动完成后必须走 `harness/new-task.yaml` 的 7-10 验证闭环（build → start → test → lint/analyze）
 - Review Agent 拥有最终合入权，但自身代码也需其他 Agent 交叉审阅
 
+**Agent 创建时序（Tauri 生产模式）**：
+1. 前端弹窗收集信息 → 调用 `createAgent()`
+2. `createAgent()` 发送 `create-agent` 命令给 Agent Engine（Rust → Node.js）
+3. Engine 创建成功后推送 `agent-created` 事件 → 前端列表更新
+4. **引擎未启动时**：`sendToEngine` 抛出异常，前端必须 `.catch()` 捕获并提示用户，禁止静默失败
+
 ## 登录流程
 
 `login()` 执行验证链：
