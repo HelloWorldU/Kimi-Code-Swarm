@@ -128,6 +128,8 @@ typecheck → lint → analyze → check-docs → test → build
 | Tauri v2 桌面壳层 | `src-tauri/` Rust 主进程 + Vue 渲染进程 | ✅ |
 | API Key 安全存储 | OS Keyring (keyring crate) | ✅ |
 | Agent 状态持久化 | tauri-plugin-store | ✅ |
+| E2E 测试 | Playwright + WebView2 CDP | ✅ |
+| 后端集成测试 | Rust IPC + Agent Engine + Git 自动化验证 | 🚧 |
 
 ---
 

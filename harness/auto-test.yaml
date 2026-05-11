@@ -1,0 +1,21 @@
+meta:
+  name: auto-test
+  version: "1.0"
+  description: Agent 代码变更后的自测流程
+
+must:
+  - 代码变更后必须先运行 npm run ci（快速验证）
+  - ci 通过后，若变更涉及 UI 组件，必须运行 Playwright E2E 测试
+  - E2E 失败时必须修复或回滚，禁止合入 main
+  - 后端逻辑（Rust IPC / Agent Engine / Git 操作）的变更需人工 review，暂无可自动化验证路径
+
+must-not:
+  - 跳过 E2E 直接合并 UI 改动
+  - 在 E2E 失败时手动强制通过
+
+reference:
+  - 快速验证: npm run ci
+  - E2E 测试: npx playwright test
+  - 自测脚本: scripts/auto-test.ts
+  - E2E 限制: 仅覆盖前端 DOM 交互，不验证 Rust 后端 / Agent Engine / Git 调用
+  - 后端测试 TODO: docs/STATUS.md（后端集成测试 🚧）

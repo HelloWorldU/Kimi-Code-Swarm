@@ -45,6 +45,7 @@ function handleSubmit() {
             <input
               v-model="apiKey"
               :type="showKey ? 'text' : 'password'"
+              data-testid="api-key-input"
               placeholder="输入你的 Kimi API Key（sk-...）"
               class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-swarm-500 focus:ring-1 focus:ring-swarm-500/30 transition-all text-sm pr-20"
               :disabled="isLoading"
@@ -60,6 +61,7 @@ function handleSubmit() {
 
           <button
             type="submit"
+            data-testid="login-button"
             :disabled="isLoading || !apiKey.trim()"
             class="w-full py-3 bg-swarm-600 hover:bg-swarm-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2"
           >

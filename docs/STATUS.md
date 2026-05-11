@@ -49,7 +49,8 @@
 | `tests/` 单元测试 | ⚡ | 前端测试已接入 Vitest（7 个通过）；项目级测试待填充 | `tests/` |
 | 文件变更展示 | ✅ | `git diff --name-only` 自动检测，点击文件查看 diff | `src/components/TaskDetail.vue` |
 | 监控分析页 | ✅ | 任务状态分布、Token 消耗排行、活跃任务、审阅队列 | `src/components/AnalyticsPanel.vue` |
-| E2E 测试 | ❌ | Playwright 预留，v0.3 引入 | `tests/e2e/` |
+| E2E 测试 | ✅ | Playwright + WebView2 CDP，覆盖登录→创建 Agent smoke test | `tests/e2e/` |
+| 后端集成测试 | 🚧 | Rust IPC + Agent Engine + Git 调用的自动化验证待实现 | `tests/integration/` |
 
 ---
 

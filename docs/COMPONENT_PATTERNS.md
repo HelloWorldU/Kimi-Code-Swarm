@@ -41,3 +41,11 @@ const emit = defineEmits<{...}>()
 - **白色简约主题**：全局白底（`bg-white` / `bg-gray-50`），深灰文字（`text-gray-900` / `text-gray-700`），浅灰边框（`border-gray-200`）
 - **状态色**：深色饱和（`-600`）+ 浅色背景（`-50`），避免半透明 overlay
 - **阴影**：仅在卡片/弹窗使用 `shadow-sm` 或 `shadow-md`，不用 heavy shadow
+
+## E2E 测试标识
+
+Playwright 通过 `data-testid` 定位元素。交互组件的核心元素须加测试标识：
+- 表单输入框：`data-testid="xxx-input"`
+- 提交按钮：`data-testid="xxx-submit"`
+- 触发按钮：`data-testid="xxx-button"`
+- 禁止用 class 名或文本内容定位（易因重构失效）

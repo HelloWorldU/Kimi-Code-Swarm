@@ -17,7 +17,8 @@
         "height": 900,
         "resizable": true,
         "fullscreen": false,
-        "devtools": true
+        "devtools": true,
+        "additionalBrowserArgs": "--remote-debugging-port=9222"
       }
     ],
     "security": {

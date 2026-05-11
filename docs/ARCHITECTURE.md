@@ -124,3 +124,10 @@ Agent Engine 用 TypeScript 编写，Rust 直接启动。详见 [`docs/CLI_HARNE
 简要结论：
 - ❌ `node --experimental-strip-types` — Windows ESM 下 `.js`→`.ts` 映射失败
 - ✅ `npx tsx src/index.ts` — esbuild 驱动，seamless 映射，开发体验最佳
+
+## E2E 测试架构
+
+Playwright 通过 WebView2 CDP（`--remote-debugging-port=9222`）连接 Tauri 窗口：
+- 仅验证前端 DOM 交互（登录 → 创建 Agent → Dashboard 验证）
+- 不覆盖 Rust IPC、Agent Engine 进程、Git 操作等后端逻辑
+- 后端集成测试待实现（见 `docs/STATUS.md`）

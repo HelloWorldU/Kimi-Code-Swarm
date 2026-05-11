@@ -136,6 +136,7 @@ function handleLogout() {
         </div>
         <button
           v-if="view === 'dashboard'"
+          data-testid="create-agent-button"
           :disabled="!store.canCreateAgent.value"
           class="px-3 py-1.5 bg-swarm-600 hover:bg-swarm-700 disabled:opacity-30 disabled:cursor-not-allowed text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
           @click="() => { log.debug('新建 Agent button clicked'); store.setIsCreateModalOpen(true) }"

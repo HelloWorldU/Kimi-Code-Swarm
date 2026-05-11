@@ -14,6 +14,7 @@ Vue 3 + TypeScript + Vite + Tailwind CSS + lucide-vue-next + Tauri v2 + @tauri-a
 4. 状态色：running=emerald, idle=blue, error=red, queued=amber, stopped=gray；统一使用 `-600` 文字 + `-50` 背景，白色简约主题
 5. 新增组件必须在 App.vue 注册
 6. 问题暴露但代码不明显时，优先加 Logger 日志定位，禁止盲猜（`src/utils/logger.ts`）
+7. E2E 测试依赖的元素须加 `data-testid` 属性，禁止用 class 或文本来定位
 
 ## 关键文件
 
@@ -52,6 +53,7 @@ npm run check-docs    # 文档同步检测 + Harness 合规检查（硬约束）
 npm run health-check  # 仓库一致性检查（信息供给型）
 npm run test          # Vitest 单元测试
 npm run test:watch    # Vitest 监听模式
+npx playwright test   # E2E 测试（需先 cargo tauri dev）
 npm run ci            # 完整流水线：typecheck → lint → analyze → check-docs → test → build
 npm run build         # 生产构建
 ```

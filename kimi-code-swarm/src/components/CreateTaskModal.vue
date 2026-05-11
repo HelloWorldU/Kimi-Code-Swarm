@@ -43,6 +43,7 @@ function handleSubmit() {
           <label class="block text-sm font-medium text-gray-700 mb-1.5">Agent 名称</label>
           <input
             v-model="name"
+            data-testid="agent-name-input"
             type="text"
             placeholder="例如: 前端专家"
             class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-swarm-500 focus:ring-1 focus:ring-swarm-500/30 transition-all"
@@ -54,6 +55,7 @@ function handleSubmit() {
           <label class="block text-sm font-medium text-gray-700 mb-1.5">仓库地址</label>
           <input
             v-model="repoUrl"
+            data-testid="agent-repo-url-input"
             type="text"
             placeholder="例如: https://github.com/HelloWorldU/Kimi-Code-Swarm"
             class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-swarm-500 focus:ring-1 focus:ring-swarm-500/30 transition-all"
@@ -64,6 +66,7 @@ function handleSubmit() {
           <label class="block text-sm font-medium text-gray-700 mb-1.5">初始指令</label>
           <textarea
             v-model="instruction"
+            data-testid="agent-instruction-input"
             placeholder="描述这个 Agent 的职责..."
             rows="3"
             class="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-swarm-500 focus:ring-1 focus:ring-swarm-500/30 transition-all resize-none"
@@ -98,6 +101,7 @@ function handleSubmit() {
           </button>
           <button
             type="submit"
+            data-testid="agent-create-submit"
             :disabled="!name.trim() || !repoUrl.trim()"
             class="px-4 py-2 rounded-lg text-sm font-medium bg-swarm-600 text-white hover:bg-swarm-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
           >
