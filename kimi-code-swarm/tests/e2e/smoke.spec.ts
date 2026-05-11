@@ -55,14 +55,20 @@ test('login and create agent flow', async () => {
   const context = browser.contexts()[0]
   const page = context.pages()[0]
 
-  // 1. 等待登录页面出现
-  await expect(page.locator('[data-testid="login-button"]')).toBeVisible({
-    timeout: 10000,
-  })
+  // 如果 keyring 中有 API key，应用会自动登录，跳过登录页
+  const isLoggedIn = await page.locator('[data-testid="create-agent-button"]').isVisible()
+    .catch(() => false)
 
-  // 2. 输入 API Key 并登录
-  await page.fill('[data-testid="api-key-input"]', 'sk-test-playwright-key')
-  await page.click('[data-testid="login-button"]')
+  if (!isLoggedIn) {
+    // 1. 等待登录页面出现
+    await expect(page.locator('[data-testid="login-button"]')).toBeVisible({
+      timeout: 10000,
+    })
+
+    // 2. 输入 API Key 并登录
+    await page.fill('[data-testid="api-key-input"]', 'sk-test-playwright-key')
+    await page.click('[data-testid="login-button"]')
+  }
 
   // 3. 验证进入 Dashboard（新建 Agent 按钮出现）
   await expect(page.locator('[data-testid="create-agent-button"]')).toBeVisible({
