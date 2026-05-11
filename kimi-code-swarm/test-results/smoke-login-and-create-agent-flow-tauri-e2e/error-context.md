@@ -75,40 +75,46 @@ TypeError: Cannot read properties of undefined (reading 'locator')
   55 |   const context = browser.contexts()[0]
   56 |   const page = context.pages()[0]
   57 | 
-  58 |   // 1. 等待登录页面出现
-> 59 |   await expect(page.locator('[data-testid="login-button"]')).toBeVisible({
-     |                     ^ TypeError: Cannot read properties of undefined (reading 'locator')
-  60 |     timeout: 10000,
-  61 |   })
-  62 | 
-  63 |   // 2. 输入 API Key 并登录
-  64 |   await page.fill('[data-testid="api-key-input"]', 'sk-test-playwright-key')
-  65 |   await page.click('[data-testid="login-button"]')
-  66 | 
-  67 |   // 3. 验证进入 Dashboard（新建 Agent 按钮出现）
-  68 |   await expect(page.locator('[data-testid="create-agent-button"]')).toBeVisible({
-  69 |     timeout: 10000,
-  70 |   })
-  71 | 
-  72 |   // 4. 点击新建 Agent
-  73 |   await page.click('[data-testid="create-agent-button"]')
-  74 | 
-  75 |   // 5. 填写表单
-  76 |   await page.fill('[data-testid="agent-name-input"]', 'E2E 测试 Agent')
-  77 |   await page.fill(
-  78 |     '[data-testid="agent-repo-url-input"]',
-  79 |     'https://github.com/HelloWorldU/Kimi-Code-Swarm',
-  80 |   )
-  81 |   await page.fill('[data-testid="agent-instruction-input"]', '运行 E2E 冒烟测试')
-  82 | 
-  83 |   // 6. 提交创建
-  84 |   await page.click('[data-testid="agent-create-submit"]')
-  85 | 
-  86 |   // 7. 验证弹窗关闭、Dashboard 中出现新 Agent
-  87 |   await expect(page.locator('[data-testid="agent-create-submit"]')).not.toBeVisible()
-  88 |   await expect(page.locator('text=E2E 测试 Agent')).toBeVisible({ timeout: 5000 })
-  89 | 
-  90 |   await browser.close()
-  91 | })
-  92 | 
+  58 |   // 如果 keyring 中有 API key，应用会自动登录，跳过登录页
+> 59 |   const isLoggedIn = await page.locator('[data-testid="create-agent-button"]').isVisible()
+     |                                 ^ TypeError: Cannot read properties of undefined (reading 'locator')
+  60 |     .catch(() => false)
+  61 | 
+  62 |   if (!isLoggedIn) {
+  63 |     // 1. 等待登录页面出现
+  64 |     await expect(page.locator('[data-testid="login-button"]')).toBeVisible({
+  65 |       timeout: 10000,
+  66 |     })
+  67 | 
+  68 |     // 2. 输入 API Key 并登录
+  69 |     await page.fill('[data-testid="api-key-input"]', 'sk-test-playwright-key')
+  70 |     await page.click('[data-testid="login-button"]')
+  71 |   }
+  72 | 
+  73 |   // 3. 验证进入 Dashboard（新建 Agent 按钮出现）
+  74 |   await expect(page.locator('[data-testid="create-agent-button"]')).toBeVisible({
+  75 |     timeout: 10000,
+  76 |   })
+  77 | 
+  78 |   // 4. 点击新建 Agent
+  79 |   await page.click('[data-testid="create-agent-button"]')
+  80 | 
+  81 |   // 5. 填写表单
+  82 |   await page.fill('[data-testid="agent-name-input"]', 'E2E 测试 Agent')
+  83 |   await page.fill(
+  84 |     '[data-testid="agent-repo-url-input"]',
+  85 |     'https://github.com/HelloWorldU/Kimi-Code-Swarm',
+  86 |   )
+  87 |   await page.fill('[data-testid="agent-instruction-input"]', '运行 E2E 冒烟测试')
+  88 | 
+  89 |   // 6. 提交创建
+  90 |   await page.click('[data-testid="agent-create-submit"]')
+  91 | 
+  92 |   // 7. 验证弹窗关闭、Dashboard 中出现新 Agent
+  93 |   await expect(page.locator('[data-testid="agent-create-submit"]')).not.toBeVisible()
+  94 |   await expect(page.locator('text=E2E 测试 Agent')).toBeVisible({ timeout: 5000 })
+  95 | 
+  96 |   await browser.close()
+  97 | })
+  98 | 
 ```

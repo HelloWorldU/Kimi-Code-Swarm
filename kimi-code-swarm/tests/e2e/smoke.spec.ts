@@ -52,8 +52,16 @@ test.beforeEach(async () => {
 test('login and create agent flow', async () => {
   const wsUrl = await getWebSocketDebuggerUrl(9222)
   const browser = await chromium.connectOverCDP(wsUrl)
-  const context = browser.contexts()[0]
-  const page = context.pages()[0]
+
+  // WebView2 连接后页面可能还没创建，等待一下
+  let context = browser.contexts()[0]
+  if (!context) {
+    context = await browser.waitForEvent('context', { timeout: 10000 })
+  }
+  let page = context.pages()[0]
+  if (!page) {
+    page = await context.waitForEvent('page', { timeout: 10000 })
+  }
 
   // 如果 keyring 中有 API key，应用会自动登录，跳过登录页
   const isLoggedIn = await page.locator('[data-testid="create-agent-button"]').isVisible()
