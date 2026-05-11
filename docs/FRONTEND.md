@@ -13,6 +13,7 @@ Vue 3 + TypeScript + Vite + Tailwind CSS + lucide-vue-next + Tauri v2 + @tauri-a
 3. 图标从 `lucide-vue-next` 导入
 4. 状态色：running=emerald, idle=blue, error=red, queued=amber, stopped=gray；统一使用 `-600` 文字 + `-50` 背景，白色简约主题
 5. 新增组件必须在 App.vue 注册
+6. 问题暴露但代码不明显时，优先加 Logger 日志定位，禁止盲猜（`src/utils/logger.ts`）
 
 ## 关键文件
 

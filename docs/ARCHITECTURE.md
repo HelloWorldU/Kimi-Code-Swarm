@@ -69,6 +69,8 @@ PR 创建时，Store 自动生成 `ReviewEntry[]`，包含所有其他 Agent 作
 5. `startAgentEngine()` — 启动 Agent 引擎（失败时通过 Logger 记录）
 6. `state.isAuthLoading = false` — 结束加载态
 
+> **Debug 原则**：问题暴露但代码层面不明显时，优先通过 `src/utils/logger.ts` 增加运行时日志定位根因，而非盲猜。
+
 ## 退出登录流程
 
 `logout()` 执行完整重置：

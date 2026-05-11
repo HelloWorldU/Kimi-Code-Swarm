@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { createLogger } from './utils/logger'
+
+const log = createLogger('App')
 import { Plus, LogOut, Settings } from 'lucide-vue-next'
 import LoginView from './components/LoginView.vue'
 import AgentDashboard from './components/AgentDashboard.vue'
@@ -16,6 +19,10 @@ const view = ref<View>('dashboard')
 
 watch(() => store.isLoggedIn.value, (loggedIn) => {
   if (!loggedIn) view.value = 'dashboard'
+})
+
+watch(() => store.isCreateModalOpen.value, (isOpen) => {
+  log.debug('isCreateModalOpen changed:', isOpen)
 })
 
 function handleLogin(key: string) {
@@ -131,7 +138,7 @@ function handleLogout() {
           v-if="view === 'dashboard'"
           :disabled="!store.canCreateAgent.value"
           class="px-3 py-1.5 bg-swarm-600 hover:bg-swarm-700 disabled:opacity-30 disabled:cursor-not-allowed text-white rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5"
-          @click="store.setIsCreateModalOpen(true)"
+          @click="() => { log.debug('新建 Agent button clicked'); store.setIsCreateModalOpen(true) }"
         >
           <Plus class="w-3.5 h-3.5" /> 新建 Agent
         </button>

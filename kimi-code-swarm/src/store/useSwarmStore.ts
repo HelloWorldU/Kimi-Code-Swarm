@@ -466,7 +466,10 @@ export function useSwarmStore() {
 
     // Actions
     setSelectedAgentId: (id: string | null) => { state.selectedAgentId = id },
-    setIsCreateModalOpen: (v: boolean) => { state.isCreateModalOpen = v },
+    setIsCreateModalOpen: (v: boolean) => {
+      log.debug('setIsCreateModalOpen called:', v, 'current:', state.isCreateModalOpen)
+      state.isCreateModalOpen = v
+    },
     login,
     logout,
     createAgent,
