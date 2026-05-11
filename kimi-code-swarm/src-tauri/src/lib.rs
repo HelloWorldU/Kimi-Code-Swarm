@@ -187,8 +187,32 @@ fn spawn_agent_engine(app: tauri::AppHandle) -> Result<u32, String> {
     };
 
     // Use tsx to run TypeScript directly (handles .js -> .ts resolution)
-    let mut cmd_builder = Command::new("npx");
-    cmd_builder.args(["tsx", "src/index.ts"])
+    // Try local tsx CLI module first to avoid PATH / npx issues
+    let tsx_cli = engine_dir.join("node_modules/tsx/dist/cli.mjs");
+    let tsx_bin = engine_dir.join("node_modules/.bin/tsx");
+
+    let mut cmd_builder = if tsx_cli.exists() {
+        let mut cmd = Command::new("node");
+        cmd.arg(&tsx_cli).arg("src/index.ts");
+        cmd
+    } else if tsx_bin.exists() {
+        let mut cmd = Command::new("node");
+        cmd.arg(&tsx_bin).arg("src/index.ts");
+        cmd
+    } else {
+        // fallback: try npx via cmd /c on Windows to inherit PATH
+        if cfg!(target_os = "windows") {
+            let mut cmd = Command::new("cmd");
+            cmd.args(["/c", "npx", "tsx", "src/index.ts"]);
+            cmd
+        } else {
+            let mut cmd = Command::new("npx");
+            cmd.args(["tsx", "src/index.ts"]);
+            cmd
+        }
+    };
+
+    cmd_builder
         .current_dir(&engine_dir)
         .stdout(Stdio::piped())
         .stdin(Stdio::piped());

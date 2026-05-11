@@ -10,7 +10,7 @@
     "typecheck": "vue-tsc --noEmit",
     "lint": "eslint src --ext .ts,.vue",
     "lint:fix": "eslint src --ext .ts,.vue --fix",
-    "analyze": "npx tsx ../ast/analyzer.ts src",
+    "analyze": "npx tsx ../ast/analyzer.ts src tests",
     "check-docs": "npx tsx ../ci/scripts/check-docs-sync.ts",
     "health-check": "npx tsx ../scripts/health-check.ts",
     "test": "vitest run",

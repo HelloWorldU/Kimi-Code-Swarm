@@ -77,6 +77,7 @@
 - **CI（`npm run ci`）**：验证代码质量（编译/Linter/AST/测试/构建）—— 这些是机械可执行的硬约束
 - **harness**：定义 Agent 执行任务的**方向、红线和参考建议**—— 高抽象层的软性约束
 - **硬化路径**：只有 Must/Must-Not 中的关键节点才会被逐步编码到 CI/AST 中。Reference 层永远保持软性
+- **AST 扫描范围**：`analyze` 同时扫描 `src/` 和 `tests/`，`tests/` 目录排除孤立文件检测（测试文件不被视为 dead code）
 
 ### 当前硬化状态
 

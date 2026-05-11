@@ -28,6 +28,7 @@
 | Git 自动化（clone/checkout/commit/push） | ✅ | Tauri 环境通过 IPC 执行真实 git | `src/api/ipc.ts` |
 | GitHub API（PR 创建/合并/查询） | ⚡ | 配置 Token 后走真实 API；否则 Mock | `src/api/github.ts` |
 | 全员审阅门控 | ⚡ | 逻辑真实；Mock 模式 3 秒自动通过 | `src/store/useSwarmStore.ts` |
+| Agent Engine 进程管理 | ✅ | Rust 后台 spawn Node.js Agent Engine，stdin/stdout 管道通信；Windows 优先使用本地 `tsx.cmd` 避免 PATH 继承问题 | `src-tauri/src/lib.rs`, `agent-engine/src/index.ts` |
 | Kimi CLI 接入 | ✅ | `sendInstruction` 调用 `kimi --print --quiet`，实时 stdout 流式捕获，可取消 | `src/store/useSwarmStore.ts` |
 | Token 预算控制 | ✅ | sendInstruction 前检查预算；process-output 中按输出行长度估算并累加；耗尽时自动 kill 进程 | `src/store/useSwarmStore.ts` |
 
@@ -52,4 +53,4 @@
 
 ---
 
-*Last updated: 2026-05-07*
+*Last updated: 2026-05-08*

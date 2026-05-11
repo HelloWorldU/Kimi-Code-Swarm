@@ -80,14 +80,21 @@ function printIssues(issues: AstIssue[], totalRef: { value: number }, fixableRef
 }
 
 function main() {
-  const target = process.argv.find((_, i, arr) => i > 1 && !arr[i].startsWith('--'))
-  if (!target) {
-    console.error('用法: npx tsx ast/analyzer.ts <file|dir> [--fix]')
+  const targets = process.argv.slice(2).filter(arg => !arg.startsWith('--'))
+  if (targets.length === 0) {
+    console.error('用法: npx tsx ast/analyzer.ts <file|dir> ... [--fix]')
     process.exit(1)
   }
 
-  const stat = statSync(target)
-  const files: string[] = stat.isDirectory() ? findFiles(target) : [target]
+  const files: string[] = []
+  for (const target of targets) {
+    const stat = statSync(target)
+    if (stat.isDirectory()) {
+      files.push(...findFiles(target))
+    } else {
+      files.push(target)
+    }
+  }
 
   const total = { value: 0 }
   const fixable = { value: 0 }

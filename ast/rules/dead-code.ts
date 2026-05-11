@@ -21,6 +21,7 @@ const ORPHAN_IGNORE_PATTERNS = [
   /[/\\]main\.ts$/,
   /[/\\]vite-env\.d\.ts$/,
   /[/\\]index\.html$/,
+  /(^|[/\\])tests($|[/\\])/,
 ]
 
 // ── 工具函数 ──
