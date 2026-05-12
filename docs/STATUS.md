@@ -47,7 +47,6 @@
 
 | 功能模块 | 状态 | 说明 | 关键文件 |
 |----------|------|------|----------|
-| `evals/` 回归测试 | ❌ | 目录存在，用例待填充 | `evals/` |
 | `tests/` 单元测试 | ✅ | 前端 Vitest（16 个通过）；测试同步硬约束已接入 CI | `tests/unit/` |
 | 测试同步硬约束 | ✅ | PR CI 阻断：`src/` 新增代码 → `tests/` 必须有对应更新 | `ci/scripts/check-test-sync.ts` |
 | `evals/` 回归测试 | ✅ | bug-fix / new-task 流程评估：分支规范、根因留痕、测试覆盖、文档同步 | `evals/bug-fix.eval.ts`, `evals/new-task.eval.ts` |
