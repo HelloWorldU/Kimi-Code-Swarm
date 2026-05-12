@@ -10,6 +10,7 @@ import {
   getDiffSummary,
   hasRootCause,
   isConventionalCommit,
+  hasAddedComments,
 } from './utils/git-analyzer.js'
 
 interface EvalResult {
@@ -36,25 +37,26 @@ function evaluate(): EvalResult[] {
       : '❌ commit message 未包含根因说明（禁止盲修）',
   })
 
-  // ── must: 修复后必须留痕（形式不限）──
+  // ── must: 修复后必须留痕（形式不限：文档、计划、代码注释均可）──
   const hasDocTrace = diff.docFiles.length > 0
-  const hasCodeComment = false // TODO: 扫描代码中新增的注释
+  const hasCodeComment = hasAddedComments('HEAD')
+  const hasTrace = hasDocTrace || hasCodeComment
   results.push({
     rule: 'bug-fix/documentation-trace',
     severity: 'hard',
-    passed: hasDocTrace,
-    message: hasDocTrace
-      ? `✅ 伴随文档/计划更新 (${diff.docFiles.length} 个文件)`
-      : '❌ 修复后未留痕（docs/、exec-plans/、或 harness/ 无变更）',
+    passed: hasTrace,
+    message: hasTrace
+      ? `✅ 已留痕 (${hasDocTrace ? diff.docFiles.length + ' 个文档' : ''}${hasDocTrace && hasCodeComment ? ' + ' : ''}${hasCodeComment ? '代码注释' : ''})`
+      : '❌ 修复后未留痕（docs/、exec-plans/、harness/ 无变更，代码中亦无新增注释）',
   })
 
   // ── must-not: 修复后不留任何痕迹 ──
   results.push({
     rule: 'bug-fix/no-trace-forbidden',
     severity: 'hard',
-    passed: hasDocTrace || diff.codeFiles.length === 0,
-    message: diff.codeFiles.length > 0 && !hasDocTrace
-      ? '❌ 代码有变更但未留任何痕迹'
+    passed: hasTrace || diff.codeFiles.length === 0,
+    message: diff.codeFiles.length > 0 && !hasTrace
+      ? '❌ 代码有变更但未留任何痕迹（无文档更新且无新增代码注释）'
       : '✅ 未违反不留痕迹禁令',
   })
 

@@ -4,7 +4,7 @@
  * 用法: npx tsx ast/analyzer.ts <file|dir> [--fix]
  */
 
-import { readFileSync, readdirSync, statSync } from 'fs'
+import { readFileSync, readdirSync, statSync, writeFileSync } from 'fs'
 import { join, extname, relative } from 'path'
 
 import { checkVueStructure } from './rules/vue-structure'
@@ -12,6 +12,7 @@ import { checkImports } from './rules/import-restrictions'
 import { checkStyle } from './rules/style-constraints'
 import { checkDeadCode } from './rules/dead-code'
 import { checkErrorHandling } from './rules/error-handling'
+import { fixEmptyCatches } from './fixers/error-handling'
 
 export interface AstIssue {
   file: string
@@ -64,6 +65,24 @@ function analyzeTsFile(filePath: string, content: string): AstIssue[] {
   return issues
 }
 
+function applyFixes(filePath: string, issues: AstIssue[]): string | null {
+  if (!SHOULD_FIX) return null
+  let content = readFileSync(filePath, 'utf-8')
+  let modified = false
+
+  // 按 fixer 类型分组应用
+  const hasEmptyCatch = issues.some(i => i.rule === 'error-handling/empty-catch' && i.fixable)
+  if (hasEmptyCatch) {
+    const fixed = fixEmptyCatches(content)
+    if (fixed !== content) {
+      content = fixed
+      modified = true
+    }
+  }
+
+  return modified ? content : null
+}
+
 function printIssues(issues: AstIssue[], totalRef: { value: number }, fixableRef: { value: number }) {
   for (const issue of issues) {
     const relPath = relative(process.cwd(), issue.file)
@@ -71,7 +90,7 @@ function printIssues(issues: AstIssue[], totalRef: { value: number }, fixableRef
     const icon = issue.fixable ? '🔧' : '❌'
     const loc = issue.line ? `:${issue.line}` : ''
     console.log(`  ${icon} [${issue.rule}]${loc} ${issue.message}`)
-    if (issue.fix && SHOULD_FIX) {
+    if (issue.fix) {
       console.log(`     💡 ${issue.fix}`)
     }
     totalRef.value++
@@ -112,6 +131,14 @@ function main() {
       ? analyzeVueFile(path, content)
       : analyzeTsFile(path, content)
     printIssues(issues, total, fixable)
+
+    if (SHOULD_FIX && issues.some(i => i.fixable)) {
+      const fixed = applyFixes(path, issues)
+      if (fixed) {
+        writeFileSync(path, fixed, 'utf-8')
+        console.log(`     ✅ 已自动修复并写回文件`)
+      }
+    }
   }
 
   // ── 跨文件规则（dead code） ──

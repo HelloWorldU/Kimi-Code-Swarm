@@ -19,7 +19,7 @@ interface CatchBlock {
 }
 
 /** 从文件内容中提取所有 catch 块 */
-function findCatchBlocks(content: string): CatchBlock[] {
+export function findCatchBlocks(content: string): CatchBlock[] {
   const blocks: CatchBlock[] = []
   const lines = content.split('\n')
 
@@ -66,9 +66,10 @@ function findCatchBlocks(content: string): CatchBlock[] {
 }
 
 /** 判断 catch 块是否为空（只有注释、空白、throw） */
-function isEmptyCatch(content: string): boolean {
+export function isEmptyCatch(content: string): boolean {
   let cleaned = content
     .replace(/catch\s*\([^)]*\)\s*\{/g, '')
+    .replace(/^\s*\}\s*/g, '')
     .replace(/\}\s*$/g, '')
 
   // 移除注释
@@ -83,7 +84,7 @@ function isEmptyCatch(content: string): boolean {
 }
 
 /** 检查是否使用了 Logger */
-function hasLogger(content: string): boolean {
+export function hasLogger(content: string): boolean {
   return /\blog(?:ger)?\.(?:error|warn|debug|info)\b/.test(content)
 }
 

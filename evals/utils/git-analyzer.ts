@@ -111,6 +111,51 @@ export function isConventionalCommit(message: string): boolean {
 }
 
 /**
+ * 扫描代码 diff 中是否新增了有意义的注释
+ * 只检查 kimi-code-swarm/src/ 和 agent-engine/src/ 下的 .ts/.vue 文件
+ */
+export function hasAddedComments(commit: string = 'HEAD'): boolean {
+  try {
+    const diffOutput = execGit(['diff', commit + '~1', commit, '--'])
+    if (!diffOutput) return false
+
+    const lines = diffOutput.split('\n')
+    let inHunk = false
+    let filePath = ''
+    const isTargetFile = (f: string) =>
+      (f.startsWith('kimi-code-swarm/src/') || f.startsWith('agent-engine/src/')) &&
+      (f.endsWith('.ts') || f.endsWith('.vue')) &&
+      !f.endsWith('.d.ts')
+
+    for (const line of lines) {
+      // diff --git a/... b/...
+      const fileMatch = line.match(/^diff --git a\/(.+?) b\/(.+)$/)
+      if (fileMatch) {
+        filePath = fileMatch[2]
+        inHunk = isTargetFile(filePath)
+        continue
+      }
+
+      if (!inHunk) continue
+
+      // 新增的行（以 + 开头，但不是 +++）
+      if (line.startsWith('+') && !line.startsWith('+++')) {
+        const content = line.slice(1).trim()
+        // 跳过空行和纯格式变更
+        if (content.length === 0) continue
+        // 检测注释：// 开头 或 /* */ 中间的内容
+        if (/^\/\/.+/.test(content) || /\/\*.*\*\//.test(content) || /\/\*.+/.test(content)) {
+          return true
+        }
+      }
+    }
+    return false
+  } catch {
+    return false
+  }
+}
+
+/**
  * 获取 PR 的 commits 列表
  */
 export function getPRCommits(base: string = 'origin/main', head: string = 'HEAD'): CommitInfo[] {

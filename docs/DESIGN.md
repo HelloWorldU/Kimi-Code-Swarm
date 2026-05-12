@@ -88,7 +88,7 @@
 
 | harness 准则 | 硬化方式 | 状态 |
 |-------------|---------|------|
-| bug-fix: 禁止吞没错误 | AST `error-handling/empty-catch` | ✅ 硬约束 |
+| bug-fix: 禁止吞没错误 | AST `error-handling/empty-catch` + fixer 自动修复 | ✅ 硬约束 |
 | bug-fix: 鼓励留痕 | AST `error-handling/missing-logger` (warn) + check-docs-sync（要求 docs/ 变更） | ⚡ 半硬（warn + 分支检查） |
 | new-task: 未验证代码禁止合入 | CI 流水线 + PR 门控 | ✅ 硬约束 |
 | new-task: 审阅通过才能合并 | PR review 机制 | ⚡ 半硬（Mock 模式可跳过） |
