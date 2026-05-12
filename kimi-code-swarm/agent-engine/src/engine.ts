@@ -10,7 +10,7 @@ export class AgentEngine {
     this.emit = emit
   }
 
-  private broadcast(event: EngineEvent) {
+  private broadcast = (event: EngineEvent) => {
     this.emit(event)
   }
 

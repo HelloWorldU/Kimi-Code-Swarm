@@ -104,6 +104,10 @@ Kimi-Code-Swarm/
     │   ├── skills/
     │   ├── App.vue
     │   └── main.ts
+    ├── tests/                 ← 🧪 所有可运行测试集中在此
+    │   ├── unit/                Vitest 单元测试
+    │   ├── integration/         AgentEngine 集成测试
+    │   └── e2e/                 Playwright 端到端测试
     ├── index.html
     ├── vite.config.ts
     ├── tailwind.config.js

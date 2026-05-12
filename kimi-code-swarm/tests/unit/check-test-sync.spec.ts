@@ -36,13 +36,13 @@ describe('check-test-sync logic', () => {
 
     it('excludes non-src files', () => {
       expect(isCodeFile('ci/scripts/check-test-sync.ts')).toBe(false)
-      expect(isCodeFile('tests/unit/store.spec.ts')).toBe(false)
+      expect(isCodeFile('kimi-code-swarm/tests/unit/store.spec.ts')).toBe(false)
     })
   })
 
   describe('isTestFile', () => {
     it('recognizes test directory files', () => {
-      expect(isTestFile('tests/unit/store.spec.ts')).toBe(true)
+      expect(isTestFile('kimi-code-swarm/tests/unit/store.spec.ts')).toBe(true)
       expect(isTestFile('kimi-code-swarm/tests/unit/github-api.spec.ts')).toBe(true)
     })
 

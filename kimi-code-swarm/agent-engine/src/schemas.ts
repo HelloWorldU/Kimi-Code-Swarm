@@ -76,10 +76,6 @@ export const EngineCommandSchema = z.discriminatedUnion('type', [
     agentId: z.string().min(1),
   }),
   z.object({
-    type: z.literal('delete-agent'),
-    agentId: z.string().min(1),
-  }),
-  z.object({
     type: z.literal('submit-for-review'),
     agentId: z.string().min(1),
     githubToken: z.string().optional(),
@@ -106,6 +102,10 @@ export const EngineCommandSchema = z.discriminatedUnion('type', [
   }),
   z.object({ type: z.literal('ping') }),
   z.object({ type: z.literal('shutdown') }),
+  z.object({
+    type: z.literal('delete-agent'),
+    agentId: z.string().min(1),
+  }),
 ])
 
 // ── EngineEvent (Discriminated Union) ──

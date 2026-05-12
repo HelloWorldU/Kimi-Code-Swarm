@@ -15,6 +15,7 @@
 | 多轮对话 UI | ✅ | `src/components/AgentDetail.vue` |
 | GitHub API 真实路径 | ✅ | `agent-engine/src/github-api.ts` |
 | 文件 diff 查看 | ✅ | `agent-engine/src/git.ts` + store 事件驱动 |
+| 后端集成测试 | ✅ | `tests/integration/engine.spec.ts` — 覆盖 Engine 完整生命周期及降级行为 |
 
 ## 架构演进记录
 
