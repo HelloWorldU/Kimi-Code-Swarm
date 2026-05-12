@@ -37,7 +37,7 @@ Vue 3 + TypeScript + Vite + Tailwind CSS + lucide-vue-next + Tauri v2 + @tauri-a
 | Node.js | 22+ | 前端构建 + Agent Engine | [nodejs.org](https://nodejs.org/) |
 | Git | 任意 | Agent clone/commit/push | [git-scm.com](https://git-scm.com/) |
 | Kimi CLI | 最新 | Agent 执行指令 | `py -3.12 -m pip install kimi-cli` |
-| Kimi API Key | 必需 | App 登录 + CLI 进程注入 | [platform.moonshot.cn](https://platform.moonshot.cn/) |
+| Kimi API Key | 必需 | App 登录 + CLI 进程注入 | [kimi.com/code/console](https://www.kimi.com/code/console) |
 | GitHub Token | 可选 | PR 真实操作（否则 Mock） | GitHub Settings → PAT |
 | Rust | 可选 | Tauri 桌面模式 | [rustup.rs](https://rustup.rs/) |
 

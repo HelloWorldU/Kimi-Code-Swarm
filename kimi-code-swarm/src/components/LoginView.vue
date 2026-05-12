@@ -84,7 +84,7 @@ function handleSubmit() {
           </p>
           <p class="text-xs text-gray-400 flex items-center gap-1.5">
             <span class="w-1 h-1 rounded-full bg-gray-300" />
-            在 <a href="https://platform.moonshot.cn/console/api-keys" target="_blank" class="text-swarm-600 hover:text-swarm-700">Moonshot 平台</a> 获取 API Key
+            在 <a href="https://www.kimi.com/code/console" target="_blank" class="text-swarm-600 hover:text-swarm-700">Moonshot 平台</a> 获取 API Key
           </p>
         </div>
       </div>

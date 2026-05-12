@@ -131,7 +131,7 @@ Kimi-Code-Swarm/
 - **Node.js 22+**
 - **Git**
 - **Kimi CLI**：`py -3.12 -m pip install kimi-cli`
-- **Kimi API Key**：[platform.moonshot.cn](https://platform.moonshot.cn/)
+- **Kimi API Key**：[kimi.com/code/console](https://www.kimi.com/code/console)
 
 ### 启动
 

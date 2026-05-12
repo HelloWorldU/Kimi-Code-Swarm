@@ -30,7 +30,7 @@ const emit = defineEmits<{...}>()
 
 ## 组件类型示例
 
-- `LoginView.vue` — 独立页面组件：登录表单 + 验证状态 + 外部链接
+- `LoginView.vue` — 独立页面组件：登录表单 + API Key 验证 + Kimi Code 控制台外链
 - `AgentDashboard.vue` — 列表容器组件：统计卡片 + Agent 网格 + 空状态
 - `AgentDetail.vue` — 聊天式多轮对话组件：Header + Info + PR 审阅 + 文件变更 + 聊天消息区（input/output/system/error 气泡）+ 输入框。日期字段通过 new Date(string).toLocaleTimeString() 显示
 - `AnalyticsPanel.vue` — 数据展示型组件：状态分布、Token 排行、任务列表

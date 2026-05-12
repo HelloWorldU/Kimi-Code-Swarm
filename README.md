@@ -51,7 +51,7 @@
 | **Node.js** | 22+ | 前端构建与 Agent Engine | [nodejs.org](https://nodejs.org/) |
 | **Git** | 任意 | Agent 自动 clone/commit/push | [git-scm.com](https://git-scm.com/) |
 | **Kimi CLI** | 最新 | Agent 执行指令的核心工具 | `py -3.12 -m pip install kimi-cli` |
-| **Kimi API Key** | 必需 | 登录 App，注入 CLI 进程 | [platform.moonshot.cn](https://platform.moonshot.cn/) |
+| **Kimi API Key** | 必需 | 登录 App，注入 CLI 进程 | [kimi.com/code/console](https://www.kimi.com/code/console) |
 | GitHub Token | 可选 | PR 创建/合并（无 Token 时降级为 Mock） | GitHub Settings → Developer settings → Personal access tokens |
 | Rust | 可选 | 仅 Tauri 桌面模式需要 | [rustup.rs](https://rustup.rs/) |
 
@@ -79,7 +79,7 @@ npm run tauri dev
 
 1. 打开 App（浏览器或桌面窗口）
 2. 在登录页输入 Kimi API Key → 点击验证
-   - API Key 从 [Moonshot 平台](https://platform.moonshot.cn/console/api-keys) 获取
+   - API Key 从 [Kimi Code 控制台](https://www.kimi.com/code/console) 获取
    - 验证通过后存入系统 Keyring（Tauri）或 localStorage（浏览器），**不会明文保存**
 3. 进入 Dashboard → 点击「新建 Agent」→ 输入仓库地址和指令
 4. 点击「启动」→ App 自动 clone 仓库到 `E:/workspace/{agent-id}`
