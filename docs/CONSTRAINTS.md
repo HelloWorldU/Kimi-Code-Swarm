@@ -128,13 +128,13 @@ typecheck → lint → analyze → test → check-docs → check-test → build
 
 | 软性约束 | 硬化方式 | 优先级 |
 |----------|---------|--------|
-| `harness/*.yaml` 偏离 | `evals/` 回归测试 | P1 |
-| 模块边界（前端禁 spawn） | ESLint 自定义规则 | P1 |
+| `harness/*.yaml` 偏离 | `evals/` 回归测试 | ✅ |
+| 模块边界（前端禁 spawn） | ESLint 自定义规则 | ✅ |
 | Store 直接赋值 | ESLint 规则或 TS 类型设计 | P2 |
 | 状态色语义 | AST 规则扫描非法颜色类名 | P2 |
 | 工程约定 | check-docs-sync.ts 扩展禁止模式检测 | P2 |
 | AST 扫描范围 | `analyze` 支持多目录参数（`src tests`），`tests/` 排除孤立文件检测 | ✅ |
-| 运行时边界验证 | 引入 zod / io-ts | P1 |
+| 运行时边界验证 | 引入 zod / io-ts | ✅ |
 | 循环清理 | `scripts/cleanup.ts` 实现 | P1 |
 | 仓库一致性检查器 | `scripts/health-check.ts`（信息供给型） | ✅ |
 | Tauri v2 桌面壳层 | `src-tauri/` Rust 主进程 + Vue 渲染进程 | ✅ |

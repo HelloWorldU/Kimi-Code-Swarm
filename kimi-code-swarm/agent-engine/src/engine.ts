@@ -1,5 +1,6 @@
 import { Agent } from './agent.js'
 import type { AgentState, EngineCommand, EngineEvent } from './types.js'
+import { EngineCommandSchema } from './schemas.js'
 
 export class AgentEngine {
   private agents = new Map<string, Agent>()
@@ -13,7 +14,15 @@ export class AgentEngine {
     this.emit(event)
   }
 
-  async handleCommand(cmd: EngineCommand) {
+  async handleCommand(rawCmd: EngineCommand) {
+    // 运行时验证：确保命令格式合法
+    const parseResult = EngineCommandSchema.safeParse(rawCmd)
+    if (!parseResult.success) {
+      this.emit({ type: 'error', message: `命令格式错误: ${parseResult.error.message}` })
+      return
+    }
+    const cmd = parseResult.data
+
     try {
       switch (cmd.type) {
         case 'create-agent': {

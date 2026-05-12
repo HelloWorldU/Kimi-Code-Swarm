@@ -2,6 +2,7 @@ import js from '@eslint/js'
 import ts from 'typescript-eslint'
 import vue from 'eslint-plugin-vue'
 import globals from 'globals'
+import noProcessInFrontend from '../ci/lint-rules/no-process-in-frontend.js'
 
 export default [
   {
@@ -21,7 +22,12 @@ export default [
         ...globals.browser,
       },
     },
+    plugins: {
+      'harness': { rules: { 'no-process-in-frontend': noProcessInFrontend } },
+    },
     rules: {
+      // Harness 自定义规则
+      'harness/no-process-in-frontend': 'error',
       // 关闭多词组件名检查（我们允许单词如 Sidebar）
       'vue/multi-word-component-names': 'off',
       // 禁止使用 var
