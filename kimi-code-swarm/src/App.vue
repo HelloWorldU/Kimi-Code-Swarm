@@ -40,15 +40,8 @@ function handleBackToDashboard() {
 }
 
 async function handleShowFileDiff(agentId: string, filePath: string) {
-  const diff = await store.getFileDiff(agentId, filePath)
-  const agent = store.agents.value.find((a) => a.id === agentId)
-  if (!agent) return
-  agent.logs.push({
-    id: Math.random().toString(36).substring(2, 10),
-    timestamp: new Date().toISOString(),
-    type: 'system',
-    content: `=== ${filePath} ===\n${diff || '无变更内容'}`,
-  })
+  await store.getFileDiff(agentId, filePath)
+  // diff 结果通过 diff-result 事件异步返回，由 useSwarmStore 推入日志
 }
 
 function handleLogout() {

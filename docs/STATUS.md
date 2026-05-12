@@ -52,7 +52,7 @@
 | `evals/` 回归测试 | ✅ | bug-fix / new-task 流程评估：分支规范、根因留痕、测试覆盖、文档同步 | `evals/bug-fix.eval.ts`, `evals/new-task.eval.ts` |
 | ESLint 模块边界规则 | ✅ | 自定义规则 `no-process-in-frontend`，禁止 `kimi-code-swarm/src/` 直接 spawn 进程 | `ci/lint-rules/no-process-in-frontend.js` |
 | Zod 运行时验证 | ✅ | EngineCommand / AgentState / EngineEvent schema，engine.ts 入口安全解析 | `agent-engine/src/schemas.ts` |
-| 文件变更展示 | ✅ | `git diff --name-only` 自动检测，点击文件查看 diff | `src/components/TaskDetail.vue` |
+| 文件变更展示 | ✅ | `git diff --name-only` 自动检测；点击文件通过 engine 获取真实 diff（Tauri）或 mock diff（浏览器） | `src/components/AgentDetail.vue`, `agent-engine/src/git.ts` |
 | 监控分析页 | ✅ | 任务状态分布、Token 消耗排行、活跃任务、审阅队列 | `src/components/AnalyticsPanel.vue` |
 | E2E 测试 | ⚡ | Playwright 已接入，但 E2E 用例待填充（当前未配置） | `tests/e2e/` |
 | 后端集成测试 | 🚧 | Rust IPC + Agent Engine + Git 调用的自动化验证待实现 | `tests/integration/` |

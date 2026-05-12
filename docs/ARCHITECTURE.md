@@ -96,6 +96,7 @@ PR 创建时，Store 自动生成 `ReviewEntry[]`，包含所有其他 Agent 作
 | Tauri IPC (`spawn_agent_engine`, `stop_agent_engine`, `send_to_engine` 等) | ✅ 真实 |
 | GitHub API 封装 | ⚡ 双模式（Token 可选） |
 | 审阅门控逻辑 | ✅ 真实 |
+| 文件 diff 查看 (`getFileDiff` → engine → `git diff`) | ✅ 真实 |
 | Kimi CLI 接入 (`detectKimiCli` + `spawn_process` + 实时事件) | ✅ 真实 |
 | 统一日志 (`src/utils/logger.ts`) | ✅ 已接入 Store，替代散落 console |
 

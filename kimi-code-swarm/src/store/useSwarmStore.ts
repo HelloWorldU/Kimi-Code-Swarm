@@ -133,7 +133,16 @@ function handleEngineEvent(event: Record<string, unknown>) {
       break
     }
     case 'diff-result': {
-      // handled by caller
+      const diffAgent = state.agents.find((a) => a.id === event.agentId)
+      if (diffAgent) {
+        diffAgent.logs.push({
+          id: generateId(),
+          timestamp: new Date().toISOString(),
+          type: 'system',
+          content: `=== ${event.filePath} ===\n${event.diff || '无变更内容'}`,
+        })
+        persistAgents()
+      }
       break
     }
     case 'pong': {
@@ -454,7 +463,8 @@ export function useSwarmStore() {
     const agent = state.agents.find((a) => a.id === agentId)
     if (!agent) return ''
     if (!isTauri) return `mock diff for ${filePath}`
-    // TODO: implement engine-based diff retrieval
+    // 发送命令给 engine，diff 结果通过 diff-result 事件异步返回
+    sendToEngine({ type: 'get-file-diff', agentId, filePath })
     return ''
   }
 
