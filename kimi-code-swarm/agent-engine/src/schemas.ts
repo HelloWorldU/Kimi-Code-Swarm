@@ -82,10 +82,12 @@ export const EngineCommandSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('submit-for-review'),
     agentId: z.string().min(1),
+    githubToken: z.string().optional(),
   }),
   z.object({
     type: z.literal('merge-pr'),
     agentId: z.string().min(1),
+    githubToken: z.string().optional(),
   }),
   z.object({
     type: z.literal('reject-pr'),

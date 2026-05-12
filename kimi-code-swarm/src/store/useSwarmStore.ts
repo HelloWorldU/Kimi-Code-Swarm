@@ -15,7 +15,7 @@ import {
   loadStoreValue,
   saveStoreValue,
 } from '../api/ipc'
-// import { hasToken } from '../api/github'
+import { getToken as getGitHubToken } from '../api/github'
 
 const log = createLogger('SwarmStore')
 
@@ -376,6 +376,7 @@ export function useSwarmStore() {
   }
 
   function submitForReview(id: string) {
+    const token = getGitHubToken()
     if (!isTauri) {
       const agent = state.agents.find((a) => a.id === id)
       if (!agent || agent.status !== 'working') return
@@ -391,7 +392,7 @@ export function useSwarmStore() {
       agent.prStatus = 'open'
       agent.prNumber = Math.floor(Math.random() * 100) + 1
       agent.prUrl = `${agent.repoUrl.replace(/\.git$/, '')}/pull/${agent.prNumber}`
-      agent.logs.push({ id: generateId(), timestamp: new Date().toISOString(), type: 'system', content: `PR #${agent.prNumber} 已创建（模拟）` })
+      agent.logs.push({ id: generateId(), timestamp: new Date().toISOString(), type: 'system', content: `PR #${agent.prNumber} 已创建（浏览器模式模拟）` })
       if (reviewers.length > 0) {
         setTimeout(() => {
           agent.reviews.forEach((r) => {
@@ -405,10 +406,11 @@ export function useSwarmStore() {
       persistAgents()
       return
     }
-    sendToEngine({ type: 'submit-for-review', agentId: id })
+    sendToEngine({ type: 'submit-for-review', agentId: id, githubToken: token || undefined })
   }
 
   function mergePr(id: string) {
+    const token = getGitHubToken()
     if (!isTauri) {
       const agent = state.agents.find((a) => a.id === id)
       if (!agent || agent.status !== 'reviewing') return
@@ -422,11 +424,11 @@ export function useSwarmStore() {
       agent.status = 'completed'
       agent.prStatus = 'merged'
       agent.reviews = []
-      agent.logs.push({ id: generateId(), timestamp: new Date().toISOString(), type: 'system', content: `PR #${agent.prNumber} 已合并到 main（模拟）` })
+      agent.logs.push({ id: generateId(), timestamp: new Date().toISOString(), type: 'system', content: `PR #${agent.prNumber} 已合并到 main（浏览器模式模拟）` })
       persistAgents()
       return
     }
-    sendToEngine({ type: 'merge-pr', agentId: id })
+    sendToEngine({ type: 'merge-pr', agentId: id, githubToken: token || undefined })
   }
 
   function rejectPr(id: string) {

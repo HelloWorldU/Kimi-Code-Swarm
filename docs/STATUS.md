@@ -27,7 +27,7 @@
 | Agent 管理（最多5个，五角色固定） | ✅ | Dashboard 卡片网格，数量限制，点击进详情页；五角色分工：UI/Core/Docs/Review/Tools | `src/components/AgentDashboard.vue`, `src/components/AgentDetail.vue`, `src/App.vue`, `docs/ARCHITECTURE.md` |
 | Agent 状态持久化 | ✅ | tauri-plugin-store 自动保存/恢复 Agent 列表 | `src/store/useSwarmStore.ts` |
 | Git 自动化（clone/checkout/commit/push） | ✅ | Tauri 环境通过 IPC 执行真实 git | `src/api/ipc.ts` |
-| GitHub API（PR 创建/合并/查询） | ⚡ | 配置 Token 后走真实 API；否则 Mock | `src/api/github.ts` |
+| GitHub API（PR 创建/合并/查询） | ✅ | 配置 GitHub Token 后 Agent Engine 调用真实 GitHub REST API；无 Token 降级为 Mock | `agent-engine/src/github-api.ts` |
 | 全员审阅门控 | ⚡ | 逻辑真实；Mock 模式 3 秒自动通过 | `src/store/useSwarmStore.ts` |
 | Agent Engine 进程管理 | ✅ | Rust 后台 spawn Node.js Agent Engine，stdin/stdout 管道通信；Windows 优先使用本地 `tsx.cmd` 避免 PATH 继承问题 | `src-tauri/src/lib.rs`, `agent-engine/src/index.ts` |
 | Kimi CLI 接入 | ✅ | `sendInstruction` 调用 `kimi --print --quiet`，实时 stdout 流式捕获，可取消 | `src/store/useSwarmStore.ts` |

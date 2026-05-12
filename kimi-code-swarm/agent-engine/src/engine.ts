@@ -67,13 +67,13 @@ export class AgentEngine {
           const agent = this.agents.get(cmd.agentId)
           if (!agent || agent.state.status !== 'working') return
           agent.assignReviewers(Array.from(this.agents.values()))
-          await agent.submitForReview()
+          await agent.submitForReview(cmd.githubToken)
           break
         }
 
         case 'merge-pr': {
           const agent = this.agents.get(cmd.agentId)
-          if (agent) agent.mergePr()
+          if (agent) await agent.mergePr(cmd.githubToken)
           break
         }
 

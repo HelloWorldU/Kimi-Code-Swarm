@@ -53,8 +53,8 @@ export type EngineCommand =
   | { type: 'send-instruction'; agentId: string; instruction: string }
   | { type: 'stop-agent'; agentId: string }
   | { type: 'delete-agent'; agentId: string }
-  | { type: 'submit-for-review'; agentId: string }
-  | { type: 'merge-pr'; agentId: string }
+  | { type: 'submit-for-review'; agentId: string; githubToken?: string }
+  | { type: 'merge-pr'; agentId: string; githubToken?: string }
   | { type: 'reject-pr'; agentId: string }
   | { type: 'submit-review'; agentId: string; reviewerAgentId: string; approved: boolean }
   | { type: 'get-file-diff'; agentId: string; filePath: string }

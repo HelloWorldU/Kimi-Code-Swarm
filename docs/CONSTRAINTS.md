@@ -135,7 +135,7 @@ typecheck → lint → analyze → test → check-docs → check-test → build
 | 工程约定 | check-docs-sync.ts 扩展禁止模式检测 | P2 |
 | AST 扫描范围 | `analyze` 支持多目录参数（`src tests`），`tests/` 排除孤立文件检测 | ✅ |
 | 运行时边界验证 | 引入 zod / io-ts | ✅ |
-| 循环清理 | `scripts/cleanup.ts` 实现 | P1 |
+| 循环清理 | `scripts/cleanup.ts` 实现 | P2（AST dead-code 检测已覆盖核心需求） |
 | 仓库一致性检查器 | `scripts/health-check.ts`（信息供给型） | ✅ |
 | Tauri v2 桌面壳层 | `src-tauri/` Rust 主进程 + Vue 渲染进程 | ✅ |
 | API Key 安全存储 | OS Keyring (keyring crate) | ✅ |

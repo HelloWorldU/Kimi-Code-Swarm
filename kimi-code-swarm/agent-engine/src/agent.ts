@@ -1,6 +1,7 @@
 import type { AgentState, LogEntry, ReviewEntry, TaskStatus, EngineEvent } from './types.js'
 import { runKimi, detectKimiCli, type KimiProcess } from './kimi.js'
 import { getChangedFiles, getFileDiff, gitAdd, gitCommit, gitPush, createBranch, cloneRepo } from './git.js'
+import { createPullRequest, mergePullRequest } from './github-api.js'
 
 let idCounter = 0
 const generateId = () => `agent-${Date.now().toString(36)}${(idCounter++).toString(36)}`
@@ -190,7 +191,7 @@ export class Agent {
     this.log('system', 'Agent 已停止')
   }
 
-  async submitForReview() {
+  async submitForReview(githubToken?: string) {
     if (this.state.status !== 'working') return
 
     if (this.state.workspace) {
@@ -206,10 +207,28 @@ export class Agent {
     }
 
     this.setStatus('reviewing')
+
+    // 如果有 GitHub Token，调用真实 API 创建 PR
+    if (githubToken) {
+      try {
+        const pr = await createPullRequest(githubToken, this.state.repoUrl, this.state.branch, `feat: ${this.state.name}`)
+        if (pr) {
+          this.state.prStatus = 'open'
+          this.state.prNumber = pr.number
+          this.state.prUrl = pr.html_url
+          this.log('system', `PR #${pr.number} 已创建: ${pr.html_url}`)
+          return
+        }
+      } catch (err) {
+        this.log('error', `GitHub API 创建 PR 失败: ${String(err)}`)
+      }
+    }
+
+    // 无 Token 或 API 失败时降级为 Mock
     this.state.prStatus = 'open'
     this.state.prNumber = Math.floor(Math.random() * 100) + 1
     this.state.prUrl = `${this.state.repoUrl.replace(/\.git$/, '')}/pull/${this.state.prNumber}`
-    this.log('system', `PR #${this.state.prNumber} 已创建`)
+    this.log('system', `PR #${this.state.prNumber} 已创建（模拟，未配置 GitHub Token）`)
   }
 
   canMerge(): boolean {
@@ -217,17 +236,36 @@ export class Agent {
     return this.state.reviews.every((r) => r.status === 'approved')
   }
 
-  mergePr() {
+  async mergePr(githubToken?: string) {
     if (this.state.status !== 'reviewing') return
     if (!this.canMerge()) {
       const approved = this.state.reviews.filter((r) => r.status === 'approved').length
       this.log('error', `合并被拒绝：需等待全员审阅通过（${approved}/${this.state.reviews.length}）`)
       return
     }
+
+    // 如果有 GitHub Token，调用真实 API 合并 PR
+    if (githubToken && this.state.prNumber) {
+      try {
+        const ok = await mergePullRequest(githubToken, this.state.repoUrl, this.state.prNumber)
+        if (ok) {
+          this.setStatus('completed')
+          this.state.prStatus = 'merged'
+          this.state.reviews = []
+          this.log('system', `PR #${this.state.prNumber} 已合并到 main（GitHub）`)
+          return
+        }
+        this.log('error', `GitHub API 合并 PR 失败，可能 PR 尚未就绪`)
+      } catch (err) {
+        this.log('error', `GitHub API 合并失败: ${String(err)}`)
+      }
+    }
+
+    // 无 Token 时降级为 Mock
     this.setStatus('completed')
     this.state.prStatus = 'merged'
     this.state.reviews = []
-    this.log('system', `PR #${this.state.prNumber} 已合并到 main`)
+    this.log('system', `PR #${this.state.prNumber} 已合并到 main（模拟）`)
   }
 
   rejectPr() {
