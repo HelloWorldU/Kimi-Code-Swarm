@@ -88,6 +88,11 @@ export class Agent {
   }
 
   async sendInstruction(instruction: string) {
+    // Allow continuing conversation from stopped or completed state
+    if (this.state.status === 'stopped' || this.state.status === 'completed') {
+      this.setStatus('ready')
+      this.log('system', 'Agent 已恢复，继续对话')
+    }
     if (this.state.status !== 'ready') return
 
     this.setStatus('working')

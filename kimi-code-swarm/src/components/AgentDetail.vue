@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, type Component } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import {
-  ArrowLeft, Send, Terminal, AlertCircle, CheckCircle, MessageSquare, Play,
-  GitPullRequest, GitMerge, RotateCcw, Square, Clock, XCircle, FileCode
+  ArrowLeft, Send, Terminal, AlertCircle, CheckCircle, Play,
+  GitPullRequest, GitMerge, RotateCcw, Square, Clock, XCircle, FileCode,
+  User, Bot, Loader2
 } from 'lucide-vue-next'
 import type { AgentTask } from '../types'
 
@@ -32,7 +33,7 @@ const canMerge = computed(() => props.agent.reviews.length === 0 || props.agent.
 const statusText = computed(() => {
   const map: Record<string, string> = {
     pending: '待启动', cloning: '克隆中', ready: '就绪',
-    working: '工作中', reviewing: '待审阅', completed: '已完成', stopped: '已停止',
+    working: '执行中', reviewing: '待审阅', completed: '已完成', stopped: '已停止',
   }
   return map[props.agent.status] || props.agent.status
 })
@@ -45,15 +46,15 @@ const statusColor = computed(() => {
   return 'text-gray-500'
 })
 
-const logTypeConfig: Record<string, { icon: Component; color: string; bg: string }> = {
-  system: { icon: Terminal, color: 'text-gray-500', bg: 'bg-gray-50' },
-  input: { icon: MessageSquare, color: 'text-swarm-600', bg: 'bg-swarm-50' },
-  output: { icon: CheckCircle, color: 'text-blue-600', bg: 'bg-blue-50' },
-  error: { icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-50' },
-}
+const canSendMessage = computed(() => {
+  return ['ready', 'stopped', 'completed'].includes(props.agent.status)
+})
+
+const isWorking = computed(() => props.agent.status === 'working')
 
 function handleSendInstruction() {
   if (!instruction.value.trim()) return
+  if (!canSendMessage.value && !isWorking.value) return
   emit('sendInstruction', props.agent.id, instruction.value.trim())
   instruction.value = ''
 }
@@ -64,12 +65,19 @@ watch(() => props.agent.logs.length, async () => {
     scrollRef.value.scrollTop = scrollRef.value.scrollHeight
   }
 })
+
+watch(() => props.agent.status, async () => {
+  await nextTick()
+  if (scrollRef.value) {
+    scrollRef.value.scrollTop = scrollRef.value.scrollHeight
+  }
+})
 </script>
 
 <template>
   <div class="h-full flex flex-col">
     <!-- Header -->
-    <div class="flex items-center gap-4 mb-6">
+    <div class="flex items-center gap-4 mb-4 shrink-0">
       <button
         class="p-2 rounded-lg bg-gray-100 text-gray-500 hover:text-gray-900 hover:bg-gray-200 transition-colors"
         @click="emit('back')"
@@ -95,19 +103,19 @@ watch(() => props.agent.logs.length, async () => {
     </div>
 
     <!-- Info Panel -->
-    <div class="grid grid-cols-2 gap-3 mb-4">
-      <div class="px-4 py-3 rounded-lg bg-gray-50 border border-gray-100">
+    <div class="grid grid-cols-2 gap-3 mb-3 shrink-0">
+      <div class="px-4 py-2.5 rounded-lg bg-gray-50 border border-gray-100">
         <p class="text-xs text-gray-500">任务指令</p>
         <p class="text-sm text-gray-700 mt-1">{{ agent.instruction || '暂无指令' }}</p>
       </div>
-      <div class="px-4 py-3 rounded-lg bg-gray-50 border border-gray-100">
+      <div class="px-4 py-2.5 rounded-lg bg-gray-50 border border-gray-100">
         <p class="text-xs text-gray-500">仓库</p>
         <p class="text-sm text-gray-700 mt-1 truncate">{{ agent.repoUrl }}</p>
       </div>
     </div>
 
     <!-- PR Panel -->
-    <div v-if="agent.prStatus !== 'none'" class="mb-4 px-4 py-3 rounded-lg bg-purple-50 border border-purple-100 space-y-3">
+    <div v-if="agent.prStatus !== 'none'" class="mb-3 px-4 py-3 rounded-lg bg-purple-50 border border-purple-100 space-y-3 shrink-0">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2">
           <GitPullRequest class="w-4 h-4 text-purple-600" />
@@ -204,51 +212,8 @@ watch(() => props.agent.logs.length, async () => {
       <a v-if="agent.prUrl" :href="agent.prUrl" target="_blank" class="text-xs text-gray-400 hover:text-swarm-600 block">{{ agent.prUrl }}</a>
     </div>
 
-    <!-- Action Panel -->
-    <div v-if="agent.status === 'pending'" class="mb-4">
-      <button
-        class="w-full px-4 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-medium transition-colors flex items-center justify-center gap-2"
-        @click="emit('start', agent.id)"
-      >
-        <Play class="w-4 h-4" /> 启动 Agent（自动 clone + 启动 CLI）
-      </button>
-    </div>
-
-    <div v-else-if="agent.status === 'ready'" class="mb-4">
-      <form class="flex gap-3" @submit.prevent="handleSendInstruction">
-        <input
-          v-model="instruction"
-          type="text"
-          placeholder="输入任务指令发送给 Agent..."
-          class="flex-1 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-swarm-500 focus:ring-1 focus:ring-swarm-500/30 transition-all"
-        />
-        <button
-          type="submit"
-          :disabled="!instruction.trim()"
-          class="px-5 py-2.5 bg-swarm-600 text-white rounded-xl hover:bg-swarm-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-2 font-medium"
-        >
-          <Send class="w-4 h-4" /> 发送
-        </button>
-      </form>
-    </div>
-
-    <div v-else-if="agent.status === 'working'" class="mb-4 flex items-center gap-3">
-      <button
-        class="flex-1 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-medium transition-colors flex items-center justify-center gap-2"
-        @click="emit('submitForReview', agent.id)"
-      >
-        <GitPullRequest class="w-4 h-4" /> 提交审阅（推送分支 + 创建 PR）
-      </button>
-      <button
-        class="px-4 py-2.5 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 transition-colors font-medium flex items-center gap-2"
-        @click="emit('stop', agent.id)"
-      >
-        <Square class="w-4 h-4" /> 停止
-      </button>
-    </div>
-
     <!-- Changed Files -->
-    <div v-if="agent.changedFiles && agent.changedFiles.length > 0" class="mb-4">
+    <div v-if="agent.changedFiles && agent.changedFiles.length > 0" class="mb-3 shrink-0">
       <div class="flex items-center gap-2 mb-2">
         <FileCode class="w-3.5 h-3.5 text-swarm-600" />
         <span class="text-xs font-medium text-gray-500">文件变更 ({{ agent.changedFiles.length }})</span>
@@ -266,26 +231,159 @@ watch(() => props.agent.logs.length, async () => {
       </div>
     </div>
 
-    <!-- Logs -->
+    <!-- Chat Area -->
     <div
       ref="scrollRef"
-      class="flex-1 overflow-y-auto scrollbar-thin rounded-xl bg-white border border-gray-200 p-4 space-y-2 min-h-0 shadow-sm"
+      class="flex-1 overflow-y-auto scrollbar-thin rounded-xl bg-gray-50/50 border border-gray-200 p-4 space-y-4 min-h-0"
     >
-      <div
-        v-for="log in agent.logs"
-        :key="log.id"
-        :class="['flex gap-3 p-2.5 rounded-lg border border-transparent hover:border-gray-200 transition-colors', logTypeConfig[log.type].bg]"
-      >
-        <component :is="logTypeConfig[log.type].icon" :class="['w-4 h-4 mt-0.5 shrink-0', logTypeConfig[log.type].color]" />
-        <div class="flex-1 min-w-0">
-          <div class="flex items-center gap-2 mb-0.5">
-            <span class="text-xs text-gray-400">{{ new Date(log.timestamp).toLocaleTimeString() }}</span>
-            <span v-if="log.tokens" class="text-xs text-gray-400">{{ log.tokens }} tokens</span>
-          </div>
-          <p :class="['text-sm whitespace-pre-wrap break-words', log.type === 'error' ? 'text-red-700' : 'text-gray-700']">
-            {{ log.content }}
-          </p>
+      <template v-if="agent.logs.length === 0">
+        <div class="h-full flex flex-col items-center justify-center text-gray-400">
+          <Bot class="w-10 h-10 mb-3 opacity-30" />
+          <p class="text-sm">Agent 已就绪，开始对话吧</p>
         </div>
+      </template>
+
+      <template v-for="log in agent.logs" :key="log.id">
+        <!-- User Message -->
+        <div v-if="log.type === 'input'" class="flex justify-end">
+          <div class="flex items-end gap-2 max-w-[85%]">
+            <div class="bg-swarm-600 text-white rounded-2xl rounded-tr-sm px-4 py-2.5 shadow-sm">
+              <p class="text-sm whitespace-pre-wrap break-words leading-relaxed">{{ log.content }}</p>
+              <div class="flex items-center justify-end gap-2 mt-1">
+                <span v-if="log.tokens" class="text-[10px] opacity-60">{{ log.tokens }} tokens</span>
+                <span class="text-[10px] opacity-60">{{ new Date(log.timestamp).toLocaleTimeString() }}</span>
+              </div>
+            </div>
+            <div class="w-7 h-7 rounded-full bg-swarm-100 flex items-center justify-center shrink-0 mb-1">
+              <User class="w-3.5 h-3.5 text-swarm-600" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Agent Message -->
+        <div v-else-if="log.type === 'output'" class="flex justify-start">
+          <div class="flex items-end gap-2 max-w-[85%]">
+            <div class="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center shrink-0 mb-1">
+              <Bot class="w-3.5 h-3.5 text-blue-600" />
+            </div>
+            <div class="bg-white text-gray-800 rounded-2xl rounded-tl-sm px-4 py-2.5 shadow-sm border border-gray-100">
+              <p class="text-sm whitespace-pre-wrap break-words leading-relaxed">{{ log.content }}</p>
+              <div class="flex items-center gap-2 mt-1">
+                <span class="text-[10px] text-gray-400">{{ new Date(log.timestamp).toLocaleTimeString() }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- System / Error Message -->
+        <div v-else class="flex justify-center">
+          <div
+            :class="[
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs max-w-[90%]',
+              log.type === 'error'
+                ? 'bg-red-50 text-red-600 border border-red-100'
+                : 'bg-gray-100 text-gray-500 border border-gray-200'
+            ]"
+          >
+            <Terminal v-if="log.type === 'system'" class="w-3 h-3 shrink-0" />
+            <AlertCircle v-else class="w-3 h-3 shrink-0" />
+            <span class="whitespace-pre-wrap">{{ log.content }}</span>
+          </div>
+        </div>
+      </template>
+
+      <!-- Working Indicator -->
+      <div v-if="agent.status === 'working'" class="flex justify-start">
+        <div class="flex items-end gap-2">
+          <div class="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+            <Bot class="w-3.5 h-3.5 text-blue-600" />
+          </div>
+          <div class="bg-white rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm border border-gray-100">
+            <div class="flex items-center gap-2">
+              <Loader2 class="w-4 h-4 text-blue-500 animate-spin" />
+              <span class="text-sm text-gray-500">Agent 正在执行中...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Input Area -->
+    <div class="shrink-0 mt-3 pt-3 border-t border-gray-200">
+      <!-- Pending: Start Button -->
+      <div v-if="agent.status === 'pending'">
+        <button
+          class="w-full px-4 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-medium transition-colors flex items-center justify-center gap-2"
+          @click="emit('start', agent.id)"
+        >
+          <Play class="w-4 h-4" /> 启动 Agent（自动 clone + 启动 CLI）
+        </button>
+      </div>
+
+      <!-- Cloning -->
+      <div v-else-if="agent.status === 'cloning'" class="flex items-center justify-center gap-2 py-3 text-gray-500">
+        <Loader2 class="w-4 h-4 animate-spin" />
+        <span class="text-sm">正在克隆仓库，请稍候...</span>
+      </div>
+
+      <!-- Ready / Stopped / Completed: Chat Input -->
+      <div v-else-if="canSendMessage">
+        <form class="flex gap-2" @submit.prevent="handleSendInstruction">
+          <input
+            v-model="instruction"
+            type="text"
+            :placeholder="agent.status === 'stopped' ? 'Agent 已停止，发送消息将继续执行...' : '输入消息与 Agent 对话...'"
+            class="flex-1 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-swarm-500 focus:ring-1 focus:ring-swarm-500/30 transition-all"
+          />
+          <button
+            type="submit"
+            :disabled="!instruction.trim()"
+            class="px-5 py-2.5 bg-swarm-600 text-white rounded-xl hover:bg-swarm-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-2 font-medium shrink-0"
+          >
+            <Send class="w-4 h-4" /> 发送
+          </button>
+        </form>
+        <!-- Action Toolbar -->
+        <div v-if="agent.changedFiles && agent.changedFiles.length > 0 && agent.status !== 'completed'" class="flex items-center gap-2 mt-2">
+          <button
+            class="px-3 py-1.5 rounded-lg bg-purple-50 text-purple-600 hover:bg-purple-100 transition-colors text-xs font-medium flex items-center gap-1"
+            @click="emit('submitForReview', agent.id)"
+          >
+            <GitPullRequest class="w-3 h-3" /> 提交审阅
+          </button>
+        </div>
+      </div>
+
+      <!-- Working: Disabled Input + Stop -->
+      <div v-else-if="agent.status === 'working'">
+        <form class="flex gap-2" @submit.prevent>
+          <input
+            type="text"
+            disabled
+            placeholder="Agent 执行中，请等待完成后再发送..."
+            class="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-400 cursor-not-allowed"
+          />
+          <button
+            type="button"
+            class="px-4 py-2.5 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 transition-colors font-medium flex items-center gap-2 shrink-0"
+            @click="emit('stop', agent.id)"
+          >
+            <Square class="w-4 h-4" /> 停止
+          </button>
+        </form>
+        <div class="flex items-center gap-2 mt-2">
+          <button
+            class="px-3 py-1.5 rounded-lg bg-purple-50 text-purple-600 hover:bg-purple-100 transition-colors text-xs font-medium flex items-center gap-1"
+            @click="emit('submitForReview', agent.id)"
+          >
+            <GitPullRequest class="w-3 h-3" /> 提交审阅
+          </button>
+        </div>
+      </div>
+
+      <!-- Reviewing: No input -->
+      <div v-else-if="agent.status === 'reviewing'" class="text-center py-3 text-gray-400 text-sm">
+        当前处于审阅阶段，无法进行对话
       </div>
     </div>
   </div>

@@ -331,6 +331,11 @@ export function useSwarmStore() {
     if (!isTauri) {
       const agent = state.agents.find((a) => a.id === id)
       if (!agent) return
+      // Allow continuing conversation from stopped or completed state
+      if (agent.status === 'stopped' || agent.status === 'completed') {
+        agent.status = 'ready'
+        agent.logs.push({ id: generateId(), timestamp: new Date().toISOString(), type: 'system', content: 'Agent 已恢复，继续对话' })
+      }
       agent.status = 'working'
       agent.instruction = instruction
       agent.logs.push({ id: generateId(), timestamp: new Date().toISOString(), type: 'input', content: instruction, tokens: Math.floor(instruction.length / 2) })

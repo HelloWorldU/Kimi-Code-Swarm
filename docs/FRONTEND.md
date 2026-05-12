@@ -30,13 +30,28 @@ Vue 3 + TypeScript + Vite + Tailwind CSS + lucide-vue-next + Tauri v2 + @tauri-a
 - `components/AnalyticsPanel.vue` — 监控分析：状态分布、Token 排行、活跃/审阅任务
 - `components/TaskCard.vue` — Agent 卡片：状态 + Token 进度 + 审阅徽章
 
+## 环境准备
+
+| 依赖 | 版本 | 用途 | 获取 |
+|------|------|------|------|
+| Node.js | 22+ | 前端构建 + Agent Engine | [nodejs.org](https://nodejs.org/) |
+| Git | 任意 | Agent clone/commit/push | [git-scm.com](https://git-scm.com/) |
+| Kimi CLI | 最新 | Agent 执行指令 | `py -3.12 -m pip install kimi-cli` |
+| Kimi API Key | 必需 | App 登录 + CLI 进程注入 | [platform.moonshot.cn](https://platform.moonshot.cn/) |
+| GitHub Token | 可选 | PR 真实操作（否则 Mock） | GitHub Settings → PAT |
+| Rust | 可选 | Tauri 桌面模式 | [rustup.rs](https://rustup.rs/) |
+
+> **浏览器模式**（`npm run dev`）不需要 Rust。核心功能（真实 CLI 调用、Git 自动化）仅在 **Tauri 桌面模式** 生效。
+
 ## 快速启动
 
 ```bash
 cd kimi-code-swarm
 npm install         # 自动配置 Git hooks (core.hooksPath = ci/hooks)
-npm run dev         # 开发服务器
+npm run dev         # 开发服务器（浏览器模式）
 ```
+
+首次打开后在登录页输入 Kimi API Key，验证通过后存入系统 Keyring。
 
 > `npm install` 会自动运行 `postinstall` 脚本配置 Git hooks。如果跳过此步骤，需手动执行 `git config core.hooksPath ci/hooks`。
 
@@ -61,6 +76,11 @@ npm run build         # 生产构建
 ## 提交前检查
 
 `git commit` 会自动触发 pre-commit hook（`ci/hooks/pre-commit.cmd`），运行 typecheck → lint → analyze → check-docs。任一阶段失败将阻断提交。
+
+> **注意**：测试（`npm run test`）**不在 pre-commit 中运行**，原因：
+> 1. 完整测试耗时较长，不应阻塞本地提交
+> 2. 本地环境可能缺少 Tauri 等运行时依赖
+> 3. 测试放在 **PR CI（GitHub Actions）** 中执行，作为硬性合入门控
 
 pre-commit 中的 `check-docs` 除文档同步外，还包含 **Harness 流程合规检查**：
 - 若当前分支名为 `fix/*` / `bugfix/*`，必须伴随 `docs/`、`exec-plans/` 或 `harness/bug-fix.yaml` 的变更

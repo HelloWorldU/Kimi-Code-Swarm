@@ -126,11 +126,22 @@ Kimi-Code-Swarm/
 
 ## 🚀 快速启动
 
+### 前置条件
+
+- **Node.js 22+**
+- **Git**
+- **Kimi CLI**：`py -3.12 -m pip install kimi-cli`
+- **Kimi API Key**：[platform.moonshot.cn](https://platform.moonshot.cn/)
+
+### 启动
+
 ```bash
 cd kimi-code-swarm
-npm install
-npm run dev          # localhost:5173
+npm install          # 自动配置 Git hooks
+npm run dev          # localhost:5173（浏览器模式）
 ```
+
+首次打开 App 后在登录页输入 API Key，验证通过后存入系统 Keyring。
 
 ---
 

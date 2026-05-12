@@ -18,9 +18,9 @@
 │  └── 审阅 PR → 合并         │
 └─────────────────────────────┘
     │
-    ├─► Agent-01 @ ~/workspace/agent-01  ──► PR #42
-    ├─► Agent-02 @ ~/workspace/agent-02  ──► PR #43
-    └─► Agent-03 @ ~/workspace/agent-03  ──► PR #44
+    ├─► Agent-01 @ E:/workspace/agent-01  ──► PR #42
+    ├─► Agent-02 @ E:/workspace/agent-02  ──► PR #43
+    └─► Agent-03 @ E:/workspace/agent-03  ──► PR #44
 ```
 
 ## 核心功能
@@ -38,15 +38,54 @@
 | 前端 | Vue 3 + TypeScript + Vite + Tailwind CSS |
 | 构建 | Vite |
 | 图标 | lucide-vue-next |
-| 桌面壳 | Tauri v2 / Electron（未来） |
+| 桌面壳 | Tauri v2 |
 
-## 快速启动
+---
+
+## 🚀 快速启动
+
+### 前置条件
+
+| 依赖 | 版本/要求 | 用途 | 获取方式 |
+|------|----------|------|---------|
+| **Node.js** | 22+ | 前端构建与 Agent Engine | [nodejs.org](https://nodejs.org/) |
+| **Git** | 任意 | Agent 自动 clone/commit/push | [git-scm.com](https://git-scm.com/) |
+| **Kimi CLI** | 最新 | Agent 执行指令的核心工具 | `py -3.12 -m pip install kimi-cli` |
+| **Kimi API Key** | 必需 | 登录 App，注入 CLI 进程 | [platform.moonshot.cn](https://platform.moonshot.cn/) |
+| GitHub Token | 可选 | PR 创建/合并（无 Token 时降级为 Mock） | GitHub Settings → Developer settings → Personal access tokens |
+| Rust | 可选 | 仅 Tauri 桌面模式需要 | [rustup.rs](https://rustup.rs/) |
+
+> 💡 **浏览器开发模式**（`npm run dev`）不需要 Rust/Tauri，但核心功能（真实 CLI 调用、Git 自动化）只在 **Tauri 桌面模式** 下生效。
+
+### 安装与启动
 
 ```bash
+# 1. 克隆仓库
+git clone <repo-url>
+cd Kimi-Code-Swarm
+
+# 2. 安装前端依赖（自动配置 Git hooks）
 cd kimi-code-swarm
-npm install    # 自动配置 Git hooks
+npm install
+
+# 3. 启动开发服务器（浏览器模式）
 npm run dev    # localhost:5173
+
+# 4. （可选）Tauri 桌面模式
+npm run tauri dev
 ```
+
+### 首次使用流程
+
+1. 打开 App（浏览器或桌面窗口）
+2. 在登录页输入 Kimi API Key → 点击验证
+   - API Key 从 [Moonshot 平台](https://platform.moonshot.cn/console/api-keys) 获取
+   - 验证通过后存入系统 Keyring（Tauri）或 localStorage（浏览器），**不会明文保存**
+3. 进入 Dashboard → 点击「新建 Agent」→ 输入仓库地址和指令
+4. 点击「启动」→ App 自动 clone 仓库到 `E:/workspace/{agent-id}`
+5. 在对话窗口中与 Agent 多轮交互
+
+---
 
 ## 文档结构
 

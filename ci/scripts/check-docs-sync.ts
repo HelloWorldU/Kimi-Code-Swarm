@@ -31,15 +31,21 @@ interface SyncIssue {
   reason: string
 }
 
-const MODE = process.argv.includes('--all') ? 'all' : 'staged'
+const MODE = process.argv.includes('--all') ? 'all' : process.argv.includes('--base') ? 'base' : 'staged'
+const BASE_REF = (() => {
+  const idx = process.argv.indexOf('--base')
+  return idx >= 0 ? process.argv[idx + 1] : 'HEAD'
+})()
 
 function getChangedFiles(): string[] {
   let output: string
   // --diff-filter=d: 排除已删除的文件（删除废弃文件不需要同步文档）
   if (MODE === 'staged') {
     output = execSync('git diff --cached --diff-filter=d --name-only', { encoding: 'utf-8', cwd: process.cwd() })
-  } else {
+  } else if (MODE === 'all') {
     output = execSync('git diff --diff-filter=d --name-only HEAD', { encoding: 'utf-8', cwd: process.cwd() })
+  } else {
+    output = execSync(`git diff --diff-filter=d --name-only ${BASE_REF}...HEAD`, { encoding: 'utf-8', cwd: process.cwd() })
   }
   return output.split('\n').filter(f => f.trim() !== '')
 }
@@ -148,7 +154,8 @@ function checkSync(): SyncIssue[] {
 }
 
 function main() {
-  console.log(`🔍 文档同步检测 (${MODE === 'staged' ? '已暂存' : '全部'}变更)\n`)
+  const modeLabel = MODE === 'staged' ? '已暂存变更' : MODE === 'all' ? '全部变更' : `相对于 ${BASE_REF} 的变更`
+  console.log(`🔍 文档同步检测 (${modeLabel})\n`)
 
   const issues = checkSync()
 

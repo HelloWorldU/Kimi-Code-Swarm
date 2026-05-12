@@ -11,7 +11,24 @@
 | 前端单元测试 | `kimi-code-swarm/tests/unit/` | Store、API、组件 | Vitest + happy-dom | ✅ 已接入 |
 | 项目级单元测试 | `tests/unit/` | AST、CI 脚本 | Vitest / Node | 🚧 占位 |
 | 集成测试 | `tests/integration/` | 跨模块集成 | Vitest | 🚧 占位 |
-| E2E 测试 | `tests/e2e/` | 端到端 | Playwright（预留） | ❌ 未开始 |
+| E2E 测试 | `tests/e2e/` | 端到端 | Playwright（预留） | ⚡ 已接入，用例待填充 |
+
+## 测试同步约束（硬性）
+
+**规则**：`src/` 新增 `.ts`/`.vue` 代码文件时，`tests/` 必须有对应测试新增或修改。
+
+**触发**：PR CI（GitHub Actions）
+**工具**：`ci/scripts/check-test-sync.ts`
+**豁免**：删除文件、纯类型定义（`src/types/`、`.d.ts`）、纯配置改动
+
+```bash
+# 本地手动检查（对比已暂存变更）
+cd kimi-code-swarm
+npx tsx ../ci/scripts/check-test-sync.ts --staged
+
+# CI 模式（对比 origin/main）
+npx tsx ../ci/scripts/check-test-sync.ts --base origin/main
+```
 
 ## 运行前端测试
 

@@ -12,6 +12,7 @@
     "lint:fix": "eslint src --ext .ts,.vue --fix",
     "analyze": "npx tsx ../ast/analyzer.ts src tests",
     "check-docs": "npx tsx ../ci/scripts/check-docs-sync.ts",
+    "check-test": "npx tsx ../ci/scripts/check-test-sync.ts --base origin/main",
     "health-check": "npx tsx ../scripts/health-check.ts",
     "test": "vitest run",
     "test:watch": "vitest",
