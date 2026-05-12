@@ -51,7 +51,7 @@ npm install         # 自动配置 Git hooks (core.hooksPath = ci/hooks)
 npm run dev         # 开发服务器（浏览器模式）
 ```
 
-首次打开后在登录页输入 Kimi API Key，验证通过后存入系统 Keyring。
+首次打开后在登录页输入 Kimi API Key（所有 Agent 共享同一个 Key），验证通过后存入系统 Keyring。
 
 > `npm install` 会自动运行 `postinstall` 脚本配置 Git hooks。如果跳过此步骤，需手动执行 `git config core.hooksPath ci/hooks`。
 

@@ -80,6 +80,7 @@ npm run tauri dev
 1. 打开 App（浏览器或桌面窗口）
 2. 在登录页输入 Kimi API Key → 点击验证
    - API Key 从 [Kimi Code 控制台](https://www.kimi.com/code/console) 获取
+   - **一个 Key 供所有 Agent 共享**——指挥官输入一次，App 自动注入到每个 Agent 的 CLI 进程中
    - 验证通过后存入系统 Keyring（Tauri）或 localStorage（浏览器），**不会明文保存**
 3. 进入 Dashboard → 点击「新建 Agent」→ 输入仓库地址和指令
 4. 点击「启动」→ App 自动 clone 仓库到 `E:/workspace/{agent-id}`

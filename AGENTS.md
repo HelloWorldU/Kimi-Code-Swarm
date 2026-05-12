@@ -141,7 +141,7 @@ npm install          # 自动配置 Git hooks
 npm run dev          # localhost:5173（浏览器模式）
 ```
 
-首次打开 App 后在登录页输入 API Key，验证通过后存入系统 Keyring。
+首次打开 App 后在登录页输入 API Key（所有 Agent 共享同一个 Key），验证通过后存入系统 Keyring。
 
 ---
 
