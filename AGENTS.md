@@ -92,7 +92,7 @@ Kimi-Code-Swarm/
 │   └── cleanup.ts           熵管理清理脚本
 │
 ├── harness/               ← 📋 工作流模板
-│   ├── new-instance.yaml    新建 CLI 实例模板
+│   ├── new-instance.yaml    新建 Agent 模板（v2.0 Agent Engine 架构）
 │   ├── bug-fix.yaml         修复 Bug 模板
 │   └── new-task.yaml        新建任务模板（指挥官派任务）
 │

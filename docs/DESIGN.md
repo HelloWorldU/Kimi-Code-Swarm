@@ -62,6 +62,11 @@
 
 `harness/*.yaml` 是**流程约束模板**，不是可执行代码。
 
+当前包含三个模板：
+- **`harness/new-instance.yaml`**：新建 Agent 的完整流程（收集信息 → 创建 Agent → 启动 Engine → 多轮对话 → 提交审阅 → 合并分支）
+- **`harness/new-task.yaml`**：指挥官向已有 Agent 派发新任务的流程
+- **`harness/bug-fix.yaml`**：修复 Bug 的诊断-隔离-修复-验证-留痕流程
+
 ### 约束分层哲学
 
 | 层级 | 抽象程度 | 自由度 | 示例 |
@@ -87,6 +92,7 @@
 | bug-fix: 鼓励留痕 | AST `error-handling/missing-logger` (warn) + check-docs-sync（要求 docs/ 变更） | ⚡ 半硬（warn + 分支检查） |
 | new-task: 未验证代码禁止合入 | CI 流水线 + PR 门控 | ✅ 硬约束 |
 | new-task: 审阅通过才能合并 | PR review 机制 | ⚡ 半硬（Mock 模式可跳过） |
+| new-instance: Agent 生命周期 | Agent Engine IPC + 状态机驱动 | ✅ 硬约束（Engine 统一托管，禁止前端直接 spawn CLI） |
 | auto-test: E2E 验证 | Playwright + Chromium + Vite dev server（Mock 模式） | ✅ 硬约束（UI 改动后必须跑通 smoke test） |
 
 ## 关键决策记录

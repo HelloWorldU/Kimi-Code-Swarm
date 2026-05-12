@@ -1,22 +1,50 @@
-# Harness Template: 新建 CLI 实例
-# 触发: 用户点击"新建实例"
+# Harness Template: 新建 Agent（v2.0）
+# 触发: 指挥官点击 Dashboard「新建 Agent」
+# 架构: Agent Engine 统一托管（非直接 spawn CLI）
 
 meta:
-  name: new-instance
-  version: "1.0"
+  name: new-agent
+  version: "2.0"
 
 preconditions:
-  - 活跃实例数 < MAX_CONCURRENT（否则排队）
-  - workspace 目录存在且可写
-  - Token 全局剩余 > 10%
+  - 活跃 Agent 数 < MAX_AGENTS（默认 5）
+  - Kimi API Key 已验证并存入 Keyring
+  - GitHub Token 已配置（可选，无 Token 时 PR 功能降级为 Mock）
 
 steps:
-  1. init:      创建实例记录，状态 queued
-  2. spawn:     node-pty 启动 kimi CLI
-  3. handshake: 等待 CLI 就绪输出（超时 15s）
-  4. activate:  状态改为 running，记录 PID
-  5. observe:   注册 stdout/stderr 监听器
+  1. collect:
+     前端弹窗收集：name, repoUrl, instruction, tokenBudget
+
+  2. create:
+     前端调用 store.createAgent() → 发送 `create-agent` 命令给 Agent Engine
+     Engine 创建 Agent 对象，状态 = pending，生成唯一 branch 名
+     前端收到 `agent-created` 事件，Dashboard 卡片更新
+
+  3. start:
+     指挥官点击卡片「启动」→ 发送 `start-agent` 命令
+     Engine 执行：mkdir workspace → git clone → git checkout -b branch
+     状态流转：pending → cloning → ready
+     若失败：状态 = stopped，日志记录错误原因
+
+  4. converse:
+     指挥官在聊天窗口输入指令 → 发送 `send-instruction` 命令
+     Engine spawn Kimi CLI 子进程（注入 KIMI_API_KEY）
+     实时 stdout/stderr 通过 `agent-output` 事件推送前端
+     状态流转：ready → working → ready（执行完毕）
+
+  5. review: (可选)
+     指挥官点击「提交审阅」→ 发送 `submit-for-review` 命令
+     Engine 执行：git add → git commit → git push
+     若有 GitHub Token：调用 GitHub API 创建真实 PR
+     若无 Token：生成 Mock PR 号
+     状态 = reviewing，自动指派其他 Agent 审阅
+
+  6. merge: (可选)
+     全员审阅通过后，指挥官点击「合并」
+     若有 GitHub Token：调用 GitHub API 合并 PR
+     状态 = completed
 
 rollback:
-  spawn 失败 → 删除实例记录
-  handshake 失败 → kill 进程，标记 error
+  clone 失败 → 状态 = stopped，保留日志供排查
+  git push 失败 → 状态保持 working，日志提示网络/权限问题
+  GitHub API 失败 → 状态不变，降级为 Mock 继续流程
