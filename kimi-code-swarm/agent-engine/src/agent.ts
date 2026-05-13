@@ -232,12 +232,14 @@ export class Agent {
             this.termLog('Kimi', 'warn', 'loguru logging error filtered (see ~/.kimi/logs)')
             continue
           }
-          // End of loguru block: empty line or non-traceback line after PermissionError
-          if (loguruBlockActive && (line.trim() === '' || (!line.startsWith('  ') && !line.includes('Traceback')))) {
+          // End of loguru block: explicit end marker
+          if (loguruBlockActive && line.includes('--- End of logging error')) {
             loguruBlockActive = false
             continue
           }
           if (loguruBlockActive) continue
+          // Skip empty lines to avoid [Agent] ERROR spam in terminal
+          if (!line.trim()) continue
           this.log('error', line)
           this.emit({ type: 'agent-output', agentId: this.state.id, line, isStderr: true })
         }
