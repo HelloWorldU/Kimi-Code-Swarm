@@ -368,7 +368,7 @@ export function useSwarmStore() {
       persistAgents()
       return
     }
-    sendToEngine({ type: 'send-instruction', agentId: id, instruction })
+    sendToEngine({ type: 'send-instruction', agentId: id, instruction, githubToken: getGitHubToken() || undefined })
   }
 
   async function stopAgent(id: string) {

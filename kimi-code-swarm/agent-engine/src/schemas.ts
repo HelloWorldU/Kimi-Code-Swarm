@@ -71,6 +71,7 @@ export const EngineCommandSchema = z.discriminatedUnion('type', [
     type: z.literal('send-instruction'),
     agentId: z.string().min(1),
     instruction: z.string().min(1),
+    githubToken: z.string().optional(),
   }),
   z.object({
     type: z.literal('stop-agent'),

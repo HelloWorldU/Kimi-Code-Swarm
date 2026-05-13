@@ -51,7 +51,7 @@ export interface AgentState {
 export type EngineCommand =
   | { type: 'create-agent'; payload: { name: string; repoUrl: string; instruction: string; tokenBudget: number } }
   | { type: 'start-agent'; agentId: string }
-  | { type: 'send-instruction'; agentId: string; instruction: string }
+  | { type: 'send-instruction'; agentId: string; instruction: string; githubToken?: string }
   | { type: 'stop-agent'; agentId: string }
   | { type: 'delete-agent'; agentId: string }
   | { type: 'submit-for-review'; agentId: string; githubToken?: string }

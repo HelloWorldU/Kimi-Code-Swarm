@@ -25,6 +25,7 @@ export class Agent {
   private emit: (event: EngineEvent) => void
   private running = false
   private reviewRound = 0
+  private githubToken?: string
 
   constructor(
     name: string,
@@ -159,7 +160,7 @@ export class Agent {
     }
   }
 
-  async sendInstruction(instruction: string) {
+  async sendInstruction(instruction: string, githubToken?: string) {
     // Allow continuing conversation from stopped or completed state
     if (this.state.status === 'stopped' || this.state.status === 'completed') {
       this.setStatus('ready')
@@ -167,6 +168,7 @@ export class Agent {
     }
     if (this.state.status !== 'ready') return
 
+    this.githubToken = githubToken
     this.setStatus('working')
     this.state.instruction = instruction
     const inputTokens = Math.floor(instruction.length / 2)
@@ -352,10 +354,10 @@ export class Agent {
   /**
    * 自动提交审阅：失败时捕获错误并让 Agent 修复，最多重试 3 次
    */
-  async autoSubmitForReview(githubToken?: string, maxRetries = 3): Promise<void> {
+  async autoSubmitForReview(maxRetries = 3): Promise<void> {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        await this.submitForReview(githubToken)
+        await this.submitForReview(this.githubToken)
         return
       } catch (err) {
         const errorMsg = String(err)

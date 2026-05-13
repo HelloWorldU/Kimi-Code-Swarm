@@ -47,7 +47,7 @@ export class AgentEngine {
 
         case 'send-instruction': {
           const agent = this.agents.get(cmd.agentId)
-          if (agent) await agent.sendInstruction(cmd.instruction)
+          if (agent) await agent.sendInstruction(cmd.instruction, cmd.githubToken)
           break
         }
 
