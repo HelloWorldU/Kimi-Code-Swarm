@@ -226,9 +226,9 @@ export class Agent {
         for await (const line of this.process!.stderr) {
           if (!this.running) break
           // Detect start of loguru error block
-          if (line.includes('--- Logging error') && line.includes('Loguru')) {
+          if (line.includes('--- Logging error')) {
             loguruBlockActive = true
-            this.log('system', '[kimi stderr] loguru logging error filtered (see ~/.kimi/logs)')
+            this.termLog('Kimi', 'warn', 'loguru logging error filtered (see ~/.kimi/logs)')
             continue
           }
           // End of loguru block: empty line or non-traceback line after PermissionError
