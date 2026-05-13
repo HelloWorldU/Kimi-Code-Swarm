@@ -1,6 +1,6 @@
 import { execFile } from 'child_process'
 import { promisify } from 'util'
-import { mkdir } from 'fs/promises'
+import { mkdir, rm, access } from 'fs/promises'
 
 const execFileAsync = promisify(execFile)
 
@@ -12,8 +12,20 @@ async function execGit(dir: string, args: string[]): Promise<string> {
   return stdout.trim()
 }
 
+async function dirExists(dir: string): Promise<boolean> {
+  try {
+    await access(dir)
+    return true
+  } catch {
+    return false
+  }
+}
+
 export async function cloneRepo(repoUrl: string, targetDir: string, parentDir: string): Promise<void> {
   await mkdir(parentDir, { recursive: true })
+  if (await dirExists(targetDir)) {
+    await rm(targetDir, { recursive: true, force: true })
+  }
   await execGit(parentDir, ['clone', repoUrl, targetDir])
 }
 

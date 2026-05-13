@@ -67,13 +67,23 @@ export class Agent {
   }
 
   async start() {
-    if (this.state.status !== 'pending') return
+    if (this.state.status !== 'pending' && this.state.status !== 'stopped') return
+
+    const parentDir = 'E:/workspace'
+    const targetDir = `${parentDir}/${this.state.id}`
+
+    // 如果 workspace 已存在且有效，复用它（支持从 stopped 恢复）
+    if (this.state.workspace && this.state.status === 'stopped') {
+      this.log('system', 'Agent 恢复中，复用已有工作空间')
+      this.setStatus('ready')
+      this.log('system', 'Agent 已恢复，继续对话')
+      return
+    }
+
     this.setStatus('cloning')
     this.log('system', '开始克隆仓库...')
 
     try {
-      const parentDir = 'E:/workspace'
-      const targetDir = `${parentDir}/${this.state.id}`
       await cloneRepo(this.state.repoUrl, targetDir, parentDir)
       this.state.workspace = targetDir
       this.log('system', `仓库已克隆到 ${targetDir}`)
