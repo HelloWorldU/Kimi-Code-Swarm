@@ -47,6 +47,12 @@
       "paths": ["ast/**/*.ts", "ci/**/*", "eslint.config.mjs", "kimi-code-swarm/package.json"],
       "docs": ["docs/CONSTRAINTS.md"],
       "reason": "约束体系变更需同步约束文档"
+    },
+    {
+      "id": "agent-engine-core",
+      "paths": ["agent-engine/src/**/*.ts"],
+      "docs": ["docs/ARCHITECTURE.md", "docs/STATUS.md", "docs/product-specs/index.md"],
+      "reason": "Agent Engine 核心逻辑变更需同步架构、功能状态和产品规格"
     }
   ]
 }
