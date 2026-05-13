@@ -59,51 +59,67 @@ export class AgentEngine {
 
         case 'delete-agent': {
           const agent = this.agents.get(cmd.agentId)
-          if (agent) {
-            await agent.stop()
-            const workspace = agent.state.workspace || `E:/workspace/${agent.state.id}`
-            // Windows 上进程终止后需要更长时间释放文件句柄
-            await new Promise((r) => setTimeout(r, 2000))
+          this.broadcast({ type: 'log', agentId: cmd.agentId, entry: { id: 'system', timestamp: new Date().toISOString(), type: 'system', content: `[delete-agent] 开始清理 agent ${cmd.agentId}` } })
+          if (!agent) {
+            this.broadcast({ type: 'log', agentId: cmd.agentId, entry: { id: 'system', timestamp: new Date().toISOString(), type: 'error', content: `[delete-agent] agent ${cmd.agentId} 不存在，跳过停止和目录清理` } })
+            this.agents.delete(cmd.agentId)
+            break
+          }
 
-            let deleted = false
-            let lastError: unknown
-            // 先尝试 Node.js 原生删除，最多重试 3 次
-            for (let attempt = 1; attempt <= 3; attempt++) {
-              try {
-                await rm(workspace, { recursive: true, force: true })
-                deleted = true
-                break
-              } catch (err) {
-                lastError = err
-                if (attempt < 3) {
-                  await new Promise((r) => setTimeout(r, 1000))
-                }
+          this.broadcast({ type: 'log', agentId: cmd.agentId, entry: { id: 'system', timestamp: new Date().toISOString(), type: 'system', content: `[delete-agent] 停止 agent 进程...` } })
+          await agent.stop()
+          const workspace = agent.state.workspace || `E:/workspace/${agent.state.id}`
+          this.broadcast({ type: 'log', agentId: cmd.agentId, entry: { id: 'system', timestamp: new Date().toISOString(), type: 'system', content: `[delete-agent] 进程已停止，目标目录: ${workspace}` } })
+
+          // Windows 上进程终止后需要更长时间释放文件句柄
+          await new Promise((r) => setTimeout(r, 2000))
+
+          let deleted = false
+          let lastError: unknown
+          // 先尝试 Node.js 原生删除，最多重试 3 次
+          for (let attempt = 1; attempt <= 3; attempt++) {
+            this.broadcast({ type: 'log', agentId: cmd.agentId, entry: { id: 'system', timestamp: new Date().toISOString(), type: 'system', content: `[delete-agent] 第 ${attempt} 次尝试删除目录...` } })
+            try {
+              await rm(workspace, { recursive: true, force: true })
+              deleted = true
+              this.broadcast({ type: 'log', agentId: cmd.agentId, entry: { id: 'system', timestamp: new Date().toISOString(), type: 'system', content: `[delete-agent] Node.js rm 删除成功` } })
+              break
+            } catch (err) {
+              lastError = err
+              const errMsg = lastError instanceof Error ? lastError.message : String(lastError)
+              this.broadcast({ type: 'log', agentId: cmd.agentId, entry: { id: 'system', timestamp: new Date().toISOString(), type: 'error', content: `[delete-agent] 第 ${attempt} 次删除失败: ${errMsg}` } })
+              if (attempt < 3) {
+                await new Promise((r) => setTimeout(r, 1000))
               }
             }
+          }
 
-            // fallback: Windows 系统命令（对锁定文件更激进）
-            if (!deleted && process.platform === 'win32') {
-              try {
-                const { exec } = await import('child_process')
-                await new Promise<void>((resolve, reject) => {
-                  exec(`rmdir /s /q "${workspace}"`, (err) => {
-                    if (err) reject(err)
-                    else resolve()
-                  })
+          // fallback: Windows 系统命令（对锁定文件更激进）
+          if (!deleted && process.platform === 'win32') {
+            this.broadcast({ type: 'log', agentId: cmd.agentId, entry: { id: 'system', timestamp: new Date().toISOString(), type: 'system', content: `[delete-agent] fallback: 尝试 rmdir /s /q...` } })
+            try {
+              const { exec } = await import('child_process')
+              await new Promise<void>((resolve, reject) => {
+                exec(`rmdir /s /q "${workspace}"`, (err) => {
+                  if (err) reject(err)
+                  else resolve()
                 })
-                deleted = true
-              } catch (err) {
-                lastError = err
-              }
+              })
+              deleted = true
+              this.broadcast({ type: 'log', agentId: cmd.agentId, entry: { id: 'system', timestamp: new Date().toISOString(), type: 'system', content: `[delete-agent] rmdir 删除成功` } })
+            } catch (err) {
+              lastError = err
+              const errMsg = lastError instanceof Error ? lastError.message : String(lastError)
+              this.broadcast({ type: 'log', agentId: cmd.agentId, entry: { id: 'system', timestamp: new Date().toISOString(), type: 'error', content: `[delete-agent] rmdir 也失败了: ${errMsg}` } })
             }
+          }
 
-            if (deleted) {
-              this.broadcast({ type: 'log', agentId: cmd.agentId, entry: { id: 'system', timestamp: new Date().toISOString(), type: 'system', content: `工作目录已清理: ${workspace}` } })
-            } else {
-              const msg = `清理工作目录失败: ${workspace}，请手动删除。错误: ${lastError instanceof Error ? lastError.message : String(lastError)}`
-              console.error(`[engine] ${msg}`)
-              this.broadcast({ type: 'log', agentId: cmd.agentId, entry: { id: 'system', timestamp: new Date().toISOString(), type: 'error', content: msg } })
-            }
+          if (deleted) {
+            this.broadcast({ type: 'log', agentId: cmd.agentId, entry: { id: 'system', timestamp: new Date().toISOString(), type: 'system', content: `工作目录已清理: ${workspace}` } })
+          } else {
+            const msg = `清理工作目录失败: ${workspace}，请手动删除。错误: ${lastError instanceof Error ? lastError.message : String(lastError)}`
+            console.error(`[engine] ${msg}`)
+            this.broadcast({ type: 'log', agentId: cmd.agentId, entry: { id: 'system', timestamp: new Date().toISOString(), type: 'error', content: msg } })
           }
           this.agents.delete(cmd.agentId)
           break

@@ -250,6 +250,7 @@ export class Agent {
     const code = await this.process.wait()
     this.running = false
     this.state.pid = undefined
+    this.process = undefined  // 清理引用，避免 stop() 再次 kill 已死进程
 
     // Record complete output as a single log entry so the UI renders one bubble
     const fullOutput = outputLines.join('\n')

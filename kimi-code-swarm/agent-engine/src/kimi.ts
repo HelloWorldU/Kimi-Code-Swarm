@@ -116,10 +116,15 @@ export function runKimi(
     pid,
     stdout: readStream(child.stdout!),
     stderr: readStream(child.stderr!),
-    wait: () =>
-      new Promise((resolve) => {
-        child.on('close', (code: number | null) => resolve(code))
-      }),
+    wait: () => {
+      // 如果进程已经退出，立即返回，避免重复监听已触发的 close 事件
+      if (child.exitCode !== null || child.signalCode !== null) {
+        return Promise.resolve(child.exitCode)
+      }
+      return new Promise((resolve) => {
+        child.once('close', (code: number | null) => resolve(code))
+      })
+    },
     kill: () => {
       if (process.platform === 'win32' && child.pid) {
         // Windows: use taskkill /T /F to terminate the entire process tree
