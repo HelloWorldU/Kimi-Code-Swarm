@@ -95,7 +95,7 @@
 | new-instance: Agent 生命周期 | Agent Engine IPC + 状态机驱动 | ✅ 硬约束（Engine 统一托管，禁止前端直接 spawn CLI） |
 | auto-test: E2E 验证 | Playwright + Chromium + Vite dev server（Mock 模式） | ✅ 硬约束（UI 改动后必须跑通 smoke test） |
 
-> **技术债务**: AST 分析器当前基于正则实现，已暴露系统性缺陷（无法区分代码/字符串/注释、语法变体需持续打补丁）。长期应迁移至 TypeScript ESTree AST Parser。详见 `docs/design-docs/ast-parser-vs-regex.md`。
+> **技术债务**: AST 分析器当前基于正则实现，已暴露系统性缺陷（无法区分代码/字符串/注释、语法变体需持续打补丁）。长期应迁移至 TypeScript ESTree AST Parser。详见 `docs/design-docs/ast-parser-vs-regex.md`。当前 workaround：missing-logger 为 warn 级别，analyze 时显示但不阻断提交。
 
 ## 关键决策记录
 

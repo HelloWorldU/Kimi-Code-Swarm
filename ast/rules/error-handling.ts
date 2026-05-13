@@ -126,6 +126,7 @@ export function checkErrorHandling(content: string, filePath: string): AstIssue[
         line: block.startLine,
         fixable: true,
         fix: '在 catch 块中记录错误信息（Logger、console 或注释均可）',
+        severity: 'warn',
       })
     }
   }

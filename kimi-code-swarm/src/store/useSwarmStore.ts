@@ -63,8 +63,7 @@ function initEngineListeners() {
       const event = JSON.parse(payload.line)
       handleEngineEvent(event)
     } catch {
-      // engine 可能输出非 JSON 行（如 console.log），忽略
-      console.debug(`[SwarmStore] 忽略非 JSON engine 输出: ${payload.line.substring(0, 80)}`)
+      // engine 可能输出非 JSON 行（如 console.log），属于正常噪音，无需处理
     }
   })
 

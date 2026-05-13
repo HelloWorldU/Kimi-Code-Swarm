@@ -21,6 +21,7 @@ export interface AstIssue {
   line?: number
   fixable: boolean
   fix?: string
+  severity?: 'error' | 'warn'
 }
 
 const SHOULD_FIX = process.argv.includes('--fix')
@@ -83,17 +84,22 @@ function applyFixes(filePath: string, issues: AstIssue[]): string | null {
   return modified ? content : null
 }
 
-function printIssues(issues: AstIssue[], totalRef: { value: number }, fixableRef: { value: number }) {
+function printIssues(issues: AstIssue[], errorRef: { value: number }, warnRef: { value: number }, fixableRef: { value: number }) {
   for (const issue of issues) {
     const relPath = relative(process.cwd(), issue.file)
     console.log(`\n📄 ${relPath}`)
-    const icon = issue.fixable ? '🔧' : '❌'
+    const isWarn = issue.severity === 'warn'
+    const icon = isWarn ? '⚡' : (issue.fixable ? '🔧' : '❌')
     const loc = issue.line ? `:${issue.line}` : ''
     console.log(`  ${icon} [${issue.rule}]${loc} ${issue.message}`)
     if (issue.fix) {
       console.log(`     💡 ${issue.fix}`)
     }
-    totalRef.value++
+    if (isWarn) {
+      warnRef.value++
+    } else {
+      errorRef.value++
+    }
     if (issue.fixable) fixableRef.value++
   }
 }
@@ -115,7 +121,8 @@ function main() {
     }
   }
 
-  const total = { value: 0 }
+  const errors = { value: 0 }
+  const warns = { value: 0 }
   const fixable = { value: 0 }
 
   // 收集所有文件内容（用于跨文件 dead-code 分析）
@@ -130,9 +137,9 @@ function main() {
     const issues = ext === '.vue'
       ? analyzeVueFile(path, content)
       : analyzeTsFile(path, content)
-    printIssues(issues, total, fixable)
+    printIssues(issues, errors, warns, fixable)
 
-    if (SHOULD_FIX && issues.some(i => i.fixable)) {
+    if (SHOULD_FIX && issues.some(i => i.fixable && i.severity !== 'warn')) {
       const fixed = applyFixes(path, issues)
       if (fixed) {
         writeFileSync(path, fixed, 'utf-8')
@@ -143,14 +150,16 @@ function main() {
 
   // ── 跨文件规则（dead code） ──
   const deadCodeIssues = checkDeadCode(fileContents, process.cwd())
-  printIssues(deadCodeIssues, total, fixable)
+  printIssues(deadCodeIssues, errors, warns, fixable)
 
-  if (total.value === 0) {
+  const total = errors.value + warns.value
+  if (total === 0) {
     console.log('✅ 所有 AST 检查通过')
     process.exit(0)
   } else {
-    console.log(`\n📊 总计: ${total.value} 个问题，${fixable.value} 个可修复`)
-    process.exit(1)
+    const warnMsg = warns.value > 0 ? `，${warns.value} 个警告` : ''
+    console.log(`\n📊 总计: ${errors.value} 个错误${warnMsg}，${fixable.value} 个可修复`)
+    process.exit(errors.value > 0 ? 1 : 0)
   }
 }
 
