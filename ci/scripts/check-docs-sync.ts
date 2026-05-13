@@ -117,8 +117,8 @@ function checkHarnessCompliance(changedFiles: string[]): SyncIssue[] {
         })
       }
     }
-  } catch (err) {
-    console.error(`[check-docs-sync] 获取分支名失败，跳过 harness 检查: ${String(err)}`)
+  } catch {
+    // expected: 非 git 仓库或无法获取分支名，跳过 harness 检查
   }
 
   return issues

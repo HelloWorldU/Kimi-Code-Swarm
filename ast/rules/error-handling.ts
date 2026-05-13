@@ -71,10 +71,33 @@ export function findCatchBlocks(content: string): CatchBlock[] {
   return blocks
 }
 
-/** 判断 catch 块是否为空（只有注释、空白、throw） */
+/** 判断 catch 块是否有明确的"意图注释"（说明为什么不需要日志） */
+function hasIntentionalComment(content: string): boolean {
+  // 提取所有行注释
+  const comments = content.match(/\/\/.*/g) || []
+  for (const comment of comments) {
+    const text = comment.replace(/\/\//, '').trim().toLowerCase()
+    // 长度太短的注释不算（如 "// ok"、"// done"）
+    if (text.length < 8) continue
+    // 敷衍注释不算
+    if (/^(ignore|todo|fixme|hack|temp|tmp)/.test(text)) continue
+    // 意图关键字：说明为什么不需要日志
+    if (/(expected|intentional|normal|预期|正常|说明|reason|非关键|噪音|noise|try next|polling|重试)/i.test(text)) {
+      return true
+    }
+  }
+  return false
+}
+
+/** 判断 catch 块是否为空（只有注释、空白、throw）
+ *  有明确意图注释的不算空 —— 注释即留痕
+ */
 export function isEmptyCatch(content: string): boolean {
+  // 有明确意图注释 → 不算空 catch
+  if (hasIntentionalComment(content)) return false
+
   let cleaned = content
-    .replace(/catch\s*\([^)]*\)\s*\{/g, '')
+    .replace(/catch(?:\s*\([^)]*\))?\s*\{/g, '')
     .replace(/^\s*\}\s*/g, '')
     .replace(/\}\s*$/g, '')
 
@@ -116,16 +139,15 @@ export function checkErrorHandling(content: string, filePath: string): AstIssue[
       continue
     }
 
-    if (!hasLogger(block.content) && !hasConsole(block.content)) {
-      // warning 级别：鼓励使用 Logger，但不强制具体工具或格式
-      // Agent 可自由选择日志方式，只要错误不被静默吞没即可
+    // 有明确意图注释 → 注释即留痕，不報 missing-logger
+    if (!hasLogger(block.content) && !hasConsole(block.content) && !hasIntentionalComment(block.content)) {
       issues.push({
         file: filePath,
         rule: 'error-handling/missing-logger',
-        message: 'catch 块未记录错误。建议增加日志以便后续排查（log.error / console.error / 注释说明均可）',
+        message: 'catch 块未记录错误且无说明注释。关键路径请加 log.error，非关键路径请加注释说明原因',
         line: block.startLine,
         fixable: true,
-        fix: '在 catch 块中记录错误信息（Logger、console 或注释均可）',
+        fix: '关键路径：添加 log.error / console.error；非关键路径：添加 // expected: ... 说明为什么忽略',
         severity: 'warn',
       })
     }

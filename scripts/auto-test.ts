@@ -99,8 +99,8 @@ async function main() {
           stdio: 'ignore',
           detached: true,
         })
-      } catch (err) {
-        console.error(`[auto-test] 终止 dev server 失败: ${String(err)}`)
+      } catch {
+        // expected: 进程可能已退出，taskkill 失败是正常的
       }
     }
   }

@@ -13,8 +13,8 @@ async function dirExists(dir: string): Promise<boolean> {
   try {
     await access(dir)
     return true
-  } catch (err) {
-    console.error(`[git] 访问目录失败 ${dir}: ${String(err)}`)
+  } catch {
+    // expected: 目录不存在是正常情况（如首次 clone）
     return false
   }
 }

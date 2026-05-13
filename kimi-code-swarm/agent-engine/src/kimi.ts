@@ -26,12 +26,12 @@ async function detectKimiModule(): Promise<{ python: string; args: string[] } | 
       await execFileAsync(candidate.python, [...candidate.args, '--version'])
       cachedModule = candidate
       return candidate
-    } catch (err) {
-      console.error(`[kimi] 检测模块失败 ${candidate.python}: ${String(err)}`)
+    } catch {
+      // expected: 该 Python 候选不可用，尝试下一个
     }
   }
   cachedModule = null
-  console.error('[kimi] 所有 Python 模块检测候选均失败')
+  console.error('[kimi] 所有 Python 模块检测候选均失败，Kimi CLI 不可用')
   return null
 }
 
@@ -42,8 +42,8 @@ export async function detectKimiCli(): Promise<string | null> {
       await execFileAsync(cmd, ['--version'])
       cachedPath = cmd
       return cmd
-    } catch (err) {
-      console.error(`[kimi] 检测 CLI 失败 ${cmd}: ${String(err)}`)
+    } catch {
+      // expected: 该 CLI 路径不存在，尝试下一个
     }
   }
   // Try module invocation as fallback
