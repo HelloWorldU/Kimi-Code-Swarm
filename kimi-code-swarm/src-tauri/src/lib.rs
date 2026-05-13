@@ -254,7 +254,8 @@ fn spawn_agent_engine(app: tauri::AppHandle) -> Result<u32, String> {
 
 #[tauri::command]
 fn send_to_engine(command: String) -> Result<(), String> {
-    log::info!("[send_to_engine] command: {}", command);
+    let log_cmd = if command.len() > 120 { format!("{}... ({} bytes)", &command[..120], command.len()) } else { command.clone() };
+    log::info!("[send_to_engine] {}", log_cmd);
     let handle = ENGINE_HANDLE.lock().unwrap();
     let stdin = handle.as_ref()
         .ok_or("Agent engine not running")?;
