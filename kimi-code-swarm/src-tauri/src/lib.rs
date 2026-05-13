@@ -241,6 +241,10 @@ fn spawn_agent_engine(app: tauri::AppHandle) -> Result<u32, String> {
         let reader = BufReader::new(stdout);
         for line in reader.lines() {
             if let Ok(line) = line {
+                // 非 JSON 行（如引擎崩溃输出）直接回显终端；JSON 事件由前端处理，不回显
+                if serde_json::from_str::<serde_json::Value>(&line).is_err() {
+                    println!("{}", line);
+                }
                 let _ = app_emit.emit("agent-engine-event", AgentEngineEvent { line });
             }
         }

@@ -371,18 +371,27 @@ export function useSwarmStore() {
     sendToEngine({ type: 'send-instruction', agentId: id, instruction })
   }
 
-  function stopAgent(id: string) {
-    if (!isTauri) {
-      const agent = state.agents.find((a) => a.id === id)
-      if (agent) {
-        agent.status = 'stopped'
-        agent.pid = undefined
-        agent.logs.push({ id: generateId(), timestamp: new Date().toISOString(), type: 'system', content: 'Agent 已停止' })
-        persistAgents()
-      }
-      return
+  async function stopAgent(id: string) {
+    const agent = state.agents.find((a) => a.id === id)
+    if (!agent) return
+
+    // 乐观更新：立即改 UI 状态，不再等待后端确认
+    const previousStatus = agent.status
+    agent.status = 'stopped'
+    agent.pid = undefined
+    agent.logs.push({ id: generateId(), timestamp: new Date().toISOString(), type: 'system', content: 'Agent 已停止' })
+    persistAgents()
+
+    if (!isTauri) return
+
+    try {
+      await sendToEngine({ type: 'stop-agent', agentId: id })
+    } catch (err) {
+      log.error('停止 Agent 失败:', err)
+      // 后端调用失败时恢复状态
+      agent.status = previousStatus
+      persistAgents()
     }
-    sendToEngine({ type: 'stop-agent', agentId: id })
   }
 
   function submitForReview(id: string) {

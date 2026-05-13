@@ -53,20 +53,41 @@ export class AgentEngine {
 
         case 'stop-agent': {
           const agent = this.agents.get(cmd.agentId)
-          if (agent) agent.stop()
+          if (agent) await agent.stop()
           break
         }
 
         case 'delete-agent': {
           const agent = this.agents.get(cmd.agentId)
           if (agent) {
-            agent.stop()
+            await agent.stop()
             const workspace = agent.state.workspace || `E:/workspace/${agent.state.id}`
+            // 给 Windows 一点时间释放文件句柄
+            await new Promise((r) => setTimeout(r, 500))
+
+            let deleted = false
+            // 先尝试 Node.js 原生删除
             try {
               await rm(workspace, { recursive: true, force: true })
+              deleted = true
+            } catch {
+              // fallback: Windows 系统命令（对锁定文件更激进）
+              try {
+                const { exec } = await import('child_process')
+                await new Promise<void>((resolve, reject) => {
+                  exec(`rmdir /s /q "${workspace}"`, (err) => {
+                    if (err) reject(err)
+                    else resolve()
+                  })
+                })
+                deleted = true
+              } catch {}
+            }
+
+            if (deleted) {
               this.broadcast({ type: 'log', agentId: cmd.agentId, entry: { id: 'system', timestamp: new Date().toISOString(), type: 'system', content: `工作目录已清理: ${workspace}` } })
-            } catch (err) {
-              const msg = `清理工作目录失败: ${String(err)}`
+            } else {
+              const msg = `清理工作目录失败: ${workspace}，请手动删除`
               console.error(`[engine] ${msg}`)
               this.broadcast({ type: 'log', agentId: cmd.agentId, entry: { id: 'system', timestamp: new Date().toISOString(), type: 'error', content: msg } })
             }
@@ -157,9 +178,7 @@ export class AgentEngine {
 
         case 'shutdown': {
           // Stop all agents gracefully
-          for (const agent of this.agents.values()) {
-            agent.stop()
-          }
+          await Promise.all(Array.from(this.agents.values()).map((a) => a.stop()))
           this.agents.clear()
           this.broadcast({ type: 'pong', message: 'Engine shutting down' })
           break

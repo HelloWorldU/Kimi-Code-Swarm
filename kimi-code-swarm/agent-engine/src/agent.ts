@@ -11,6 +11,14 @@ const branchName = (name: string) => {
   return `agent/${slug}-${generateId().slice(-4)}`
 }
 
+const termColors = {
+  reset: '\x1b[0m',
+  red: '\x1b[31m',
+  yellow: '\x1b[33m',
+  cyan: '\x1b[36m',
+  gray: '\x1b[90m',
+}
+
 export class Agent {
   state: AgentState
   private process?: KimiProcess
@@ -54,11 +62,63 @@ export class Agent {
     }
   }
 
+  private termLog(component: string, level: 'info' | 'warn' | 'error', message: string) {
+    const c = level === 'error' ? termColors.red : level === 'warn' ? termColors.yellow : termColors.cyan
+    const tag = level === 'info' ? '' : `${c}${level.toUpperCase()}${termColors.reset} `
+    console.error(`${c}[${component}]${termColors.reset} ${tag}${message}`)
+  }
+
+  private isUserVisibleLog(type: LogEntry['type'], content: string): boolean {
+    if (type === 'input' || type === 'output') return true
+    const patterns = [
+      'Agent 已恢复',
+      '工作空间就绪',
+      '启动失败',
+      'Token 预算已耗尽',
+      'Kimi CLI 未找到',
+      '启动 Kimi CLI 失败',
+      'Agent 执行完毕',
+      'Agent 执行失败',
+      'Agent 已停止',
+      '代码已推送',
+      '推送失败',
+      'PR #',
+      '已合并到 main',
+      'PR 被打回',
+      '合并被拒绝',
+      '审阅通过了此 PR',
+      '审阅拒绝了此 PR',
+      '全员审阅通过',
+      '已指派',
+      '自动修改已达最大轮次',
+    ]
+    return patterns.some((p) => content.includes(p))
+  }
+
+  private inferComponent(content: string): string {
+    if (content.includes('Kimi') || content.includes('kimi')) return 'Kimi'
+    if (content.includes('GitHub') || content.includes('github')) return 'GitHub'
+    if (content.includes('git ') || content.includes('仓库') || content.includes('分支') || content.includes('推送') || content.includes('代码') || content.includes('克隆')) return 'Git'
+    if (content.includes('审阅')) return 'Review'
+    return 'Agent'
+  }
+
   private log(type: LogEntry['type'], content: string, tokens?: number) {
     const entry = this.makeLog(type, content, tokens)
     this.state.logs.push(entry)
     this.state.lastActivity = new Date().toISOString()
-    this.emit({ type: 'log', agentId: this.state.id, entry })
+
+    const showInUi = this.isUserVisibleLog(type, content)
+    if (showInUi) {
+      this.emit({ type: 'log', agentId: this.state.id, entry })
+    }
+
+    // system/error 都输出到终端（带颜色、组件前缀）
+    if (type === 'system' || type === 'error') {
+      const level = type === 'error' ? 'error' : 'info'
+      const component = this.inferComponent(content)
+      this.termLog(component, level, content)
+    }
   }
 
   private setStatus(status: TaskStatus) {
@@ -159,16 +219,24 @@ export class Agent {
       }
     })()
 
-    // stderr reader — filter out kimi CLI internal logging errors
+    // stderr reader — filter out kimi CLI internal loguru errors (Windows known issue)
+    let loguruBlockActive = false
     ;(async () => {
       try {
         for await (const line of this.process!.stderr) {
           if (!this.running) break
-          // Skip loguru internal rotation errors on Windows (not actionable)
-          if (line.includes('Loguru Handler') || line.includes('PermissionError')) {
-            this.log('system', `[kimi stderr filtered] ${line.substring(0, 120)}`)
+          // Detect start of loguru error block
+          if (line.includes('--- Logging error') && line.includes('Loguru')) {
+            loguruBlockActive = true
+            this.log('system', '[kimi stderr] loguru logging error filtered (see ~/.kimi/logs)')
             continue
           }
+          // End of loguru block: empty line or non-traceback line after PermissionError
+          if (loguruBlockActive && (line.trim() === '' || (!line.startsWith('  ') && !line.includes('Traceback')))) {
+            loguruBlockActive = false
+            continue
+          }
+          if (loguruBlockActive) continue
           this.log('error', line)
           this.emit({ type: 'agent-output', agentId: this.state.id, line, isStderr: true })
         }
@@ -208,10 +276,19 @@ export class Agent {
     }
   }
 
-  stop() {
+  async stop() {
     if (this.process) {
       this.process.kill()
       this.running = false
+      // 等待进程完全退出（kill() 内部 2s 后会 SIGKILL，这里最多等 3s）
+      try {
+        await Promise.race([
+          this.process.wait(),
+          new Promise<void>((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000)),
+        ])
+      } catch {
+        // 超时或异常，忽略
+      }
     }
     this.state.pid = undefined
     this.setStatus('stopped')
