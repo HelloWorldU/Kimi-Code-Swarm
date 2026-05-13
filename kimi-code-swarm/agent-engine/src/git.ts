@@ -65,3 +65,7 @@ export async function gitFetch(dir: string): Promise<void> {
 export async function getBranchDiff(dir: string, branch: string): Promise<string> {
   return await execGit(dir, ['diff', `main...origin/${branch}`])
 }
+
+export async function gitDeleteRemoteBranch(dir: string, branch: string): Promise<void> {
+  await execGit(dir, ['push', 'origin', '--delete', branch])
+}

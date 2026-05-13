@@ -1,6 +1,6 @@
 import type { AgentState, LogEntry, ReviewEntry, TaskStatus, EngineEvent } from './types.js'
 import { runKimi, detectKimiCli, type KimiProcess } from './kimi.js'
-import { getChangedFiles, getFileDiff, gitAdd, gitCommit, gitPush, createBranch, cloneRepo, gitFetch, getBranchDiff } from './git.js'
+import { getChangedFiles, getFileDiff, gitAdd, gitCommit, gitPush, createBranch, cloneRepo, gitFetch, getBranchDiff, gitDeleteRemoteBranch } from './git.js'
 import { createPullRequest, mergePullRequest } from './github-api.js'
 
 let idCounter = 0
@@ -404,6 +404,15 @@ export class Agent {
           this.state.prStatus = 'merged'
           this.state.reviews = []
           this.log('system', `PR #${this.state.prNumber} 已合并到 main（GitHub）`)
+          // 合并成功后清理远程分支，避免仓库堆积垃圾分支
+          if (this.state.workspace) {
+            try {
+              await gitDeleteRemoteBranch(this.state.workspace, this.state.branch)
+              this.log('system', `远程分支已清理: ${this.state.branch}`)
+            } catch (err) {
+              this.log('error', `删除远程分支失败: ${String(err)}`)
+            }
+          }
           return
         }
         this.log('error', `GitHub API 合并 PR 失败，可能 PR 尚未就绪`)
@@ -417,6 +426,15 @@ export class Agent {
     this.state.prStatus = 'merged'
     this.state.reviews = []
     this.log('system', `PR #${this.state.prNumber} 已合并到 main（模拟）`)
+    // Mock 模式下同样清理远程分支
+    if (this.state.workspace) {
+      try {
+        await gitDeleteRemoteBranch(this.state.workspace, this.state.branch)
+        this.log('system', `远程分支已清理: ${this.state.branch}`)
+      } catch (err) {
+        this.log('error', `删除远程分支失败: ${String(err)}`)
+      }
+    }
   }
 
   rejectPr() {
