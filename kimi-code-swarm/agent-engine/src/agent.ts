@@ -1,6 +1,6 @@
 import type { AgentState, LogEntry, ReviewEntry, TaskStatus, EngineEvent } from './types.js'
 import { runKimi, detectKimiCli, type KimiProcess } from './kimi.js'
-import { getChangedFiles, getFileDiff, gitAdd, gitCommit, gitPush, createBranch, cloneRepo } from './git.js'
+import { getChangedFiles, getFileDiff, gitAdd, gitCommit, gitPush, createBranch, cloneRepo, gitFetch, getBranchDiff } from './git.js'
 import { createPullRequest, mergePullRequest } from './github-api.js'
 
 let idCounter = 0
@@ -309,5 +309,84 @@ export class Agent {
     if (reviewers.length > 0) {
       this.log('system', `已指派 ${reviewers.length} 个 Agent 进行审阅`)
     }
+  }
+
+  /**
+   * 运行 kimi CLI 执行一次"静默"指令，返回完整 stdout
+   * 不修改 running 状态，不 emit agent-output 事件
+   */
+  private async runInstructionSilent(instruction: string): Promise<string> {
+    const kimiPath = await detectKimiCli()
+    if (!kimiPath) {
+      this.log('error', 'Kimi CLI 未找到，无法执行自动审阅')
+      return ''
+    }
+
+    const proc = runKimi(kimiPath, this.state.workspace, instruction)
+    let output = ''
+
+    try {
+      for await (const line of proc.stdout) {
+        output += line + '\n'
+      }
+    } catch {
+      // ignore
+    }
+
+    await proc.wait()
+    return output
+  }
+
+  /**
+   * 自动审阅指定分支的代码变更
+   * 返回 { approved, comment }
+   */
+  async runReview(targetBranch: string): Promise<{ approved: boolean; comment: string }> {
+    if (!this.state.workspace) {
+      return { approved: false, comment: '工作空间未就绪' }
+    }
+
+    try {
+      await gitFetch(this.state.workspace)
+    } catch (err) {
+      this.log('error', `fetch 失败: ${String(err)}`)
+    }
+
+    const diff = await getBranchDiff(this.state.workspace, targetBranch)
+    if (!diff.trim()) {
+      return { approved: true, comment: '无代码变更需要审阅' }
+    }
+
+    const truncatedDiff = diff.slice(0, 4000)
+    const prompt = `请审阅以下代码变更（分支 ${targetBranch}）。\n\n\`\`\`diff\n${truncatedDiff}\n\`\`\`\n\n请检查是否有 bug、安全隐患或规范问题。如果有问题请详细说明；如果没有问题请回复 "LGTM"。`
+
+    this.log('system', `开始对分支 ${targetBranch} 执行自动审阅...`)
+    const output = await this.runInstructionSilent(prompt)
+
+    const approved = /LGTM|lgtm|approve|通过|无问题|没问题/i.test(output)
+    const comment = approved
+      ? '自动审阅通过（LGTM）'
+      : `审阅发现潜在问题: ${output.slice(0, 200).replace(/\n/g, ' ')}`
+
+    this.log('system', comment)
+    return { approved, comment }
+  }
+
+  /**
+   * 执行自动审阅并回调结果
+   */
+  async performReview(
+    targetBranch: string,
+    targetAgentId: string,
+    onComplete: (reviewerId: string, targetId: string, approved: boolean) => void,
+  ) {
+    if (this.state.status !== 'ready') {
+      this.log('system', `当前状态 ${this.state.status}，跳过自动审阅`)
+      onComplete(this.state.id, targetAgentId, false)
+      return
+    }
+
+    const result = await this.runReview(targetBranch)
+    onComplete(this.state.id, targetAgentId, result.approved)
   }
 }

@@ -49,3 +49,15 @@ export async function getFileDiff(dir: string, filePath: string): Promise<string
     return ''
   }
 }
+
+export async function gitFetch(dir: string): Promise<void> {
+  await execGit(dir, ['fetch', 'origin'])
+}
+
+export async function getBranchDiff(dir: string, branch: string): Promise<string> {
+  try {
+    return await execGit(dir, ['diff', `main...origin/${branch}`])
+  } catch {
+    return ''
+  }
+}
