@@ -16,6 +16,7 @@ export class Agent {
   private process?: KimiProcess
   private emit: (event: EngineEvent) => void
   private running = false
+  private reviewRound = 0
 
   constructor(
     name: string,
@@ -192,7 +193,7 @@ export class Agent {
   }
 
   async submitForReview(githubToken?: string) {
-    if (this.state.status !== 'working') return
+    if (this.state.status !== 'working' && this.state.status !== 'ready') return
 
     if (this.state.workspace) {
       try {
@@ -388,5 +389,35 @@ export class Agent {
 
     const result = await this.runReview(targetBranch)
     onComplete(this.state.id, targetAgentId, result.approved)
+  }
+
+  /**
+   * 根据审阅意见自动修改代码并重新提交审阅
+   * 最多循环 3 轮，超过后停止并通知指挥官
+   */
+  async fixBasedOnReviews(githubToken?: string) {
+    if (this.reviewRound >= 3) {
+      this.log('error', '自动修改已达最大轮次（3 次），请指挥官人工介入')
+      return
+    }
+    this.reviewRound++
+
+    const rejectedReviews = this.state.reviews.filter((r) => r.status === 'rejected')
+    if (rejectedReviews.length === 0) return
+
+    const comments = rejectedReviews
+      .map((r) => `-${r.reviewerName}: ${r.comment || '审阅未通过'}`)
+      .join('\n')
+
+    const prompt = `你的 PR 被以下审阅意见拒绝了，请根据意见修改代码：\n\n${comments}\n\n请直接修改相关代码文件。修改完成后不需要额外说明。`
+
+    this.rejectPr()
+    this.log('system', `第 ${this.reviewRound} 轮自动修改开始，基于 ${rejectedReviews.length} 条审阅意见`)
+
+    await this.sendInstruction(prompt)
+
+    // sendInstruction 完成后状态为 ready，改回 working 以符合 submitForReview 前置条件
+    this.state.status = 'working'
+    await this.submitForReview(githubToken)
   }
 }

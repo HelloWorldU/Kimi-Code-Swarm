@@ -65,7 +65,7 @@ export class AgentEngine {
 
         case 'submit-for-review': {
           const agent = this.agents.get(cmd.agentId)
-          if (!agent || agent.state.status !== 'working') return
+          if (!agent || (agent.state.status !== 'working' && agent.state.status !== 'ready')) return
           agent.assignReviewers(Array.from(this.agents.values()))
           await agent.submitForReview(cmd.githubToken)
 
@@ -107,9 +107,19 @@ export class AgentEngine {
           const agent = this.agents.get(cmd.agentId)
           if (!agent) break
           agent.submitReview(cmd.reviewerAgentId, cmd.approved)
-          // 全部 approved 后自动合并
-          if (agent.canMerge() && agent.state.status === 'reviewing') {
+
+          if (agent.state.status !== 'reviewing') break
+
+          // 全部 approved → 自动合并
+          if (agent.canMerge()) {
             await agent.mergePr(cmd.githubToken)
+            break
+          }
+
+          // 所有 reviewer 都审完了且有 reject → 触发自动修改
+          const hasPending = agent.state.reviews.some((r) => r.status === 'pending')
+          if (!hasPending) {
+            await agent.fixBasedOnReviews(cmd.githubToken)
           }
           break
         }
