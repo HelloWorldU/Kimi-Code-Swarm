@@ -43,18 +43,15 @@ const reviewProgress = computed(() => {
 
 function confirmDelete() {
   const agent = props.task
+  const workspace = agent.workspace || `E:/workspace/${agent.id}`
   const lines = [
     `确认删除 Agent「${agent.name}」？`,
     '',
-  ]
-  if (agent.workspace) {
-    lines.push(`其工作目录将被一并删除：`,
-    agent.workspace,
+    `其工作目录将被一并删除：`,
+    workspace,
     '',
-    '此操作不可撤销。')
-  } else {
-    lines.push('此操作不可撤销。')
-  }
+    '此操作不可撤销。',
+  ]
   if (confirm(lines.join('\n'))) {
     emit('delete', agent.id)
   }
