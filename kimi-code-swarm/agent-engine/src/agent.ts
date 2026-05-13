@@ -198,14 +198,15 @@ export class Agent {
     this.log('system', `命令: ${kimiPath} --work-dir ${this.state.workspace} --prompt "..." --print --final-message-only`)
     this.running = true
 
-    // stdout reader
+    // stdout reader — accumulate full response, emit as single log entry at the end
+    const outputLines: string[] = []
     ;(async () => {
       try {
         for await (const line of this.process!.stdout) {
           if (!this.running) break
           const estimated = Math.max(1, Math.floor(line.length / 4))
           this.state.tokenUsed = Math.min(this.state.tokenUsed + estimated, this.state.tokenBudget)
-          this.log('output', line)
+          outputLines.push(line)
           this.emit({ type: 'agent-output', agentId: this.state.id, line, isStderr: false })
 
           if (this.state.tokenUsed >= this.state.tokenBudget) {
@@ -250,6 +251,12 @@ export class Agent {
     this.running = false
     this.state.pid = undefined
 
+    // Record complete output as a single log entry so the UI renders one bubble
+    const fullOutput = outputLines.join('\n')
+    if (fullOutput) {
+      this.log('output', fullOutput)
+    }
+
     // Use a fresh read because setStatus mutated state but TS narrowed it earlier
     const finalStatus = this.state.status as TaskStatus
     if (finalStatus === 'working') {
@@ -268,6 +275,9 @@ export class Agent {
           if (files.length > 0) {
             this.log('system', `文件变更: ${files.length} 个文件`)
             this.emit({ type: 'file-changed', agentId: this.state.id, files })
+            // Agent 完成代码修改后自动提交审阅，pre-commit 失败会自动修复并重试
+            this.log('system', '检测到代码变更，自动提交审阅...')
+            await this.autoSubmitForReview()
           }
         } catch (err) {
           this.log('error', `检测文件变更失败: ${String(err)}`)
@@ -280,15 +290,16 @@ export class Agent {
     if (this.process) {
       this.process.kill()
       this.running = false
-      // 等待进程完全退出（kill() 内部 2s 后会 SIGKILL，这里最多等 3s）
+      // 等待进程完全退出（kill() 内部 2s 后会强制终止，Windows 留足 5s）
       try {
         await Promise.race([
           this.process.wait(),
-          new Promise<void>((_, reject) => setTimeout(() => reject(new Error('timeout')), 3000)),
+          new Promise<void>((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000)),
         ])
       } catch {
-        // 超时或异常，忽略
+        this.log('system', 'Agent 进程未在 5 秒内退出，工作目录文件可能仍被占用')
       }
+      this.process = undefined
     }
     this.state.pid = undefined
     this.setStatus('stopped')
@@ -306,7 +317,7 @@ export class Agent {
         this.log('system', '代码已推送至远程')
       } catch (err) {
         this.log('error', `推送失败: ${String(err)}`)
-        return
+        throw err
       }
     }
 
@@ -333,6 +344,37 @@ export class Agent {
     this.state.prNumber = Math.floor(Math.random() * 100) + 1
     this.state.prUrl = `${this.state.repoUrl.replace(/\.git$/, '')}/pull/${this.state.prNumber}`
     this.log('system', `PR #${this.state.prNumber} 已创建（模拟，未配置 GitHub Token）`)
+  }
+
+  /**
+   * 自动提交审阅：失败时捕获错误并让 Agent 修复，最多重试 3 次
+   */
+  async autoSubmitForReview(githubToken?: string, maxRetries = 3): Promise<void> {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        await this.submitForReview(githubToken)
+        return
+      } catch (err) {
+        const errorMsg = String(err)
+        this.log('error', `提交审阅失败 (${attempt}/${maxRetries}): ${errorMsg}`)
+        if (attempt >= maxRetries) {
+          this.log('error', '多次尝试后仍无法提交审阅，请指挥官人工介入')
+          this.setStatus('ready')
+          return
+        }
+        this.log('system', '正在根据错误信息自动修复...')
+        const fixPrompt = `Git 提交或 pre-commit 检查失败了，错误信息如下：\n\n${errorMsg}\n\n请根据错误信息修改代码文件，使其能够通过项目的 typecheck、lint 和 pre-commit 检查。直接修改相关文件，不需要额外说明。`
+        await this.runInstructionSilent(fixPrompt)
+        // 修复后重新检测变更
+        if (this.state.workspace) {
+          try {
+            this.state.changedFiles = await getChangedFiles(this.state.workspace)
+          } catch {
+            // 忽略检测失败
+          }
+        }
+      }
+    }
   }
 
   canMerge(): boolean {

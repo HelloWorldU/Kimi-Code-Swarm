@@ -5,8 +5,14 @@ import { mkdir, rm, access } from 'fs/promises'
 const execFileAsync = promisify(execFile)
 
 async function execGit(dir: string, args: string[]): Promise<string> {
-  const { stdout } = await execFileAsync('git', args, { cwd: dir })
-  return stdout.trim()
+  try {
+    const { stdout } = await execFileAsync('git', args, { cwd: dir })
+    return stdout.trim()
+  } catch (err: any) {
+    const stderr = err.stderr?.toString() || ''
+    const message = stderr ? `${err.message}\n${stderr}` : err.message
+    throw new Error(message)
+  }
 }
 
 async function dirExists(dir: string): Promise<boolean> {

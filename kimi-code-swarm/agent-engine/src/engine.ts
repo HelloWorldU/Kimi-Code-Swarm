@@ -62,16 +62,27 @@ export class AgentEngine {
           if (agent) {
             await agent.stop()
             const workspace = agent.state.workspace || `E:/workspace/${agent.state.id}`
-            // 给 Windows 一点时间释放文件句柄
-            await new Promise((r) => setTimeout(r, 500))
+            // Windows 上进程终止后需要更长时间释放文件句柄
+            await new Promise((r) => setTimeout(r, 2000))
 
             let deleted = false
-            // 先尝试 Node.js 原生删除
-            try {
-              await rm(workspace, { recursive: true, force: true })
-              deleted = true
-            } catch {
-              // fallback: Windows 系统命令（对锁定文件更激进）
+            let lastError: unknown
+            // 先尝试 Node.js 原生删除，最多重试 3 次
+            for (let attempt = 1; attempt <= 3; attempt++) {
+              try {
+                await rm(workspace, { recursive: true, force: true })
+                deleted = true
+                break
+              } catch (err) {
+                lastError = err
+                if (attempt < 3) {
+                  await new Promise((r) => setTimeout(r, 1000))
+                }
+              }
+            }
+
+            // fallback: Windows 系统命令（对锁定文件更激进）
+            if (!deleted && process.platform === 'win32') {
               try {
                 const { exec } = await import('child_process')
                 await new Promise<void>((resolve, reject) => {
@@ -81,13 +92,15 @@ export class AgentEngine {
                   })
                 })
                 deleted = true
-              } catch {}
+              } catch (err) {
+                lastError = err
+              }
             }
 
             if (deleted) {
               this.broadcast({ type: 'log', agentId: cmd.agentId, entry: { id: 'system', timestamp: new Date().toISOString(), type: 'system', content: `工作目录已清理: ${workspace}` } })
             } else {
-              const msg = `清理工作目录失败: ${workspace}，请手动删除`
+              const msg = `清理工作目录失败: ${workspace}，请手动删除。错误: ${lastError instanceof Error ? lastError.message : String(lastError)}`
               console.error(`[engine] ${msg}`)
               this.broadcast({ type: 'log', agentId: cmd.agentId, entry: { id: 'system', timestamp: new Date().toISOString(), type: 'error', content: msg } })
             }

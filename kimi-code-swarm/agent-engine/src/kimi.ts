@@ -1,5 +1,4 @@
-import { spawn, type ChildProcess } from 'child_process'
-import { execFile } from 'child_process'
+import { spawn, type ChildProcess, execFile, exec } from 'child_process'
 import { promisify } from 'util'
 
 const execFileAsync = promisify(execFile)
@@ -108,7 +107,7 @@ export function runKimi(
     for await (const chunk of stream) {
       const text = chunk.toString()
       for (const line of text.split('\n')) {
-        if (line) yield line
+        yield line
       }
     }
   }
@@ -122,11 +121,24 @@ export function runKimi(
         child.on('close', (code: number | null) => resolve(code))
       }),
     kill: () => {
-      child.kill('SIGTERM')
-      // Force kill after 2s
-      setTimeout(() => {
-        if (!child.killed) child.kill('SIGKILL')
-      }, 2000)
+      if (process.platform === 'win32' && child.pid) {
+        // Windows: use taskkill /T /F to terminate the entire process tree
+        exec(`taskkill /PID ${child.pid} /T /F`, (err) => {
+          // If taskkill failed and process is still alive, fallback to default kill
+          if (err && !child.killed) {
+            child.kill('SIGTERM')
+            setTimeout(() => {
+              if (!child.killed) child.kill('SIGKILL')
+            }, 2000)
+          }
+        })
+      } else {
+        child.kill('SIGTERM')
+        // Force kill after 2s
+        setTimeout(() => {
+          if (!child.killed) child.kill('SIGKILL')
+        }, 2000)
+      }
     },
   }
 }
