@@ -5,10 +5,7 @@ import { mkdir, rm, access } from 'fs/promises'
 const execFileAsync = promisify(execFile)
 
 async function execGit(dir: string, args: string[]): Promise<string> {
-  const { stdout, stderr } = await execFileAsync('git', args, { cwd: dir })
-  if (stderr && !stdout) {
-    throw new Error(`git error: ${stderr.trim()}`)
-  }
+  const { stdout } = await execFileAsync('git', args, { cwd: dir })
   return stdout.trim()
 }
 
@@ -16,7 +13,8 @@ async function dirExists(dir: string): Promise<boolean> {
   try {
     await access(dir)
     return true
-  } catch {
+  } catch (err) {
+    console.error(`[git] 访问目录失败 ${dir}: ${String(err)}`)
     return false
   }
 }
@@ -46,20 +44,12 @@ export async function gitPush(dir: string, branch: string): Promise<void> {
 }
 
 export async function getChangedFiles(dir: string): Promise<string[]> {
-  try {
-    const out = await execGit(dir, ['diff', '--name-only'])
-    return out.split('\n').filter((f) => f.trim())
-  } catch {
-    return []
-  }
+  const out = await execGit(dir, ['diff', '--name-only'])
+  return out.split('\n').filter((f) => f.trim())
 }
 
 export async function getFileDiff(dir: string, filePath: string): Promise<string> {
-  try {
-    return await execGit(dir, ['diff', '--', filePath])
-  } catch {
-    return ''
-  }
+  return await execGit(dir, ['diff', '--', filePath])
 }
 
 export async function gitFetch(dir: string): Promise<void> {
@@ -67,9 +57,5 @@ export async function gitFetch(dir: string): Promise<void> {
 }
 
 export async function getBranchDiff(dir: string, branch: string): Promise<string> {
-  try {
-    return await execGit(dir, ['diff', `main...origin/${branch}`])
-  } catch {
-    return ''
-  }
+  return await execGit(dir, ['diff', `main...origin/${branch}`])
 }

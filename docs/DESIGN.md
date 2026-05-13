@@ -89,11 +89,13 @@
 | harness 准则 | 硬化方式 | 状态 |
 |-------------|---------|------|
 | bug-fix: 禁止吞没错误 | AST `error-handling/empty-catch` + fixer 自动修复 | ✅ 硬约束 |
-| bug-fix: 鼓励留痕 | AST `error-handling/missing-logger` (warn) + check-docs-sync（要求 docs/ 变更） | ⚡ 半硬（warn + 分支检查） |
+| bug-fix: 鼓励留痕 | AST `error-handling/missing-logger` (warn) + check-docs-sync（要求 docs/ 变更） | ⚡ 半硬（warn + 分支检查）；check-docs-sync 与 check-test-sync 脚本内部错误均记录 console.error，禁止静默失败 |
 | new-task: 未验证代码禁止合入 | CI 流水线 + PR 门控 | ✅ 硬约束 |
 | new-task: 审阅通过才能合并 | PR review 机制 | ⚡ 半硬（Mock 模式可跳过） |
 | new-instance: Agent 生命周期 | Agent Engine IPC + 状态机驱动 | ✅ 硬约束（Engine 统一托管，禁止前端直接 spawn CLI） |
 | auto-test: E2E 验证 | Playwright + Chromium + Vite dev server（Mock 模式） | ✅ 硬约束（UI 改动后必须跑通 smoke test） |
+
+> **技术债务**: AST 分析器当前基于正则实现，已暴露系统性缺陷（无法区分代码/字符串/注释、语法变体需持续打补丁）。长期应迁移至 TypeScript ESTree AST Parser。详见 `docs/design-docs/ast-parser-vs-regex.md`。
 
 ## 关键决策记录
 

@@ -25,8 +25,14 @@ export function findCatchBlocks(content: string): CatchBlock[] {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
-    // 匹配 catch (...) {   （支持多行 catch 定义，但要求 { 在同一行）
-    const catchMatch = line.match(/catch\s*\([^)]*\)\s*\{/)
+    // 先移除字符串/注释/正则字面量，避免误匹配其中的 catch 关键字
+    // 顺序很重要：先字符串（避免误伤字符串中的 //），再注释，再正则
+    const codeOnly = line
+      .replace(/(['"`])[^'"`]*\1/g, (m) => ' '.repeat(m.length))
+      .replace(/\/\/.*$/g, '')
+      .replace(/\/[^/]+\//g, (m) => ' '.repeat(m.length))
+    // 匹配 catch (...) { 或 catch { （支持可选 catch binding）
+    const catchMatch = codeOnly.match(/catch(?:\s*\([^)]*\))?\s*\{/)
     if (!catchMatch) continue
 
     // 找到这一行中 { 的位置
@@ -85,7 +91,7 @@ export function isEmptyCatch(content: string): boolean {
 
 /** 检查是否使用了 Logger */
 export function hasLogger(content: string): boolean {
-  return /\blog(?:ger)?\.(?:error|warn|debug|info)\b/.test(content)
+  return /(?:\b|\.)(?:log|logger)\.(?:error|warn|debug|info)\b|\.log\(['"`][^'"`]*error/.test(content)
 }
 
 /** 检查是否直接使用了 console（ESLint 已禁止，作为兜底） */

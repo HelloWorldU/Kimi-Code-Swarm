@@ -13,6 +13,7 @@ export interface ReviewEntry {
   reviewerAgentId: string
   reviewerName: string
   status: 'pending' | 'approved' | 'rejected'
+  comment?: string
   reviewedAt?: string
 }
 
@@ -56,7 +57,7 @@ export type EngineCommand =
   | { type: 'submit-for-review'; agentId: string; githubToken?: string }
   | { type: 'merge-pr'; agentId: string; githubToken?: string }
   | { type: 'reject-pr'; agentId: string }
-  | { type: 'submit-review'; agentId: string; reviewerAgentId: string; approved: boolean }
+  | { type: 'submit-review'; agentId: string; reviewerAgentId: string; approved: boolean; githubToken?: string }
   | { type: 'get-file-diff'; agentId: string; filePath: string }
   | { type: 'ping' }
   | { type: 'shutdown' }

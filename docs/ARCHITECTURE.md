@@ -101,7 +101,7 @@ PR 创建时，Store 自动生成 `ReviewEntry[]`，包含所有其他 Agent 作
 | 审阅门控逻辑 | ✅ 真实 |
 | 文件 diff 查看 (`getFileDiff` → engine → `git diff`) | ✅ 真实 |
 | Kimi CLI 接入 (`detectKimiCli` + `spawn_process` + 实时事件) | ✅ 真实 |
-| 统一日志 (`src/utils/logger.ts`) | ✅ 已接入 Store，替代散落 console |
+| 统一日志 (`src/utils/logger.ts`) | ✅ 已接入 Store，替代散落 console；engine 事件监听器对非 JSON 行输出 debug 日志，避免静默忽略 |
 
 ## 引擎目录探测（开发/生产兼容性）
 

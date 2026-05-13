@@ -26,11 +26,12 @@ async function detectKimiModule(): Promise<{ python: string; args: string[] } | 
       await execFileAsync(candidate.python, [...candidate.args, '--version'])
       cachedModule = candidate
       return candidate
-    } catch {
-      // try next
+    } catch (err) {
+      console.error(`[kimi] 检测模块失败 ${candidate.python}: ${String(err)}`)
     }
   }
   cachedModule = null
+  console.error('[kimi] 所有 Python 模块检测候选均失败')
   return null
 }
 
@@ -41,8 +42,8 @@ export async function detectKimiCli(): Promise<string | null> {
       await execFileAsync(cmd, ['--version'])
       cachedPath = cmd
       return cmd
-    } catch {
-      // try next
+    } catch (err) {
+      console.error(`[kimi] 检测 CLI 失败 ${cmd}: ${String(err)}`)
     }
   }
   // Try module invocation as fallback
@@ -69,15 +70,18 @@ export function runKimi(
   workspace: string,
   instruction: string,
 ): KimiProcess {
-  // If CLI was detected as a Python module, reconstruct the spawn args
+  // Kimi CLI 1.41.0 usage: kimi --work-dir <dir> --prompt "<text>" --print --final-message-only
+  // --print: run in print mode (non-interactive)
+  // --final-message-only: only output the final assistant message
+  const baseArgs = ['--work-dir', workspace, '--prompt', instruction, '--print', '--final-message-only']
   let spawnCmd = kimiPath
   let spawnArgs: string[]
   if (kimiPath === '__MODULE__') {
     const module = cachedModule!
     spawnCmd = module.python
-    spawnArgs = [...module.args, '--print', '--quiet', '-w', workspace, '-y', instruction]
+    spawnArgs = [...module.args, ...baseArgs]
   } else {
-    spawnArgs = ['--print', '--quiet', '-w', workspace, '-y', instruction]
+    spawnArgs = baseArgs
   }
 
   const env = { ...process.env }

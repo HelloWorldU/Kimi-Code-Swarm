@@ -38,7 +38,7 @@
 
 | 功能模块 | 状态 | 说明 | 关键文件 |
 |----------|------|------|----------|
-| AST 结构分析器 | ✅ | 3 套规则，CI 强制运行 | `ast/analyzer.ts` |
+| AST 结构分析器 | ✅ | 5 套规则（error-handling/vue-structure/import-restrictions/style-constraints/dead-code），CI 强制运行；error-handling 经 4 轮补丁修复后覆盖 catch { / this.log('error') / 字符串注释过滤 | `ast/analyzer.ts` |
 | 文档同步检测 | ✅ | pre-commit 硬约束 | `ci/scripts/check-docs-sync.ts` |
 | 定期健康检查 | ✅ | 信息供给型，不阻断 | `scripts/health-check.ts` |
 | Dead Code 检测 | ✅ | ESLint 模块内 + AST 分析器跨模块（孤立文件/未使用导出） | `ast/rules/dead-code.ts`, `eslint.config.mjs` |

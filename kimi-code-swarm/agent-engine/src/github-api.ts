@@ -49,7 +49,9 @@ export async function createPullRequest(
     const data = (await res.json()) as { number: number; html_url: string }
     return { number: data.number, html_url: data.html_url }
   } catch (err) {
-    throw new Error(`创建 PR 失败: ${String(err)}`)
+    const msg = `创建 PR 失败: ${String(err)}`
+    console.error(`[github-api] ${msg}`)
+    throw new Error(msg)
   }
 }
 
@@ -70,8 +72,10 @@ export async function mergePullRequest(
   try {
     const res = await fetch(url, { method: 'PUT', headers: getHeaders(token), body })
     return res.ok
-  } catch {
-    return false
+  } catch (err) {
+    const msg = `GitHub API 合并请求失败: ${String(err)}`
+    console.error(`[github-api] ${msg}`)
+    throw new Error(msg)
   }
 }
 
@@ -93,7 +97,9 @@ export async function getPullRequest(
     if (!res.ok) return null
     const data = (await res.json()) as { state: string; merged: boolean }
     return data
-  } catch {
-    return null
+  } catch (err) {
+    const msg = `GitHub API 查询 PR 失败: ${String(err)}`
+    console.error(`[github-api] ${msg}`)
+    throw new Error(msg)
   }
 }

@@ -26,8 +26,8 @@ function getDefaultLevel(): LogLevel {
   try {
     // Vite 注入的环境变量
     if (import.meta.env?.DEV) return 'debug'
-  } catch {
-    // ignore
+  } catch (err) {
+    console.debug(`[logger] import.meta.env 不可用，降级为 warn: ${String(err)}`)
   }
   return 'warn'
 }

@@ -65,8 +65,10 @@ export class AgentEngine {
             try {
               await rm(workspace, { recursive: true, force: true })
               this.broadcast({ type: 'log', agentId: cmd.agentId, entry: { id: 'system', timestamp: new Date().toISOString(), type: 'system', content: `工作目录已清理: ${workspace}` } })
-            } catch {
-              // ignore cleanup errors
+            } catch (err) {
+              const msg = `清理工作目录失败: ${String(err)}`
+              console.error(`[engine] ${msg}`)
+              this.broadcast({ type: 'log', agentId: cmd.agentId, entry: { id: 'system', timestamp: new Date().toISOString(), type: 'error', content: msg } })
             }
           }
           this.agents.delete(cmd.agentId)
@@ -164,7 +166,9 @@ export class AgentEngine {
         }
       }
     } catch (err) {
-      this.broadcast({ type: 'error', message: String(err) })
+      const msg = String(err)
+      console.error(`[engine] handleCommand 异常: ${msg}`)
+      this.broadcast({ type: 'error', message: msg })
     }
   }
 

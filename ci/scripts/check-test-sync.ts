@@ -36,7 +36,8 @@ function baseRefExists(): boolean {
   try {
     execSync(`git rev-parse --verify ${BASE_REF}`, { encoding: 'utf-8', cwd: process.cwd(), stdio: 'pipe' })
     return true
-  } catch {
+  } catch (err) {
+    console.error(`[check-test-sync] base ref ${BASE_REF} 不存在: ${String(err)}`)
     return false
   }
 }

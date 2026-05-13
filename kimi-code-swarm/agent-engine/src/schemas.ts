@@ -26,6 +26,7 @@ export const ReviewEntrySchema = z.object({
   reviewerAgentId: z.string().min(1),
   reviewerName: z.string().min(1),
   status: z.enum(['pending', 'approved', 'rejected']),
+  comment: z.string().optional(),
   reviewedAt: z.string().datetime().optional(),
 })
 
@@ -94,6 +95,7 @@ export const EngineCommandSchema = z.discriminatedUnion('type', [
     agentId: z.string().min(1),
     reviewerAgentId: z.string().min(1),
     approved: z.boolean(),
+    githubToken: z.string().optional(),
   }),
   z.object({
     type: z.literal('get-file-diff'),

@@ -125,9 +125,17 @@ export class Agent {
       return
     }
 
-    this.process = runKimi(kimiPath, this.state.workspace, instruction)
+    try {
+      this.process = runKimi(kimiPath, this.state.workspace, instruction)
+    } catch (err) {
+      this.log('error', `启动 Kimi CLI 失败: ${String(err)}`)
+      this.setStatus('ready')
+      return
+    }
     this.state.pid = this.process.pid
+    // Log the exact command line for observability / debugging
     this.log('system', `Kimi CLI 已启动 (PID: ${this.process.pid})`)
+    this.log('system', `命令: ${kimiPath} --work-dir ${this.state.workspace} --prompt "..." --print --final-message-only`)
     this.running = true
 
     // stdout reader
@@ -146,21 +154,26 @@ export class Agent {
             break
           }
         }
-      } catch {
-        // ignore
+      } catch (err) {
+        this.log('error', `stdout reader 异常: ${String(err)}`)
       }
     })()
 
-    // stderr reader
+    // stderr reader — filter out kimi CLI internal logging errors
     ;(async () => {
       try {
         for await (const line of this.process!.stderr) {
           if (!this.running) break
+          // Skip loguru internal rotation errors on Windows (not actionable)
+          if (line.includes('Loguru Handler') || line.includes('PermissionError')) {
+            this.log('system', `[kimi stderr filtered] ${line.substring(0, 120)}`)
+            continue
+          }
           this.log('error', line)
           this.emit({ type: 'agent-output', agentId: this.state.id, line, isStderr: true })
         }
-      } catch {
-        // ignore
+      } catch (err) {
+        this.log('error', `stderr reader 异常: ${String(err)}`)
       }
     })()
 
@@ -173,20 +186,23 @@ export class Agent {
     const finalStatus = this.state.status as TaskStatus
     if (finalStatus === 'working') {
       this.setStatus('ready')
-      this.log(
-        'system',
-        code === 0
-          ? 'Agent 执行完毕，可以继续发送指令或提交审阅'
-          : `Agent 进程退出 (code: ${code ?? 'unknown'})`,
-      )
+      if (code === 0) {
+        this.log('system', 'Agent 执行完毕，可以继续发送指令或提交审阅')
+      } else {
+        this.log('error', `Agent 执行失败，exit code: ${code ?? 'unknown'}。请检查上方日志中的错误信息。`)
+      }
 
       // detect changed files
       if (this.state.workspace) {
-        const files = await getChangedFiles(this.state.workspace)
-        this.state.changedFiles = files
-        if (files.length > 0) {
-          this.log('system', `文件变更: ${files.length} 个文件`)
-          this.emit({ type: 'file-changed', agentId: this.state.id, files })
+        try {
+          const files = await getChangedFiles(this.state.workspace)
+          this.state.changedFiles = files
+          if (files.length > 0) {
+            this.log('system', `文件变更: ${files.length} 个文件`)
+            this.emit({ type: 'file-changed', agentId: this.state.id, files })
+          }
+        } catch (err) {
+          this.log('error', `检测文件变更失败: ${String(err)}`)
         }
       }
     }
@@ -305,7 +321,12 @@ export class Agent {
 
   async getFileDiff(filePath: string): Promise<string> {
     if (!this.state.workspace) return ''
-    return getFileDiff(this.state.workspace, filePath)
+    try {
+      return await getFileDiff(this.state.workspace, filePath)
+    } catch (err) {
+      this.log('error', `获取文件 diff 失败 (${filePath}): ${String(err)}`)
+      return ''
+    }
   }
 
   assignReviewers(allAgents: Agent[]) {
@@ -333,18 +354,28 @@ export class Agent {
       return ''
     }
 
-    const proc = runKimi(kimiPath, this.state.workspace, instruction)
-    let output = ''
+    let proc: ReturnType<typeof runKimi>
+    try {
+      proc = runKimi(kimiPath, this.state.workspace, instruction)
+    } catch (err) {
+      this.log('error', `启动 Kimi CLI 失败: ${String(err)}`)
+      return ''
+    }
 
+    let output = ''
     try {
       for await (const line of proc.stdout) {
         output += line + '\n'
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      this.log('error', `读取 kimi stdout 失败: ${String(err)}`)
     }
 
-    await proc.wait()
+    try {
+      await proc.wait()
+    } catch (err) {
+      this.log('error', `等待 kimi 进程退出失败: ${String(err)}`)
+    }
     return output
   }
 
@@ -397,8 +428,13 @@ export class Agent {
       return
     }
 
-    const result = await this.runReview(targetBranch)
-    onComplete(this.state.id, targetAgentId, result.approved)
+    try {
+      const result = await this.runReview(targetBranch)
+      onComplete(this.state.id, targetAgentId, result.approved)
+    } catch (err) {
+      this.log('error', `自动审阅执行异常: ${String(err)}`)
+      onComplete(this.state.id, targetAgentId, false)
+    }
   }
 
   /**
@@ -424,10 +460,13 @@ export class Agent {
     this.rejectPr()
     this.log('system', `第 ${this.reviewRound} 轮自动修改开始，基于 ${rejectedReviews.length} 条审阅意见`)
 
-    await this.sendInstruction(prompt)
-
-    // sendInstruction 完成后状态为 ready，改回 working 以符合 submitForReview 前置条件
-    this.state.status = 'working'
-    await this.submitForReview(githubToken)
+    try {
+      await this.sendInstruction(prompt)
+      // sendInstruction 完成后状态为 ready，改回 working 以符合 submitForReview 前置条件
+      this.state.status = 'working'
+      await this.submitForReview(githubToken)
+    } catch (err) {
+      this.log('error', `自动修改执行异常: ${String(err)}`)
+    }
   }
 }

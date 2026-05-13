@@ -47,12 +47,8 @@ function run(cmd: string, args: string[], cwd: string): Promise<void> {
 async function waitForDevServer(url: string, timeoutMs: number): Promise<void> {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
-    try {
-      const res = await fetch(url)
-      if (res.ok) return
-    } catch {
-      // ignore
-    }
+    const res = await fetch(url).catch(() => null)
+    if (res?.ok) return
     await new Promise((r) => setTimeout(r, 500))
   }
   throw new Error(`Dev server ${url} 在 ${timeoutMs}ms 内未就绪`)
@@ -91,6 +87,7 @@ async function main() {
     log('E2E', `${COLORS.green}通过${COLORS.reset}`)
   } catch (e) {
     failed = true
+    console.error(`[auto-test] E2E 流程异常: ${e instanceof Error ? e.message : String(e)}`)
     log('FAIL', `${COLORS.red}${e instanceof Error ? e.message : String(e)}${COLORS.reset}`)
   } finally {
     // 5. 清理
@@ -102,8 +99,8 @@ async function main() {
           stdio: 'ignore',
           detached: true,
         })
-      } catch {
-        // ignore
+      } catch (err) {
+        console.error(`[auto-test] 终止 dev server 失败: ${String(err)}`)
       }
     }
   }
