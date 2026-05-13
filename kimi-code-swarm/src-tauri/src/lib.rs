@@ -254,12 +254,14 @@ fn spawn_agent_engine(app: tauri::AppHandle) -> Result<u32, String> {
 
 #[tauri::command]
 fn send_to_engine(command: String) -> Result<(), String> {
+    log::info!("[send_to_engine] command: {}", command);
     let handle = ENGINE_HANDLE.lock().unwrap();
     let stdin = handle.as_ref()
         .ok_or("Agent engine not running")?;
     let mut writer = stdin.lock().unwrap();
     writeln!(writer, "{}", command)
         .map_err(|e| format!("Failed to write to engine: {}", e))?;
+    log::info!("[send_to_engine] command sent successfully");
     Ok(())
 }
 

@@ -323,7 +323,7 @@ export function useSwarmStore() {
     persistAgents()
   }
 
-  function startAgent(id: string) {
+  async function startAgent(id: string) {
     if (!isTauri) {
       const agent = state.agents.find((a) => a.id === id)
       if (!agent) return
@@ -333,7 +333,17 @@ export function useSwarmStore() {
       persistAgents()
       return
     }
-    sendToEngine({ type: 'start-agent', agentId: id })
+    try {
+      log.info('Sending start-agent command for', id)
+      await sendToEngine({ type: 'start-agent', agentId: id })
+    } catch (e) {
+      log.error('Failed to send start-agent command:', e)
+      const agent = state.agents.find((a) => a.id === id)
+      if (agent) {
+        agent.logs.push({ id: generateId(), timestamp: new Date().toISOString(), type: 'error', content: `启动失败: ${e instanceof Error ? e.message : String(e)}` })
+        persistAgents()
+      }
+    }
   }
 
   function sendInstruction(id: string, instruction: string) {

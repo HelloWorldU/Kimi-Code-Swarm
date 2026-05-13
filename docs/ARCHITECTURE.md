@@ -65,7 +65,8 @@ PR 创建时，Store 自动生成 `ReviewEntry[]`，包含所有其他 Agent 作
 1. 前端弹窗收集信息 → 调用 `createAgent()`
 2. `createAgent()` 发送 `create-agent` 命令给 Agent Engine（Rust → Node.js）
 3. Engine 创建成功后推送 `agent-created` 事件 → 前端列表更新
-4. **引擎未启动时**：`sendToEngine` 抛出异常，前端必须 `.catch()` 捕获并提示用户，禁止静默失败
+4. 用户点击"启动"→ `startAgent()` 发送 `start-agent` 命令 → Engine 执行 clone/branch → 推送 `agent-status` 事件
+5. **引擎未启动或命令发送失败时**：`sendToEngine` 抛出异常，`startAgent` 已添加 `try/catch` 捕获并写入 Agent 日志，禁止静默失败
 
 ## 登录流程
 
