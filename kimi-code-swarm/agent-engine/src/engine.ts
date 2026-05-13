@@ -1,6 +1,7 @@
 import { Agent } from './agent.js'
 import type { AgentState, EngineCommand, EngineEvent } from './types.js'
 import { EngineCommandSchema } from './schemas.js'
+import { rm } from 'fs/promises'
 
 export class AgentEngine {
   private agents = new Map<string, Agent>()
@@ -58,7 +59,17 @@ export class AgentEngine {
 
         case 'delete-agent': {
           const agent = this.agents.get(cmd.agentId)
-          if (agent) agent.stop()
+          if (agent) {
+            agent.stop()
+            if (agent.state.workspace) {
+              try {
+                await rm(agent.state.workspace, { recursive: true, force: true })
+                this.broadcast({ type: 'log', agentId: cmd.agentId, entry: { id: 'system', timestamp: new Date().toISOString(), type: 'system', content: `工作目录已清理: ${agent.state.workspace}` } })
+              } catch {
+                // ignore cleanup errors
+              }
+            }
+          }
           this.agents.delete(cmd.agentId)
           break
         }

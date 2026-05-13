@@ -40,6 +40,25 @@ const reviewProgress = computed(() => {
   const approved = props.task.reviews.filter(r => r.status === 'approved').length
   return { approved, total: props.task.reviews.length }
 })
+
+function confirmDelete() {
+  const agent = props.task
+  const lines = [
+    `确认删除 Agent「${agent.name}」？`,
+    '',
+  ]
+  if (agent.workspace) {
+    lines.push(`其工作目录将被一并删除：`,
+    agent.workspace,
+    '',
+    '此操作不可撤销。')
+  } else {
+    lines.push('此操作不可撤销。')
+  }
+  if (confirm(lines.join('\n'))) {
+    emit('delete', agent.id)
+  }
+}
 </script>
 
 <template>
@@ -133,7 +152,7 @@ const reviewProgress = computed(() => {
       </div>
       <button
         class="px-2 py-1.5 rounded-lg bg-gray-50 text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-        @click="emit('delete', task.id)"
+        @click="confirmDelete"
       >
         <Trash2 class="w-3 h-3" />
       </button>

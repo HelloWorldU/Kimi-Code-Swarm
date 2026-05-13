@@ -42,6 +42,10 @@ const emit = defineEmits<{...}>()
 - **状态色**：深色饱和（`-600`）+ 浅色背景（`-50`），避免半透明 overlay
 - **阴影**：仅在卡片/弹窗使用 `shadow-sm` 或 `shadow-md`，不用 heavy shadow
 
+## 交互规范
+
+- **危险操作须确认**：删除 Agent 等不可逆操作须通过 `confirm()` 弹窗提示用户，明确告知影响范围（如工作目录将被一并删除）
+
 ## E2E 测试标识
 
 Playwright 通过 `data-testid` 定位元素。交互组件的核心元素须加测试标识：
