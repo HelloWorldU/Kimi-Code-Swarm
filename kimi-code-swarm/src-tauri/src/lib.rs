@@ -215,6 +215,7 @@ fn spawn_agent_engine(app: tauri::AppHandle) -> Result<u32, String> {
     cmd_builder
         .current_dir(&engine_dir)
         .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .stdin(Stdio::piped());
 
     if let Some(key) = api_key {
@@ -251,6 +252,17 @@ fn spawn_agent_engine(app: tauri::AppHandle) -> Result<u32, String> {
         let _ = app_emit.emit("agent-engine-exit", serde_json::json!({"pid": pid}));
         let mut handle = ENGINE_HANDLE.lock().unwrap();
         *handle = None;
+    });
+
+    // 捕获 engine stderr 并打印到终端，使 engine 的 console.error 在开发模式下可见
+    let stderr = child.stderr.take().unwrap();
+    std::thread::spawn(move || {
+        let reader = BufReader::new(stderr);
+        for line in reader.lines() {
+            if let Ok(line) = line {
+                eprintln!("[agent-engine] {}", line);
+            }
+        }
     });
 
     Ok(pid)

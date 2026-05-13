@@ -41,10 +41,10 @@ steps:
      状态 = reviewing，自动指派其他 Agent 审阅
      注：`submit-for-review` 命令仍保留为手动 fallback / 覆盖入口
 
-  6. merge: (可选)
-     全员审阅通过后，指挥官点击「合并」
-     若有 GitHub Token：调用 GitHub API 合并 PR
+  6. merge:
+     全员审阅通过后，Engine **自动**调用 GitHub API 合并 PR
      状态 = completed
+     注：指挥官仍可在 UI 手动点击「合并」提前触发
 
 rollback:
   clone 失败 → 状态 = stopped，保留日志供排查

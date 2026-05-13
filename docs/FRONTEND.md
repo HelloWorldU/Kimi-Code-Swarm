@@ -93,7 +93,7 @@ PR CI 中额外运行 `check-test-sync`：若 `src/` 新增代码文件，`tests
 
 ## 前端功能状态
 
-> 完整矩阵见 [`docs/STATUS.md`](../STATUS.md)。
+> 完整矩阵见 [`docs/STATUS.md`](./STATUS.md)。
 
 | 功能 | 状态 | 备注 |
 |------|------|------|
