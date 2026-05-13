@@ -63,7 +63,7 @@
 `harness/*.yaml` 是**流程约束模板**，不是可执行代码。
 
 当前包含三个模板：
-- **`harness/new-instance.yaml`**：新建 Agent 的完整流程（收集信息 → 创建 Agent → 启动 Engine → 多轮对话 → 提交审阅 → 合并分支）
+- **`harness/new-instance.yaml`**：新建 Agent 的完整流程（收集信息 → 创建 Agent → 启动 Engine → 多轮对话 → **自动提交审阅**（检测到代码变更后自动创建 PR，pre-commit 失败时自动修复重试）→ 合并分支）
 - **`harness/new-task.yaml`**：指挥官向已有 Agent 派发新任务的流程
 - **`harness/bug-fix.yaml`**：修复 Bug 的诊断-隔离-修复-验证-留痕流程
 

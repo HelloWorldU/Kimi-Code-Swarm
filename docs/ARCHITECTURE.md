@@ -68,8 +68,9 @@ PR 创建时，Store 自动生成 `ReviewEntry[]`，包含所有其他 Agent 作
 4. 用户点击"启动"→ `startAgent()` 发送 `start-agent` 命令 → Engine 执行 clone/branch → 推送 `agent-status` 事件
 5. **引擎未启动或命令发送失败时**：`sendToEngine` 抛出异常，`startAgent` 已添加 `try/catch` 捕获并写入 Agent 日志，禁止静默失败
 6. 用户点击"停止"→ `stopAgent()` **乐观更新**前端状态为 `stopped`，再 `await sendToEngine({ type: 'stop-agent' })` → Engine 调用 `agent.stop()` 等待进程退出 → 推送 `agent-status` 事件；后端失败时自动回滚状态
+7. 用户发送指令 → `sendInstruction()` 执行完毕且检测到文件变更 → Engine **自动调用 `autoSubmitForReview()`**：git add/commit/push → 创建 PR；pre-commit / lint / typecheck 失败时将 stderr 回传给 Kimi CLI 修复并重试（最多 3 轮）→ 状态变为 `reviewing`
 
-**日志分流**：
+**日志分流**:
 - `input` / `output` 及关键状态变更（执行完毕/已停止/Token耗尽等）通过 `log` 事件进入前端聊天面板
 - `system` / `error` 技术日志（PID、命令行参数、文件变更数、内部异常等）输出到 **stderr**，由终端直接显示（带 `[Agent]`/`[Kimi]`/`[Git]` 组件前缀和颜色），不污染 UI
 

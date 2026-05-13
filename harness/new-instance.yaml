@@ -32,12 +32,14 @@ steps:
      实时 stdout/stderr 通过 `agent-output` 事件推送前端
      状态流转：ready → working → ready（执行完毕）
 
-  5. review: (可选)
-     指挥官点击「提交审阅」→ 发送 `submit-for-review` 命令
-     Engine 执行：git add → git commit → git push
-     若有 GitHub Token：调用 GitHub API 创建真实 PR
-     若无 Token：生成 Mock PR 号
+  5. review:
+     Agent 执行完指令后检测到文件变更，Engine **自动**调用 `autoSubmitForReview()`：
+       git add → git commit → git push → 创建 PR
+       若有 GitHub Token：调用 GitHub API 创建真实 PR
+       若无 Token：生成 Mock PR 号
+       pre-commit / lint / typecheck 失败时：将 stderr 回传给 Kimi CLI 自动修复，重试最多 3 轮
      状态 = reviewing，自动指派其他 Agent 审阅
+     注：`submit-for-review` 命令仍保留为手动 fallback / 覆盖入口
 
   6. merge: (可选)
      全员审阅通过后，指挥官点击「合并」
@@ -46,5 +48,5 @@ steps:
 
 rollback:
   clone 失败 → 状态 = stopped，保留日志供排查
-  git push 失败 → 状态保持 working，日志提示网络/权限问题
+  git commit/push 失败（pre-commit 等）→ Agent 自动修复并重试；3 轮后仍失败则状态回到 ready，日志提示指挥官人工介入
   GitHub API 失败 → 状态不变，降级为 Mock 继续流程

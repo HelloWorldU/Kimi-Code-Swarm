@@ -171,7 +171,9 @@ pending ──start──→ cloning ──git clone──→ ready ──send i
   │                  │
   └──stop────────────→ stopped
                      │
-  working ──submit review──→ reviewing ──all approved──→ completed
-    │                          │
-    └──reject PR───────────────┘
+  working ──auto submit review──→ reviewing ──all approved──→ completed
+    │                                 │
+    └──reject PR─────────────────────┘
+    │
+    └──pre-commit fail (auto-fix ×3)──→ ready (manual fallback)
 ```
