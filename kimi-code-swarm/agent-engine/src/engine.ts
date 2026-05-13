@@ -61,13 +61,12 @@ export class AgentEngine {
           const agent = this.agents.get(cmd.agentId)
           if (agent) {
             agent.stop()
-            if (agent.state.workspace) {
-              try {
-                await rm(agent.state.workspace, { recursive: true, force: true })
-                this.broadcast({ type: 'log', agentId: cmd.agentId, entry: { id: 'system', timestamp: new Date().toISOString(), type: 'system', content: `工作目录已清理: ${agent.state.workspace}` } })
-              } catch {
-                // ignore cleanup errors
-              }
+            const workspace = agent.state.workspace || `E:/workspace/${agent.state.id}`
+            try {
+              await rm(workspace, { recursive: true, force: true })
+              this.broadcast({ type: 'log', agentId: cmd.agentId, entry: { id: 'system', timestamp: new Date().toISOString(), type: 'system', content: `工作目录已清理: ${workspace}` } })
+            } catch {
+              // ignore cleanup errors
             }
           }
           this.agents.delete(cmd.agentId)
