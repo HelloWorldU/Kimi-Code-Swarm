@@ -366,7 +366,7 @@ export class Agent {
     const approved = /LGTM|lgtm|approve|通过|无问题|没问题/i.test(output)
     const comment = approved
       ? '自动审阅通过（LGTM）'
-      : `审阅发现潜在问题: ${output.slice(0, 200).replace(/\n/g, ' ')}`
+      : `审阅发现潜在问题，kimi 输出如下：\n${output}`
 
     this.log('system', comment)
     return { approved, comment }
