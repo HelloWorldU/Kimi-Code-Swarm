@@ -85,6 +85,10 @@ export function runKimi(
   }
 
   const env = { ...process.env }
+  // Windows 默认 GBK 编码无法处理 Unicode emoji，强制 Python 使用 UTF-8
+  if (!env.PYTHONIOENCODING) {
+    env.PYTHONIOENCODING = 'utf-8'
+  }
   // Ensure KIMI_API_KEY is passed through (injected by Rust on engine spawn)
   // If somehow missing, try to read from env directly (development fallback)
   if (!env.KIMI_API_KEY) {
