@@ -17,6 +17,8 @@ UI (Vue) ←→ useSwarmStore (UI state only)
 
 PR 创建时，Store 自动生成 `ReviewEntry[]`，包含所有其他 Agent 作为 pending 审阅者。
 `mergePr()` 执行前检查 `reviews.every(r => r.status === 'approved')`，未通过则拒绝合并。
+
+审阅通过必须由外部动作触发（指挥官在 UI 点击各 reviewer 的通过/拒绝按钮，或 Tauri 模式下由其他 Agent 真实执行审阅），不会自动通过。
 ```
 
 ## 状态分层

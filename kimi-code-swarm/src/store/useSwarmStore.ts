@@ -394,14 +394,9 @@ export function useSwarmStore() {
       agent.prUrl = `${agent.repoUrl.replace(/\.git$/, '')}/pull/${agent.prNumber}`
       agent.logs.push({ id: generateId(), timestamp: new Date().toISOString(), type: 'system', content: `PR #${agent.prNumber} 已创建（浏览器模式模拟）` })
       if (reviewers.length > 0) {
-        setTimeout(() => {
-          agent.reviews.forEach((r) => {
-            r.status = 'approved'
-            r.reviewedAt = new Date().toISOString()
-          })
-          agent.logs.push({ id: generateId(), timestamp: new Date().toISOString(), type: 'system', content: `全员审阅通过（${reviewers.length}/${reviewers.length}），等待指挥官合并` })
-          persistAgents()
-        }, 3000)
+        agent.logs.push({ id: generateId(), timestamp: new Date().toISOString(), type: 'system', content: `已指派 ${reviewers.length} 个 Agent 审阅此 PR，等待全员通过后方可合并` })
+      } else {
+        agent.logs.push({ id: generateId(), timestamp: new Date().toISOString(), type: 'system', content: '当前无其他 Agent 可指派审阅，指挥官可直接合并' })
       }
       persistAgents()
       return
