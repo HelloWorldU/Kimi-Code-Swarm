@@ -1,10 +1,10 @@
 [package]
-name = "app"
+name = "kimi-code-swarm"
 version = "0.1.0"
-description = "A Tauri App"
-authors = ["you"]
-license = ""
-repository = ""
+description = "Local Agent Command Center App"
+authors = ["HelloWorldU"]
+license = "MIT"
+repository = "https://github.com/HelloWorldU/Kimi-Code-Swarm"
 edition = "2021"
 rust-version = "1.77.2"
 
