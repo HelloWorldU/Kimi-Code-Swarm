@@ -696,18 +696,28 @@ export class Agent {
   private async generateCommitAndPrBody(files: string[]): Promise<{ commitMessage: string; prTitle: string; prBody: string }> {
     // 1. 尝试用 Kimi CLI 生成
     const fileList = files.map((f) => `- ${f}`).join('\n')
-    const prompt = `你是一位资深工程师，请根据以下代码变更文件列表，生成规范的 commit message 和 PR 描述。
+    const prompt = `你是一位资深工程师。请根据以下代码变更文件列表，生成规范的 commit message 和 PR 描述。
+
+## Commit Message 规范
+遵循 Conventional Commits：
+- 格式: type(scope): summary
+- type: feat / fix / refactor / docs / test / chore
+- scope: frontend / agent-engine / docs / test / ci / ast / tauri（根据文件路径推断）
+- summary: 英文，首字母不大写，不用句号，不超过50字符，动词原形开头
+- Body（可选）: 说明变更原因和测试情况，行宽≤72字符
+
+## PR Body 规范
+用中文 Markdown 格式，包含：
+1. 变更内容：列出每个变更文件及一句话作用
+2. 类型：用 - [x] 勾选对应类型
+3. 检查项：用 - [x] 确认本地验证通过
 
 变更文件：
 ${fileList}
 
-要求：
-1. commit message 符合 Conventional Commits 规范，格式为 type(scope): description（英文，单行，不超过72字符）
-2. PR 标题与 commit message 保持一致
-3. PR 描述用中文 Markdown 格式，简要列出每个新增/修改文件的作用（一句话）
-
 请严格按以下格式输出（不要有多余内容）：
-COMMIT: <commit message>
+COMMIT:
+<commit message>
 ---
 PR_BODY:
 <pr body>
@@ -715,13 +725,15 @@ PR_BODY:
 
     try {
       const output = await this.runInstructionSilent(prompt, 60000)
-      const commitMatch = output.match(/COMMIT:\s*(.+)/)
+      const commitMatch = output.match(/COMMIT:\s*([\s\S]+?)(?=\n---\nPR_BODY:)/)
       const bodyMatch = output.match(/PR_BODY:\s*([\s\S]+)/)
 
       if (commitMatch && bodyMatch) {
         const commitMessage = commitMatch[1].trim()
         const prBody = bodyMatch[1].trim()
-        return { commitMessage, prTitle: commitMessage, prBody }
+        // PR title 取 commit message 的第一行
+        const prTitle = commitMessage.split('\n')[0].trim()
+        return { commitMessage, prTitle, prBody }
       }
     } catch {
       // Kimi CLI 生成失败，继续 fallback
@@ -732,14 +744,33 @@ PR_BODY:
     const description = this.inferDescription(files, action)
     const commitMessage = `${action}${scope ? `(${scope})` : ''}: ${description}`
 
-    const prBodyLines = files.map((f) => {
-      const filename = f.split('/').pop() || f
-      if (f.endsWith('.spec.ts') || f.endsWith('.test.ts')) return `- 补充 \`${filename}\` 单元测试`
-      if (f.endsWith('.vue')) return `- 新增/更新 \`${filename}\` 组件`
-      if (f.endsWith('.ts') || f.endsWith('.js')) return `- 新增/更新 \`${filename}\` 逻辑`
-      if (f.endsWith('.md')) return `- 更新 \`${filename}\` 文档`
-      return `- 变更 \`${filename}\``
-    })
+    const prBodyLines = [
+      '## 变更内容',
+      '',
+      ...files.map((f) => {
+        const filename = f.split('/').pop() || f
+        if (f.endsWith('.spec.ts') || f.endsWith('.test.ts')) return `- 补充 \`${filename}\` 单元测试`
+        if (f.endsWith('.vue')) return `- 新增/更新 \`${filename}\` 组件`
+        if (f.endsWith('.ts') || f.endsWith('.js')) return `- 新增/更新 \`${filename}\` 逻辑`
+        if (f.endsWith('.md')) return `- 更新 \`${filename}\` 文档`
+        return `- 变更 \`${filename}\``
+      }),
+      '',
+      '## 类型',
+      '',
+      `- [${action === 'feat' ? 'x' : ' '}] feat: 新功能`,
+      `- [${action === 'fix' ? 'x' : ' '}] fix: Bug 修复`,
+      `- [${action === 'refactor' ? 'x' : ' '}] refactor: 代码重构`,
+      `- [${action === 'docs' ? 'x' : ' '}] docs: 文档更新`,
+      `- [${action === 'test' ? 'x' : ' '}] test: 测试补充`,
+      `- [${action === 'chore' ? 'x' : ' '}] chore: 构建/工具链`,
+      '',
+      '## 检查项',
+      '',
+      '- [x] 本地 pre-commit 通过',
+      '- [x] 测试已补充或无需补充',
+      '- [x] 文档已同步或无需同步',
+    ]
 
     const prBody = prBodyLines.join('\n')
     return { commitMessage, prTitle: commitMessage, prBody }
