@@ -2,6 +2,7 @@ import type { AgentState, LogEntry, ReviewEntry, TaskStatus, EngineEvent } from 
 import { runKimi, detectKimiCli, type KimiProcess } from './kimi.js'
 import { getChangedFiles, getStagedFiles, getFileDiff, gitAdd, gitCommit, gitPush, createBranch, cloneRepo, gitFetch, getBranchDiff, gitDeleteRemoteBranch } from './git.js'
 import { createPullRequest, mergePullRequest, getPullRequest, getCheckRuns, getCheckRunLogs } from './github-api.js'
+import { readFile } from 'fs/promises'
 
 interface SubmitStep {
   name: string
@@ -690,27 +691,36 @@ export class Agent {
   }
 
   /**
+   * 从仓库根目录读取 Skill 文件内容
+   */
+  private async loadSkill(skillPath: string): Promise<string> {
+    if (!this.state.workspace) return ''
+    try {
+      const content = await readFile(`${this.state.workspace}/${skillPath}`, 'utf-8')
+      return content
+    } catch {
+      return ''
+    }
+  }
+
+  /**
    * 基于变更文件列表生成 commit message 和 PR 描述
    * 优先调用 Kimi CLI 生成高质量内容，失败时 fallback 到规则生成
+   * Skill 文件（skills/commit/SKILL.md、.github/pull_request_template.md）作为唯一事实源
    */
   private async generateCommitAndPrBody(files: string[]): Promise<{ commitMessage: string; prTitle: string; prBody: string }> {
-    // 1. 尝试用 Kimi CLI 生成
+    // 1. 读取 Skill 文件作为事实源
+    const commitSkill = await this.loadSkill('skills/commit/SKILL.md')
+    const prTemplate = await this.loadSkill('.github/pull_request_template.md')
+
     const fileList = files.map((f) => `- ${f}`).join('\n')
     const prompt = `你是一位资深工程师。请根据以下代码变更文件列表，生成规范的 commit message 和 PR 描述。
 
 ## Commit Message 规范
-遵循 Conventional Commits：
-- 格式: type(scope): summary
-- type: feat / fix / refactor / docs / test / chore
-- scope: frontend / agent-engine / docs / test / ci / ast / tauri（根据文件路径推断）
-- summary: 英文，首字母不大写，不用句号，不超过50字符，动词原形开头
-- Body（可选）: 说明变更原因和测试情况，行宽≤72字符
+${commitSkill || '遵循 Conventional Commits：type(scope): summary，英文，首字母不大写，不用句号，≤50字符'}
 
 ## PR Body 规范
-用中文 Markdown 格式，包含：
-1. 变更内容：列出每个变更文件及一句话作用
-2. 类型：用 - [x] 勾选对应类型
-3. 检查项：用 - [x] 确认本地验证通过
+${prTemplate || '用中文 Markdown 格式，列出变更文件作用、类型勾选、检查项'}
 
 变更文件：
 ${fileList}
