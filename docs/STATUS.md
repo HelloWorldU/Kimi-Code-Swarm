@@ -28,12 +28,12 @@
 | Agent 状态持久化 | ✅ | tauri-plugin-store 自动保存/恢复 Agent 列表 | `src/store/useSwarmStore.ts` |
 | Git 自动化（clone/checkout/commit/push） | ✅ | Tauri 环境通过 IPC 执行真实 git | `src/api/ipc.ts` |
 | GitHub API（PR 创建/合并/查询） | ✅ | 配置 GitHub Token 后 Agent Engine 调用真实 GitHub REST API；无 Token 降级为 Mock | `agent-engine/src/github-api.ts` |
-| 全员审阅门控 | ✅ | 后端严格检查 reviews 全 approved；Tauri 模式下 reviewer Agent 自动运行 kimi CLI 审阅代码变更（解析 LGTM 关键词），全部 approved 后自动合并；如有 reject 则被审阅 Agent 自动根据意见修改代码并重新提交（最多 3 轮）；浏览器模式下需指挥官手动审阅 | `src/store/useSwarmStore.ts`, `agent-engine/src/agent.ts`, `agent-engine/src/engine.ts` |
+| 全员审阅门控 | ✅ | 后端严格检查 reviews 全 approved；Tauri 模式下 reviewer Agent 自动运行 kimi CLI 审阅代码变更（解析 LGTM 关键词）；如有 reject 则被审阅 Agent 自动根据意见修改代码并重新提交（最多 3 轮）；浏览器模式下需指挥官手动审阅；**PR 合并可由指挥官手动触发或全员审阅通过后自动合并** | `src/store/useSwarmStore.ts`, `agent-engine/src/agent.ts`, `agent-engine/src/engine.ts` |
 | Agent Engine 进程管理 | ✅ | Rust 后台 spawn Node.js Agent Engine，stdin/stdout 管道通信；Windows 优先使用本地 `tsx.cmd` 避免 PATH 继承问题 | `src-tauri/src/lib.rs`, `agent-engine/src/index.ts` |
 | Kimi CLI 接入 | ✅ | `sendInstruction` 调用 `kimi --print --quiet`，实时 stdout 流式捕获，可取消 | `src/store/useSwarmStore.ts` |
 | Token 预算控制 | ✅ | sendInstruction 前检查预算；process-output 中按输出行长度估算并累加；耗尽时自动 kill 进程 | `src/store/useSwarmStore.ts` |
 | Agent 多轮对话交互 | ✅ | 聊天式气泡 UI，支持 input/output/system/error 消息类型；ready/stopped/completed 状态下可持续对话；working 状态显示执行中指示器；**日志已分流**（system/error 技术日志带组件前缀+颜色走终端 stderr，input/output 及关键状态变更进 UI）；**stop-agent 已修复**（前端乐观更新 + await IPC） | `src/components/AgentDetail.vue`, `src/store/useSwarmStore.ts`, `agent-engine/src/agent.ts` |
-| Agent 自动提交审阅 | ✅ | Agent 执行完指令后检测到文件变更自动 `git add/commit/push` 并创建 PR；pre-commit 失败时将完整执行日志全量回传修复（最多 3 轮）；PR 创建后自动轮询 GitHub Actions CI（30s 间隔），CI 失败时自动获取日志并修复重新提交（最多 3 轮）；无 GitHub Token 时降级为 Mock PR | `agent-engine/src/agent.ts` |
+| Agent 自动提交审阅 | ✅ | Agent 执行完指令后检测到文件变更自动 `git add/commit/push` 并创建 PR；pre-commit 失败时将完整执行日志全量回传修复（最多 3 轮）；PR 创建后自动轮询 GitHub Actions CI（30s 间隔），CI 失败时自动获取日志并修复重新提交（最多 3 轮）；**Kimi CLI 自动修复设 120s 超时保护**；无 GitHub Token 时降级为 Mock PR | `agent-engine/src/agent.ts` |
 
 ## 质量约束
 
@@ -60,4 +60,4 @@
 
 ---
 
-*Last updated: 2026-05-13*
+*Last updated: 2026-05-14*

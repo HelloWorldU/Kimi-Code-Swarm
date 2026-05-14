@@ -173,6 +173,12 @@ pending ──start──→ cloning ──git clone──→ ready ──send i
                      │
   working ──auto submit review──→ reviewing ──all approved──→ completed
     │                                 │
+    │    ┌─ CI pass ─────────────────┘
+    │    │
+    │    └─ CI fail ──auto-fix (×3)──→ reviewing (re-push)
+    │         │
+    │         └─ max retries ──→ ready (manual fallback)
+    │
     └──reject PR─────────────────────┘
     │
     └──pre-commit fail (auto-fix ×3)──→ ready (manual fallback)

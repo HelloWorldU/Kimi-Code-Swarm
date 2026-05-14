@@ -1,16 +1,23 @@
 # PR 工作流问题对齐文档
 
-> **用途**: 新 Agent 快速恢复上下文，定位并修复 PR 提交/CI 失败问题  
+> **用途**: PR #1 ~ PR #3 工作流问题的历史记录与根因分析  
 > **生成时间**: 2026-05-13  
-> **对应 PR**: [#1](https://github.com/HelloWorldU/Kimi-Code-Swarm/pull/1)
+> **对应 PR**: [#1](https://github.com/HelloWorldU/Kimi-Code-Swarm/pull/1)、[#3](https://github.com/HelloWorldU/Kimi-Code-Swarm/pull/3)
+> **状态**: ✅ 所有问题已解决（见下方更新记录）
 
 ---
 
 ## 一、当前状态摘要
 
-PR #1 已创建成功，但 **GitHub Actions CI 失败**。失败原因不是 pre-commit，而是 **PR 提交后触发的 `check-test-sync`** —— 新增 4 个代码文件缺少对应测试。
+## 历史背景
 
-Agent 的 `autoSubmitForReview` 重试机制**只覆盖 `git commit` 阶段**，PR 创建后的 CI 失败**不会自动重试**，需人工介入或给 Agent 发新指令修复。
+PR #1（2026-05-13）创建成功，但 GitHub Actions CI 的 `check-test-sync` 失败——新增 4 个代码文件缺少对应测试。
+
+当时 `autoSubmitForReview` 的重试机制**只覆盖 `git commit` 阶段**，PR 创建后的 CI 失败不会自动修复。后续通过以下改进解决了这个问题：
+
+1. **工具调用式反馈循环**（2026-05-14）：`git.ts` 返回完整 `GitResult`，`autoSubmitForReview` 将 stdout + stderr + exit code 全量回传给 Agent 自主修复
+2. **CI 自动监控**（2026-05-14）：`startCiMonitor` 轮询 GitHub Checks API，CI 失败时自动获取日志并调用 `fixBasedOnCiFailure` 修复重试（最多 3 轮）
+3. **测试补充**（2026-05-14，PR #3）：为 `useConfirm` / `useToast` 补充了单元测试，check-test-sync 通过
 
 ---
 
@@ -65,15 +72,16 @@ autoSubmitForReview(githubToken, maxRetries=3)
 
 ## 三、PR 创建后 CI 失败的处理策略（重点）
 
-### 3.1 PR CI 失败 ≠ 重试触发条件
+### 3.1 ~~PR CI 失败 ≠ 重试触发条件~~（已解决）
 
-`autoSubmitForReview` 的职责在 **PR 创建成功那一刻就结束了**。后续 GitHub Actions 跑出来的失败：
+**旧行为**（PR #1 时期）：`autoSubmitForReview` 的职责在 PR 创建成功那一刻就结束了。后续 GitHub Actions 跑出来的失败不会自动修复。
 
-- **不会**自动触发 `autoSubmitForReview` 的重试
-- **不会**自动通知 Agent 去修复
-- **需要**指挥官人工查看 CI 日志，给 Agent 发新的指令
+**新行为**（PR #3 之后）：`submitForReview` 成功后会自动启动 `startCiMonitor`，轮询 GitHub Checks API：
+- CI 失败 → `stopCiMonitor` → `fixBasedOnCiFailure` → Kimi CLI 自动修复 → `autoSubmitForReview` 重新提交
+- CI 通过 → `stopCiMonitor` → `ciStatus = 'success'`
+- 超时（10 分钟）或达最大重试次数 → 停止轮询，提示人工介入
 
-### 3.2 当前 PR #1 的 CI 失败详情
+### 3.2 PR #1 的 CI 失败详情（历史记录）
 
 ```
 Run cd kimi-code-swarm && npx tsx ../ci/scripts/check-test-sync.ts --base origin/main
@@ -122,7 +130,7 @@ Agent 修复代码后，**不能直接等自动重试**，需要：
 | **现象** | PR #1 创建成功，但 GitHub Actions 的 `check-test-sync` 失败 |
 | **根因** | 新增 4 个代码文件（2 组件 + 2 composables）未补充对应测试 |
 | **影响** | **高**。PR 无法合并 |
-| **当前状态** | ❌ 未修复，需 Agent 补充测试后重新提交 |
+| **当前状态** | ✅ **已修复**（PR #3，2026-05-14）。补充了 `useConfirm.spec.ts` 和 `useToast.spec.ts`，check-test-sync 通过 |
 
 ### 🟡 问题 3: 引擎 stderr 未输出（非阻塞）
 
@@ -136,21 +144,15 @@ Agent 修复代码后，**不能直接等自动重试**，需要：
 
 ## 五、新 Agent 接入指引
 
-如果你是新 Agent，阅读到此文档，当前任务优先级如下：
+## 五、当前状态（新 Agent 必读）
 
-1. **最高优**: 为以下 4 个文件补充测试（解决 PR #1 CI 失败）：
-   - `kimi-code-swarm/src/components/SwarmConfirmModal.vue`
-   - `kimi-code-swarm/src/components/SwarmToast.vue`
-   - `kimi-code-swarm/src/composables/useConfirm.ts`
-   - `kimi-code-swarm/src/composables/useToast.ts`
+本文档记录的是 **PR #1 ~ PR #3 时期的问题**，所有问题已通过代码重构解决。新 Agent 无需按下方旧指引操作。
 
-2. **测试类型**: 
-   - 组件用 Vitest + Vue Test Utils（单元测试）
-   - Composables 用 Vitest 直接测试
-   - 已有测试目录: `kimi-code-swarm/tests/`
+当前系统行为：
+1. `autoSubmitForReview` 会自动处理 pre-commit 失败（全量日志回传修复，最多 3 轮）
+2. PR 创建后会自动启动 CI 监控，CI 失败时自动修复并重新提交（最多 3 轮）
+3. `runInstructionSilent` 设有 120s 超时保护，防止 Kimi CLI 挂死
 
-3. **提交方式**: 修复后由指挥官手动触发"提交审阅"，新的 commit 会自动追加到 PR #1
-
-4. **避坑**: 
-   - 修改 Vue 组件时，同步检查 `doc-map.json` 映射的文档，避免 `check-docs-sync` 失败
-   - 新增 `src/` 代码文件时，**必须**同步在 `tests/` 添加测试，避免 `check-test-sync` 失败
+**避坑**: 
+- 修改 Vue 组件时，同步检查 `doc-map.json` 映射的文档，避免 `check-docs-sync` 失败
+- 新增 `src/` 代码文件时，**必须**同步在 `tests/` 添加测试，避免 `check-test-sync` 失败

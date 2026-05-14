@@ -75,7 +75,7 @@ npm run health-check  # 仓库一致性检查（信息供给型）
 npm run test          # Vitest 单元测试
 npm run test:watch    # Vitest 监听模式
 npx playwright test   # E2E 测试（需先 cargo tauri dev）
-npm run ci            # 完整流水线：typecheck → lint → analyze → check-docs → test → build
+npm run ci            # 完整流水线：typecheck → lint → analyze → test → check-docs → check-test-sync → build
 npm run build         # 生产构建
 ```
 
