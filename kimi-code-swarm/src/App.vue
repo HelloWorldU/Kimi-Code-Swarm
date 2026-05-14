@@ -10,6 +10,8 @@ import AgentDetail from './components/AgentDetail.vue'
 import CreateTaskModal from './components/CreateTaskModal.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
 import AnalyticsPanel from './components/AnalyticsPanel.vue'
+import SwarmConfirmModal from './components/SwarmConfirmModal.vue'
+import SwarmToast from './components/SwarmToast.vue'
 import { useSwarmStore } from './store/useSwarmStore'
 
 const store = useSwarmStore()
@@ -196,4 +198,8 @@ function handleLogout() {
       @create="store.createAgent"
     />
   </div>
+
+  <!-- Global Overlay Components -->
+  <SwarmConfirmModal />
+  <SwarmToast />
 </template>
