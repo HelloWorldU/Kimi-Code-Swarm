@@ -15,7 +15,6 @@ const config = computed(() => {
         confirmBg: 'bg-red-600 hover:bg-red-700',
         confirmText: 'text-white',
         border: 'border-red-200',
-        ring: 'ring-red-100',
       }
     case 'warning':
       return {
@@ -25,7 +24,6 @@ const config = computed(() => {
         confirmBg: 'bg-amber-600 hover:bg-amber-700',
         confirmText: 'text-white',
         border: 'border-amber-200',
-        ring: 'ring-amber-100',
       }
     default:
       return {
@@ -35,7 +33,6 @@ const config = computed(() => {
         confirmBg: 'bg-swarm-600 hover:bg-swarm-700',
         confirmText: 'text-white',
         border: 'border-gray-200',
-        ring: 'ring-gray-100',
       }
   }
 })

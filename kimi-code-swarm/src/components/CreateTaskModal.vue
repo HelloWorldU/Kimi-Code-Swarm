@@ -15,19 +15,13 @@ const name = ref('')
 const repoUrl = ref('')
 const instruction = ref('')
 const tokenBudget = ref(50000)
-const isVisible = ref(false)
 
 watch(() => props.isOpen, (open) => {
   if (open) {
-    isVisible.value = true
-  } else {
-    setTimeout(() => {
-      isVisible.value = false
-      name.value = ''
-      repoUrl.value = ''
-      instruction.value = ''
-      tokenBudget.value = 50000
-    }, 200)
+    name.value = ''
+    repoUrl.value = ''
+    instruction.value = ''
+    tokenBudget.value = 50000
   }
 })
 

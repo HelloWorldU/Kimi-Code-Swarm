@@ -32,6 +32,7 @@ Vue 3 + TypeScript + Vite + Tailwind CSS + lucide-vue-next + Tauri v2 + @tauri-a
 - `components/SettingsPanel.vue` — 系统设置（GitHub Token + Kimi CLI 安装指引）
 - `components/AnalyticsPanel.vue` — 监控分析：状态分布、Token 排行、活跃/审阅任务
 - `components/TaskCard.vue` — Agent 卡片：状态 + Token 进度 + 审阅徽章
+- `components/CreateTaskModal.vue` — 新建 Agent 弹窗（名称/仓库/指令/Token 预算表单，Vue Transition 过渡）
 - `components/SwarmToast.vue` — 全局 Toast 容器（动画进入/退出 + 进度条）
 - `components/SwarmConfirmModal.vue` — 全局确认弹窗（带图标、动画、类型化样式）
 

@@ -35,6 +35,7 @@ const emit = defineEmits<{...}>()
 - `AgentDetail.vue` — 聊天式多轮对话组件：Header + Info + PR 审阅 + 文件变更 + 聊天消息区（input/output/system/error 气泡）+ 输入框。日期字段通过 new Date(string).toLocaleTimeString() 显示
 - `AnalyticsPanel.vue` — 数据展示型组件：状态分布、Token 排行、任务列表
 - `SettingsPanel.vue` — 纯信息展示型设置面板，使用 lucide 图标 + code 标签展示命令指引
+- `CreateTaskModal.vue` — 表单弹窗组件：新建 Agent 的输入表单，使用 Vue `<Transition>` 原生过渡，避免手动管理过渡状态
 - `SwarmToast.vue` — 全局 Toast 通知容器（右上角堆叠，自动消失）
 - `SwarmConfirmModal.vue` — 全局确认弹窗（danger/warning/info 三种类型，替代原生 confirm）
 
