@@ -26,8 +26,12 @@ Vue 3 + TypeScript + Vite + Tailwind CSS + lucide-vue-next + Tauri v2 + @tauri-a
 - `components/LoginView.vue` — API Key 登录页（验证 + keyring 存储）
 - `components/AgentDashboard.vue` — Agent 卡片网格（最多 5 个，点击进入详情）
 - `components/CreateTaskModal.vue` — 新建 Agent 弹窗：收集 name / repoUrl / instruction / tokenBudget
+- `components/SwarmConfirmModal.vue` — 确认弹窗组件：支持 danger/warning/info 类型，配合 useConfirm 使用
+- `components/SwarmToast.vue` — Toast 通知组件：支持 error/success/info/warning，自动消失
 - `App.vue` — 主入口：布局框架 + 视图路由（dashboard/agent-detail/analytics）+ 全局事件处理（如文件 diff 查看）
 - `components/AgentDetail.vue` — Agent 详情：指令输入 + 日志流 + PR 审阅 + 文件变更（点击通过 engine 获取 diff）
+- `composables/useConfirm.ts` — 全局确认弹窗状态管理（命令式 API）
+- `composables/useToast.ts` — 全局 Toast 通知状态管理（命令式 API）
 - `components/SettingsPanel.vue` — 系统设置（GitHub Token + Kimi CLI 安装指引）
 - `components/AnalyticsPanel.vue` — 监控分析：状态分布、Token 排行、活跃/审阅任务
 - `components/TaskCard.vue` — Agent 卡片：状态 + Token 进度 + 审阅徽章

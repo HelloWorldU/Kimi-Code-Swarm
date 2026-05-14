@@ -110,6 +110,7 @@ export interface CheckRun {
   status: string
   conclusion: string | null
   html_url: string
+  details_url?: string
   started_at: string | null
 }
 
@@ -147,18 +148,38 @@ export async function getCheckRuns(
 
 /**
  * 获取失败 check run 的日志文本
- * GitHub 返回的是 text/plain 的日志文件，跟随重定向获取
+ * 优先使用 GitHub Actions job logs API（check-runs 的 logs_url 经常为 null）
  */
 export async function getCheckRunLogs(
   token: string,
   repoUrl: string,
   checkRunId: number,
+  detailsUrl?: string,
 ): Promise<string | null> {
   const repo = parseRepoUrl(repoUrl)
   if (!repo) return null
 
-  const url = `${GITHUB_API}/repos/${repo.owner}/${repo.repo}/check-runs/${checkRunId}/logs`
+  // 方案 A: 从 details_url 提取 job_id，调用 Actions job logs API
+  if (detailsUrl) {
+    const match = detailsUrl.match(/\/job\/(\d+)$/)
+    if (match) {
+      const jobId = match[1]
+      const url = `${GITHUB_API}/repos/${repo.owner}/${repo.repo}/actions/jobs/${jobId}/logs`
+      try {
+        const res = await fetch(url, { headers: getHeaders(token) })
+        if (res.ok) {
+          const text = await res.text()
+          return text.length > 8000 ? text.slice(0, 8000) + '\n...[truncated]' : text
+        }
+        console.error(`[github-api] job logs ${res.status}`)
+      } catch (err) {
+        console.error(`[github-api] job logs 异常: ${String(err)}`)
+      }
+    }
+  }
 
+  // 方案 B: fallback 到 check-runs logs 端点
+  const url = `${GITHUB_API}/repos/${repo.owner}/${repo.repo}/check-runs/${checkRunId}/logs`
   try {
     const res = await fetch(url, {
       headers: { ...getHeaders(token), Accept: 'application/vnd.github.v3+json' },
@@ -168,7 +189,6 @@ export async function getCheckRunLogs(
       console.error(`[github-api] getCheckRunLogs ${res.status}`)
       return null
     }
-    // 日志可能很大，截断到 8000 字符以内
     const text = await res.text()
     return text.length > 8000 ? text.slice(0, 8000) + '\n...[truncated]' : text
   } catch (err) {

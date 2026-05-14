@@ -70,6 +70,8 @@ PR 创建时，Store 自动生成 `ReviewEntry[]`，包含所有其他 Agent 作
 6. 用户点击"停止"→ `stopAgent()` **乐观更新**前端状态为 `stopped`，再 `await sendToEngine({ type: 'stop-agent' })` → Engine 调用 `agent.stop()` 等待进程退出 → 推送 `agent-status` 事件；后端失败时自动回滚状态
 7. 用户发送指令 → `sendInstruction()` 执行完毕且检测到文件变更 → Engine **自动调用 `autoSubmitForReview()`**：git add/commit/push → 创建 PR；任何步骤失败时，Engine 将完整执行日志（stdout + stderr + exit code）全量回传给 Kimi CLI，由 Agent 自主判断并修复，然后重试（最多 3 轮）→ 状态变为 `reviewing` → **自动启动 CI 监控**：Engine 每 30s 轮询 GitHub Checks API，CI 失败时自动将失败日志回传给 Agent 修复并重新提交（最多 3 轮）；CI 通过或超时后停止轮询
 
+**全局组件挂载**：`App.vue` 全局挂载 `SwarmConfirmModal`（确认弹窗）和 `SwarmToast`（Toast 通知），配合 `useConfirm` / `useToast` composables 提供命令式调用能力。
+
 **日志分流**:
 - `input` / `output` 及关键状态变更（执行完毕/已停止/Token耗尽等）通过 `log` 事件进入前端聊天面板
 - `system` / `error` 技术日志（PID、命令行参数、文件变更数、内部异常等）输出到 **stderr**，由终端直接显示（带 `[Agent]`/`[Kimi]`/`[Git]` 组件前缀和颜色），不污染 UI

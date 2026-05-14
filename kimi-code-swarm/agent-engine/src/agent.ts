@@ -432,7 +432,7 @@ export class Agent {
         this.state.ciStatus = 'failure'
         this.log('error', `CI 失败: ${failedRun.name}`)
 
-        const logs = await getCheckRunLogs(githubToken, this.state.repoUrl, failedRun.id)
+        const logs = await getCheckRunLogs(githubToken, this.state.repoUrl, failedRun.id, failedRun.details_url)
         await this.fixBasedOnCiFailure(logs || `Check run "${failedRun.name}" failed. No logs available.`, githubToken)
         return
       }
