@@ -15,6 +15,7 @@ import {
   verifyKimiApiKey,
   loadStoreValue,
   saveStoreValue,
+  isEngineRunning,
 } from '../api/ipc'
 import { getToken as getGitHubToken } from '../api/github'
 
@@ -44,7 +45,6 @@ async function bootstrap() {
 async function startAgentEngine() {
   if (!isTauri) return
   try {
-    const { isEngineRunning } = await import('../api/ipc')
     const running = await isEngineRunning()
     if (running) return
     await spawnAgentEngine()
