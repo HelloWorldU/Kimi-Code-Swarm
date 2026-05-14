@@ -18,11 +18,12 @@ async function execGitRaw(dir: string, args: string[]): Promise<GitResult> {
       stderr: (stderr?.toString() || '').trim(),
       exitCode: 0,
     }
-  } catch (err: any) {
+  } catch (err) {
+    const e = err as { stdout?: Buffer | string; stderr?: Buffer | string; code?: number }
     return {
-      stdout: (err.stdout?.toString() || '').trim(),
-      stderr: (err.stderr?.toString() || '').trim(),
-      exitCode: err.code ?? 1,
+      stdout: (e.stdout?.toString() || '').trim(),
+      stderr: (e.stderr?.toString() || '').trim(),
+      exitCode: e.code ?? 1,
     }
   }
 }

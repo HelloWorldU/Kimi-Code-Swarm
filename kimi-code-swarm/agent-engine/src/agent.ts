@@ -325,6 +325,9 @@ export class Agent {
   }
 
   async submitForReview(githubToken?: string): Promise<{ ok: boolean; steps: SubmitStep[] }> {
+    if (githubToken) {
+      this.githubToken = githubToken
+    }
     if (this.state.status !== 'working' && this.state.status !== 'ready') {
       return { ok: false, steps: [] }
     }
@@ -433,7 +436,7 @@ export class Agent {
         this.log('error', `CI 失败: ${failedRun.name}`)
 
         const logs = await getCheckRunLogs(githubToken, this.state.repoUrl, failedRun.id, failedRun.details_url)
-        await this.fixBasedOnCiFailure(logs || `Check run "${failedRun.name}" failed. No logs available.`, githubToken)
+        await this.fixBasedOnCiFailure(logs || `Check run "${failedRun.name}" failed. No logs available.`)
         return
       }
 
@@ -457,7 +460,7 @@ export class Agent {
   /**
    * 基于 CI 失败日志自动修复代码并重新提交
    */
-  private async fixBasedOnCiFailure(ciLogs: string, githubToken: string): Promise<void> {
+  private async fixBasedOnCiFailure(ciLogs: string): Promise<void> {
     this.ciRetryCount++
     if (this.ciRetryCount > this.CI_MAX_RETRIES) {
       this.log('error', `CI 修复已达最大轮次（${this.CI_MAX_RETRIES} 次），请指挥官人工介入`)
@@ -625,7 +628,7 @@ export class Agent {
    * 运行 kimi CLI 执行一次"静默"指令，返回完整 stdout
    * 不修改 running 状态，不 emit agent-output 事件
    */
-  private async runInstructionSilent(instruction: string): Promise<string> {
+  private async runInstructionSilent(instruction: string, timeoutMs = 120000): Promise<string> {
     const kimiPath = await detectKimiCli()
     if (!kimiPath) {
       this.log('error', 'Kimi CLI 未找到，无法执行自动审阅')
@@ -641,20 +644,37 @@ export class Agent {
     }
 
     let output = ''
-    try {
-      for await (const line of proc.stdout) {
-        output += line + '\n'
+    const timeoutPromise = new Promise<string>((_, reject) => {
+      const timer = setTimeout(() => {
+        clearTimeout(timer)
+        proc.kill()
+        reject(new Error(`Kimi CLI 执行超时（${timeoutMs}ms），已终止进程`))
+      }, timeoutMs)
+    })
+
+    const runPromise = (async () => {
+      try {
+        for await (const line of proc.stdout) {
+          output += line + '\n'
+        }
+      } catch (err) {
+        this.log('error', `读取 kimi stdout 失败: ${String(err)}`)
       }
-    } catch (err) {
-      this.log('error', `读取 kimi stdout 失败: ${String(err)}`)
-    }
+
+      try {
+        await proc.wait()
+      } catch (err) {
+        this.log('error', `等待 kimi 进程退出失败: ${String(err)}`)
+      }
+      return output
+    })()
 
     try {
-      await proc.wait()
+      return await Promise.race([runPromise, timeoutPromise])
     } catch (err) {
-      this.log('error', `等待 kimi 进程退出失败: ${String(err)}`)
+      this.log('error', String(err))
+      return output
     }
-    return output
   }
 
   /**

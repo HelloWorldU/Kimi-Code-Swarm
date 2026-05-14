@@ -1,4 +1,4 @@
-import { spawn, type ChildProcess, execFile, exec } from 'child_process'
+import { spawn, execFile, exec } from 'child_process'
 import { promisify } from 'util'
 
 const execFileAsync = promisify(execFile)
