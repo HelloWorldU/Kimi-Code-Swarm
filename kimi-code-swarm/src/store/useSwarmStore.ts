@@ -1,6 +1,7 @@
 import { reactive, computed } from 'vue'
 import type { AgentTask, ReviewEntry } from '../types'
 import { createLogger } from '../utils/logger'
+import { useToast } from '../composables/useToast'
 import {
   isTauri,
   spawnAgentEngine,
@@ -18,6 +19,7 @@ import {
 import { getToken as getGitHubToken } from '../api/github'
 
 const log = createLogger('SwarmStore')
+const toast = useToast()
 
 const MAX_AGENTS = 5
 const STORE_KEY = 'agents'
@@ -151,6 +153,11 @@ function handleEngineEvent(event: Record<string, unknown>) {
     }
     case 'error': {
       log.error('Agent engine error:', event.message)
+      toast.add({
+        type: 'error',
+        title: 'Agent 引擎错误',
+        message: String(event.message || '未知错误'),
+      })
       break
     }
   }
@@ -306,7 +313,11 @@ export function useSwarmStore() {
       payload: { name, repoUrl, instruction, tokenBudget },
     }).catch((e) => {
       log.error('createAgent failed:', e)
-      alert(`创建 Agent 失败: ${e instanceof Error ? e.message : String(e)}\n\n可能原因: Agent 引擎未启动。请检查终端日志。`)
+      toast.add({
+        type: 'error',
+        title: '创建 Agent 失败',
+        message: `${e instanceof Error ? e.message : String(e)}\n可能原因: Agent 引擎未启动。请检查终端日志。`,
+      })
     })
   }
 
@@ -343,6 +354,11 @@ export function useSwarmStore() {
         agent.logs.push({ id: generateId(), timestamp: new Date().toISOString(), type: 'error', content: `启动失败: ${e instanceof Error ? e.message : String(e)}` })
         persistAgents()
       }
+      toast.add({
+        type: 'error',
+        title: '启动 Agent 失败',
+        message: e instanceof Error ? e.message : String(e),
+      })
     }
   }
 
@@ -391,6 +407,11 @@ export function useSwarmStore() {
       // 后端调用失败时恢复状态
       agent.status = previousStatus
       persistAgents()
+      toast.add({
+        type: 'error',
+        title: '停止 Agent 失败',
+        message: err instanceof Error ? err.message : String(err),
+      })
     }
   }
 

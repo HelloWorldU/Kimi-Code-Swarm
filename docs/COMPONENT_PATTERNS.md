@@ -31,12 +31,12 @@ const emit = defineEmits<{...}>()
 ## 组件类型示例
 
 - `LoginView.vue` — 独立页面组件：登录表单 + API Key 验证 + Kimi Code 控制台外链
-- `AgentDashboard.vue` — 列表容器组件：统计卡片 + Agent 网格 + 空状态
-- `CreateTaskModal.vue` — 表单弹窗组件：新建 Agent 的信息收集与提交
+- `AgentDashboard.vue` — 列表容器组件：渐变背景统计卡片（含底部进度条）+ Agent 网格 + 空状态
+- `CreateTaskModal.vue` — 表单弹窗组件：新建 Agent 的信息收集与提交，Vue `<Transition>` 原生过渡动画
 - `SwarmConfirmModal.vue` — 确认弹窗组件：类型化图标 + 双按钮确认/取消，配合 useConfirm composable
 - `SwarmToast.vue` — Toast 通知组件：类型化图标 + 进度条 + 自动消失，配合 useToast composable
 - `AgentDetail.vue` — 聊天式多轮对话组件：Header + Info + PR 审阅 + 文件变更 + 聊天消息区（input/output/system/error 气泡）+ 输入框。日期字段通过 new Date(string).toLocaleTimeString() 显示
-- `TaskCard.vue` — 卡片组件：Agent 状态 + Token 进度 + 审阅徽章
+- `TaskCard.vue` — 卡片组件：Agent 状态 + Token 进度 + 审阅徽章；删除操作通过 `useConfirm()` 调用自定义确认弹窗
 - `AnalyticsPanel.vue` — 数据展示型组件：状态分布、Token 排行、任务列表
 - `SettingsPanel.vue` — 纯信息展示型设置面板，使用 lucide 图标 + code 标签展示命令指引
 
