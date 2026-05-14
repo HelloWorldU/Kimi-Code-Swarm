@@ -68,7 +68,7 @@ PR 创建时，Store 自动生成 `ReviewEntry[]`，包含所有其他 Agent 作
 4. 用户点击"启动"→ `startAgent()` 发送 `start-agent` 命令 → Engine 执行 clone/branch → 推送 `agent-status` 事件
 5. **引擎未启动或命令发送失败时**：`sendToEngine` 抛出异常，`startAgent` 已添加 `try/catch` 捕获并写入 Agent 日志，禁止静默失败
 6. 用户点击"停止"→ `stopAgent()` **乐观更新**前端状态为 `stopped`，再 `await sendToEngine({ type: 'stop-agent' })` → Engine 调用 `agent.stop()` 等待进程退出 → 推送 `agent-status` 事件；后端失败时自动回滚状态
-7. 用户发送指令 → `sendInstruction()` 执行完毕且检测到文件变更 → Engine **自动调用 `autoSubmitForReview()`**：git add/commit/push → 创建 PR；pre-commit / lint / typecheck 失败时将 stderr 回传给 Kimi CLI 修复并重试（最多 3 轮）→ 状态变为 `reviewing`
+7. 用户发送指令 → `sendInstruction()` 执行完毕且检测到文件变更 → Engine **自动调用 `autoSubmitForReview()`**：git add/commit/push → 创建 PR；任何步骤失败时，Engine 将完整执行日志（stdout + stderr + exit code）全量回传给 Kimi CLI，由 Agent 自主判断并修复，然后重试（最多 3 轮）→ 状态变为 `reviewing`
 
 **日志分流**:
 - `input` / `output` 及关键状态变更（执行完毕/已停止/Token耗尽等）通过 `log` 事件进入前端聊天面板
@@ -85,6 +85,51 @@ PR 创建时，Store 自动生成 `ReviewEntry[]`，包含所有其他 Agent 作
 6. `state.isAuthLoading = false` — 结束加载态
 
 > **Debug 原则**：问题暴露但代码层面不明显时，优先通过 `src/utils/logger.ts` 增加运行时日志定位根因，而非盲猜。
+
+## 架构设计转变：从命令式错误处理到工具调用式反馈循环
+
+> 记录时间：2026-05-14
+> 对应修改：`agent-engine/src/git.ts` + `agent-engine/src/agent.ts`
+
+### 转变前（问题）
+
+`autoSubmitForReview` 采用**命令式错误处理**：
+- `gitCommit()` 失败 → `catch(err)` → 把 `err.message`（一行摘要）丢给 Kimi CLI → Agent 盲猜修复
+- 结果：pre-commit `check-docs-sync` 报错时，Agent 只看到 `Error: git error: ❌ 发现 2 处文档未同步`，3 次重试均失败
+
+根因：**Engine 做了太多智能判断**（只传错误摘要），导致 Agent 信息匮乏。
+
+### 转变后（方案）
+
+采用**工具调用式反馈循环**（Tool Use / MCP 模式）：
+- `gitAdd()` / `gitCommit()` / `gitPush()` 返回完整结果 `{ stdout, stderr, exitCode }`
+- `submitForReview()` 收集每一步的执行日志，失败时返回全部 steps
+- `autoSubmitForReview()` 把完整执行日志拼成 prompt 全量回传：
+
+```
+=== git add (exit: 0) ===
+[stdout] ...
+=== git commit (exit: 1) ===
+[stdout] 🔍 pre-commit 检查...
+         1️⃣ TypeScript...✅ 通过
+         4️⃣ 文档同步检测...❌ 发现 2 处未同步
+[stderr] husky - pre-commit hook exited with code 1
+```
+
+Agent 基于完整上下文自主判断："类型检查过了，问题只在文档同步，我需要改 COMPONENT_PATTERNS.md 的 props 规范段"。
+
+### 核心理念
+
+**Engine 不做智能判断，只做信息搬运工。** 工具执行完，stdout + stderr + exit code 全量返回给 Agent，让 Agent 自己看化验单、自己开药方。这与 MCP（Model Context Protocol）的工具调用哲学一致。
+
+### 影响范围
+
+| 模块 | 变更 |
+|------|------|
+| `git.ts` | `execGitRaw()` 新增，`gitAdd/Commit/Push` 返回 `GitResult` |
+| `agent.ts` | `submitForReview()` 返回 `{ ok, steps }`，`autoSubmitForReview()` 全量日志回传 |
+
+---
 
 ## 退出登录流程
 

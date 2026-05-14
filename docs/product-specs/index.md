@@ -35,7 +35,7 @@
    （如："实现用户登录模块，包含前后端"）
 4. Agent 在独立目录里干活
    （写代码、测试、git commit）
-5. Agent 完成 → 自动 git add/commit/push → 自动创建 PR（pre-commit / lint / typecheck 失败时自动修复并重试，最多 3 轮）
+5. Agent 完成 → 自动 git add/commit/push → 自动创建 PR（任何步骤失败时，Engine 将完整执行日志全量回传给 Agent 自主判断并修复，最多 3 轮）
 6. 指挥官在 App 里审阅 PR diff
    → 点击"合并到 main" 或 "打回修改"
 7. 任务完成，Agent 可释放或接新任务

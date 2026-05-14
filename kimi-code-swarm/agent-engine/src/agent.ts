@@ -3,6 +3,13 @@ import { runKimi, detectKimiCli, type KimiProcess } from './kimi.js'
 import { getChangedFiles, getFileDiff, gitAdd, gitCommit, gitPush, createBranch, cloneRepo, gitFetch, getBranchDiff, gitDeleteRemoteBranch } from './git.js'
 import { createPullRequest, mergePullRequest } from './github-api.js'
 
+interface SubmitStep {
+  name: string
+  stdout: string
+  stderr: string
+  exitCode: number
+}
+
 let idCounter = 0
 const generateId = () => `agent-${Date.now().toString(36)}${(idCounter++).toString(36)}`
 
@@ -311,19 +318,36 @@ export class Agent {
     this.log('system', 'Agent 已停止')
   }
 
-  async submitForReview(githubToken?: string) {
-    if (this.state.status !== 'working' && this.state.status !== 'ready') return
+  async submitForReview(githubToken?: string): Promise<{ ok: boolean; steps: SubmitStep[] }> {
+    if (this.state.status !== 'working' && this.state.status !== 'ready') {
+      return { ok: false, steps: [] }
+    }
+
+    const steps: SubmitStep[] = []
 
     if (this.state.workspace) {
-      try {
-        await gitAdd(this.state.workspace)
-        await gitCommit(this.state.workspace, `feat: ${this.state.name}`)
-        await gitPush(this.state.workspace, this.state.branch)
-        this.log('system', '代码已推送至远程')
-      } catch (err) {
-        this.log('error', `推送失败: ${String(err)}`)
-        throw err
+      // git add
+      const addRes = await gitAdd(this.state.workspace)
+      steps.push({ name: 'git add', stdout: addRes.stdout, stderr: addRes.stderr, exitCode: addRes.exitCode })
+      if (addRes.exitCode !== 0) {
+        return { ok: false, steps }
       }
+
+      // git commit
+      const commitRes = await gitCommit(this.state.workspace, `feat: ${this.state.name}`)
+      steps.push({ name: 'git commit', stdout: commitRes.stdout, stderr: commitRes.stderr, exitCode: commitRes.exitCode })
+      if (commitRes.exitCode !== 0) {
+        return { ok: false, steps }
+      }
+
+      // git push
+      const pushRes = await gitPush(this.state.workspace, this.state.branch)
+      steps.push({ name: 'git push', stdout: pushRes.stdout, stderr: pushRes.stderr, exitCode: pushRes.exitCode })
+      if (pushRes.exitCode !== 0) {
+        return { ok: false, steps }
+      }
+
+      this.log('system', '代码已推送至远程')
     }
 
     this.setStatus('reviewing')
@@ -337,7 +361,7 @@ export class Agent {
           this.state.prNumber = pr.number
           this.state.prUrl = pr.html_url
           this.log('system', `PR #${pr.number} 已创建: ${pr.html_url}`)
-          return
+          return { ok: true, steps }
         }
       } catch (err) {
         this.log('error', `GitHub API 创建 PR 失败: ${String(err)}`)
@@ -349,6 +373,7 @@ export class Agent {
     this.state.prNumber = Math.floor(Math.random() * 100) + 1
     this.state.prUrl = `${this.state.repoUrl.replace(/\.git$/, '')}/pull/${this.state.prNumber}`
     this.log('system', `PR #${this.state.prNumber} 已创建（模拟，未配置 GitHub Token）`)
+    return { ok: true, steps }
   }
 
   /**
@@ -356,27 +381,32 @@ export class Agent {
    */
   async autoSubmitForReview(maxRetries = 3): Promise<void> {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        await this.submitForReview(this.githubToken)
+      const { ok, steps } = await this.submitForReview(this.githubToken)
+      if (ok) return
+
+      // 构建完整执行日志
+      const fullLog = steps.map((s) => {
+        let out = `=== ${s.name} (exit: ${s.exitCode}) ===`
+        if (s.stdout) out += `\n[stdout]\n${s.stdout}`
+        if (s.stderr) out += `\n[stderr]\n${s.stderr}`
+        return out
+      }).join('\n\n')
+
+      this.log('error', `提交审阅失败 (${attempt}/${maxRetries})`)
+      if (attempt >= maxRetries) {
+        this.log('error', '多次尝试后仍无法提交审阅，请指挥官人工介入')
+        this.setStatus('ready')
         return
-      } catch (err) {
-        const errorMsg = String(err)
-        this.log('error', `提交审阅失败 (${attempt}/${maxRetries}): ${errorMsg}`)
-        if (attempt >= maxRetries) {
-          this.log('error', '多次尝试后仍无法提交审阅，请指挥官人工介入')
-          this.setStatus('ready')
-          return
-        }
-        this.log('system', '正在根据错误信息自动修复...')
-        const fixPrompt = `Git 提交或 pre-commit 检查失败了，错误信息如下：\n\n${errorMsg}\n\n请根据错误信息修改代码文件，使其能够通过项目的 typecheck、lint 和 pre-commit 检查。直接修改相关文件，不需要额外说明。`
-        await this.runInstructionSilent(fixPrompt)
-        // 修复后重新检测变更
-        if (this.state.workspace) {
-          try {
-            this.state.changedFiles = await getChangedFiles(this.state.workspace)
-          } catch {
-            // 忽略检测失败
-          }
+      }
+      this.log('system', '正在根据执行日志自动修复...')
+      const fixPrompt = `你刚才尝试提交代码，执行日志如下：\n\n${fullLog}\n\n请根据上述日志中的错误信息，修改相关文件，使其能够通过项目的 typecheck、lint 和 pre-commit 检查。直接修改相关文件，不需要额外说明。`
+      await this.runInstructionSilent(fixPrompt)
+      // 修复后重新检测变更
+      if (this.state.workspace) {
+        try {
+          this.state.changedFiles = await getChangedFiles(this.state.workspace)
+        } catch {
+          // 忽略检测失败
         }
       }
     }
@@ -606,7 +636,16 @@ export class Agent {
       await this.sendInstruction(prompt)
       // sendInstruction 完成后状态为 ready，改回 working 以符合 submitForReview 前置条件
       this.state.status = 'working'
-      await this.submitForReview(githubToken)
+      const { ok, steps } = await this.submitForReview(githubToken)
+      if (!ok) {
+        const fullLog = steps.map((s) => {
+          let out = `=== ${s.name} (exit: ${s.exitCode}) ===`
+          if (s.stdout) out += `\n[stdout]\n${s.stdout}`
+          if (s.stderr) out += `\n[stderr]\n${s.stderr}`
+          return out
+        }).join('\n\n')
+        this.log('error', `自动修改后提交失败，日志如下：\n${fullLog}`)
+      }
     } catch (err) {
       this.log('error', `自动修改执行异常: ${String(err)}`)
     }

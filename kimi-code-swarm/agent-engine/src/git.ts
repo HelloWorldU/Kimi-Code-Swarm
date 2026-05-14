@@ -4,15 +4,36 @@ import { mkdir, rm, access } from 'fs/promises'
 
 const execFileAsync = promisify(execFile)
 
-async function execGit(dir: string, args: string[]): Promise<string> {
+export interface GitResult {
+  stdout: string
+  stderr: string
+  exitCode: number
+}
+
+async function execGitRaw(dir: string, args: string[]): Promise<GitResult> {
   try {
-    const { stdout } = await execFileAsync('git', args, { cwd: dir })
-    return stdout.trim()
+    const { stdout, stderr } = await execFileAsync('git', args, { cwd: dir })
+    return {
+      stdout: stdout.trim(),
+      stderr: (stderr?.toString() || '').trim(),
+      exitCode: 0,
+    }
   } catch (err: any) {
-    const stderr = err.stderr?.toString() || ''
-    const message = stderr ? `${err.message}\n${stderr}` : err.message
+    return {
+      stdout: (err.stdout?.toString() || '').trim(),
+      stderr: (err.stderr?.toString() || '').trim(),
+      exitCode: err.code ?? 1,
+    }
+  }
+}
+
+async function execGit(dir: string, args: string[]): Promise<string> {
+  const result = await execGitRaw(dir, args)
+  if (result.exitCode !== 0) {
+    const message = result.stderr || result.stdout || 'Git command failed'
     throw new Error(message)
   }
+  return result.stdout
 }
 
 async function dirExists(dir: string): Promise<boolean> {
@@ -37,16 +58,16 @@ export async function createBranch(dir: string, branch: string): Promise<void> {
   await execGit(dir, ['checkout', '-b', branch])
 }
 
-export async function gitAdd(dir: string): Promise<void> {
-  await execGit(dir, ['add', '.'])
+export async function gitAdd(dir: string): Promise<GitResult> {
+  return await execGitRaw(dir, ['add', '.'])
 }
 
-export async function gitCommit(dir: string, message: string): Promise<void> {
-  await execGit(dir, ['commit', '-m', message])
+export async function gitCommit(dir: string, message: string): Promise<GitResult> {
+  return await execGitRaw(dir, ['commit', '-m', message])
 }
 
-export async function gitPush(dir: string, branch: string): Promise<void> {
-  await execGit(dir, ['push', 'origin', branch])
+export async function gitPush(dir: string, branch: string): Promise<GitResult> {
+  return await execGitRaw(dir, ['push', 'origin', branch])
 }
 
 export async function getChangedFiles(dir: string): Promise<string[]> {

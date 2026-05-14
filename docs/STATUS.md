@@ -33,7 +33,7 @@
 | Kimi CLI 接入 | ✅ | `sendInstruction` 调用 `kimi --print --quiet`，实时 stdout 流式捕获，可取消 | `src/store/useSwarmStore.ts` |
 | Token 预算控制 | ✅ | sendInstruction 前检查预算；process-output 中按输出行长度估算并累加；耗尽时自动 kill 进程 | `src/store/useSwarmStore.ts` |
 | Agent 多轮对话交互 | ✅ | 聊天式气泡 UI，支持 input/output/system/error 消息类型；ready/stopped/completed 状态下可持续对话；working 状态显示执行中指示器；**日志已分流**（system/error 技术日志带组件前缀+颜色走终端 stderr，input/output 及关键状态变更进 UI）；**stop-agent 已修复**（前端乐观更新 + await IPC） | `src/components/AgentDetail.vue`, `src/store/useSwarmStore.ts`, `agent-engine/src/agent.ts` |
-| Agent 自动提交审阅 | ✅ | Agent 执行完指令后检测到文件变更自动 `git add/commit/push` 并创建 PR；pre-commit / typecheck / lint 失败时自动将 stderr 回传给 Kimi CLI 修复并重试（最多 3 轮）；无 GitHub Token 时降级为 Mock PR | `agent-engine/src/agent.ts` |
+| Agent 自动提交审阅 | ✅ | Agent 执行完指令后检测到文件变更自动 `git add/commit/push` 并创建 PR；任何步骤失败时，Engine 将完整执行日志（stdout + stderr + exit code）全量回传给 Kimi CLI，由 Agent 自主判断并修复，然后重试（最多 3 轮）；无 GitHub Token 时降级为 Mock PR | `agent-engine/src/agent.ts` |
 
 ## 质量约束
 
