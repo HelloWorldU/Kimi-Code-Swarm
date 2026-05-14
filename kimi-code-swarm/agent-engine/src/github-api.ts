@@ -28,20 +28,21 @@ export async function createPullRequest(
   repoUrl: string,
   branch: string,
   title: string,
+  body?: string,
 ): Promise<{ number: number; html_url: string } | null> {
   const repo = parseRepoUrl(repoUrl)
   if (!repo) return null
 
   const url = `${GITHUB_API}/repos/${repo.owner}/${repo.repo}/pulls`
-  const body = JSON.stringify({
+  const payload = JSON.stringify({
     title,
     head: branch,
     base: 'main',
-    body: `由 Kimi Code Swarm Agent 自动创建`,
+    body: body || `由 Kimi Code Swarm Agent 自动创建`,
   })
 
   try {
-    const res = await fetch(url, { method: 'POST', headers: getHeaders(token), body })
+    const res = await fetch(url, { method: 'POST', headers: getHeaders(token), body: payload })
     if (!res.ok) {
       const err = await res.text()
       throw new Error(`GitHub API ${res.status}: ${err}`)

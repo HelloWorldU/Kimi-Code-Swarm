@@ -76,6 +76,11 @@ export async function getChangedFiles(dir: string): Promise<string[]> {
   return out.split('\n').filter((f) => f.trim())
 }
 
+export async function getStagedFiles(dir: string): Promise<string[]> {
+  const out = await execGit(dir, ['diff', '--cached', '--name-only'])
+  return out.split('\n').filter((f) => f.trim())
+}
+
 export async function getFileDiff(dir: string, filePath: string): Promise<string> {
   return await execGit(dir, ['diff', '--', filePath])
 }

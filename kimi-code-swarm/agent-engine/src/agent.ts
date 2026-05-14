@@ -1,6 +1,6 @@
 import type { AgentState, LogEntry, ReviewEntry, TaskStatus, EngineEvent } from './types.js'
 import { runKimi, detectKimiCli, type KimiProcess } from './kimi.js'
-import { getChangedFiles, getFileDiff, gitAdd, gitCommit, gitPush, createBranch, cloneRepo, gitFetch, getBranchDiff, gitDeleteRemoteBranch } from './git.js'
+import { getChangedFiles, getStagedFiles, getFileDiff, gitAdd, gitCommit, gitPush, createBranch, cloneRepo, gitFetch, getBranchDiff, gitDeleteRemoteBranch } from './git.js'
 import { createPullRequest, mergePullRequest, getPullRequest, getCheckRuns, getCheckRunLogs } from './github-api.js'
 
 interface SubmitStep {
@@ -334,6 +334,9 @@ export class Agent {
 
     const steps: SubmitStep[] = []
 
+    let prTitle = `feat: ${this.state.name}`
+    let prBody = `由 Kimi Code Swarm Agent 自动创建`
+
     if (this.state.workspace) {
       // git add
       const addRes = await gitAdd(this.state.workspace)
@@ -342,8 +345,13 @@ export class Agent {
         return { ok: false, steps }
       }
 
+      // 获取 staged 文件列表，生成规范的 commit message 和 PR 描述
+      const stagedFiles = await getStagedFiles(this.state.workspace)
+      const generated = await this.generateCommitAndPrBody(stagedFiles)
+      this.log('system', `生成提交信息: ${generated.commitMessage}`)
+
       // git commit
-      const commitRes = await gitCommit(this.state.workspace, `feat: ${this.state.name}`)
+      const commitRes = await gitCommit(this.state.workspace, generated.commitMessage)
       steps.push({ name: 'git commit', stdout: commitRes.stdout, stderr: commitRes.stderr, exitCode: commitRes.exitCode })
       if (commitRes.exitCode !== 0) {
         return { ok: false, steps }
@@ -357,6 +365,10 @@ export class Agent {
       }
 
       this.log('system', '代码已推送至远程')
+
+      // 保存生成的 PR 内容（commit 后 staged 文件会被清空，需提前保存）
+      prTitle = generated.prTitle
+      prBody = generated.prBody
     }
 
     this.setStatus('reviewing')
@@ -371,7 +383,7 @@ export class Agent {
     // 如果有 GitHub Token，调用真实 API 创建 PR
     if (githubToken) {
       try {
-        const pr = await createPullRequest(githubToken, this.state.repoUrl, this.state.branch, `feat: ${this.state.name}`)
+        const pr = await createPullRequest(githubToken, this.state.repoUrl, this.state.branch, prTitle, prBody)
         if (pr) {
           this.state.prStatus = 'open'
           this.state.prNumber = pr.number
@@ -675,6 +687,120 @@ export class Agent {
       this.log('error', String(err))
       return output
     }
+  }
+
+  /**
+   * 基于变更文件列表生成 commit message 和 PR 描述
+   * 优先调用 Kimi CLI 生成高质量内容，失败时 fallback 到规则生成
+   */
+  private async generateCommitAndPrBody(files: string[]): Promise<{ commitMessage: string; prTitle: string; prBody: string }> {
+    // 1. 尝试用 Kimi CLI 生成
+    const fileList = files.map((f) => `- ${f}`).join('\n')
+    const prompt = `你是一位资深工程师，请根据以下代码变更文件列表，生成规范的 commit message 和 PR 描述。
+
+变更文件：
+${fileList}
+
+要求：
+1. commit message 符合 Conventional Commits 规范，格式为 type(scope): description（英文，单行，不超过72字符）
+2. PR 标题与 commit message 保持一致
+3. PR 描述用中文 Markdown 格式，简要列出每个新增/修改文件的作用（一句话）
+
+请严格按以下格式输出（不要有多余内容）：
+COMMIT: <commit message>
+---
+PR_BODY:
+<pr body>
+`
+
+    try {
+      const output = await this.runInstructionSilent(prompt, 60000)
+      const commitMatch = output.match(/COMMIT:\s*(.+)/)
+      const bodyMatch = output.match(/PR_BODY:\s*([\s\S]+)/)
+
+      if (commitMatch && bodyMatch) {
+        const commitMessage = commitMatch[1].trim()
+        const prBody = bodyMatch[1].trim()
+        return { commitMessage, prTitle: commitMessage, prBody }
+      }
+    } catch {
+      // Kimi CLI 生成失败，继续 fallback
+    }
+
+    // 2. Fallback：基于规则自动生成
+    const { scope, action } = this.inferScopeAndAction(files)
+    const description = this.inferDescription(files, action)
+    const commitMessage = `${action}${scope ? `(${scope})` : ''}: ${description}`
+
+    const prBodyLines = files.map((f) => {
+      const filename = f.split('/').pop() || f
+      if (f.endsWith('.spec.ts') || f.endsWith('.test.ts')) return `- 补充 \`${filename}\` 单元测试`
+      if (f.endsWith('.vue')) return `- 新增/更新 \`${filename}\` 组件`
+      if (f.endsWith('.ts') || f.endsWith('.js')) return `- 新增/更新 \`${filename}\` 逻辑`
+      if (f.endsWith('.md')) return `- 更新 \`${filename}\` 文档`
+      return `- 变更 \`${filename}\``
+    })
+
+    const prBody = prBodyLines.join('\n')
+    return { commitMessage, prTitle: commitMessage, prBody }
+  }
+
+  /**
+   * 根据文件路径推断 scope 和 action
+   */
+  private inferScopeAndAction(files: string[]): { scope: string; action: string } {
+    const scopes = new Set<string>()
+    let hasNew = false
+    let hasModify = false
+
+    for (const f of files) {
+      if (f.startsWith('kimi-code-swarm/src/components/') || f.startsWith('kimi-code-swarm/src/composables/') || f.startsWith('kimi-code-swarm/src/App.vue')) {
+        scopes.add('frontend')
+      } else if (f.startsWith('kimi-code-swarm/src/store/') || f.startsWith('kimi-code-swarm/src/api/')) {
+        scopes.add('frontend')
+      } else if (f.startsWith('agent-engine/src/')) {
+        scopes.add('agent-engine')
+      } else if (f.startsWith('docs/')) {
+        scopes.add('docs')
+      } else if (f.startsWith('tests/') || f.includes('.spec.ts') || f.includes('.test.ts')) {
+        scopes.add('test')
+      } else if (f.startsWith('ci/')) {
+        scopes.add('ci')
+      } else if (f.startsWith('ast/')) {
+        scopes.add('ast')
+      } else if (f.startsWith('src-tauri/')) {
+        scopes.add('tauri')
+      }
+      // 简单判断新增还是修改（通过文件名特征无法准确判断，默认用 update，如果有测试文件用 add test）
+      if (f.includes('.spec.ts') || f.includes('.test.ts')) hasNew = true
+      else hasModify = true
+    }
+
+    const scope = scopes.size === 1 ? Array.from(scopes)[0] : scopes.size > 1 ? 'multi' : ''
+    const action = hasNew && !hasModify ? 'feat' : hasNew && hasModify ? 'feat' : 'refactor'
+    return { scope, action }
+  }
+
+  /**
+   * 根据文件名生成描述
+   */
+  private inferDescription(files: string[], action: string): string {
+    const names = files
+      .map((f) => f.split('/').pop() || f)
+      .filter((f) => !f.endsWith('.spec.ts') && !f.endsWith('.test.ts'))
+
+    if (names.length === 0) {
+      const testFiles = files.map((f) => f.split('/').pop() || f).filter((f) => f.endsWith('.spec.ts') || f.endsWith('.test.ts'))
+      if (testFiles.length > 0) return `add unit tests for ${testFiles.map((f) => f.replace(/\.(spec|test)\.ts$/, '')).join(', ')}`
+    }
+
+    if (names.length === 1) {
+      const name = names[0].replace(/\.vue$/, '').replace(/\.ts$/, '').replace(/\.js$/, '')
+      return action === 'feat' ? `add ${name}` : `update ${name}`
+    }
+
+    const baseNames = names.map((n) => n.replace(/\.vue$/, '').replace(/\.ts$/, '').replace(/\.js$/, ''))
+    return action === 'feat' ? `add ${baseNames.slice(0, 3).join(', ')}${baseNames.length > 3 ? ' and more' : ''}` : `update multiple files`
   }
 
   /**
