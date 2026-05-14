@@ -35,6 +35,8 @@ const emit = defineEmits<{...}>()
 - `AgentDetail.vue` — 聊天式多轮对话组件：Header + Info + PR 审阅 + 文件变更 + 聊天消息区（input/output/system/error 气泡）+ 输入框。日期字段通过 new Date(string).toLocaleTimeString() 显示
 - `AnalyticsPanel.vue` — 数据展示型组件：状态分布、Token 排行、任务列表
 - `SettingsPanel.vue` — 纯信息展示型设置面板，使用 lucide 图标 + code 标签展示命令指引
+- `SwarmToast.vue` — 全局 Toast 通知容器（右上角堆叠，自动消失）
+- `SwarmConfirmModal.vue` — 全局确认弹窗（danger/warning/info 三种类型，替代原生 confirm）
 
 ## 视觉风格
 
@@ -44,7 +46,8 @@ const emit = defineEmits<{...}>()
 
 ## 交互规范
 
-- **危险操作须确认**：删除 Agent 等不可逆操作须通过 `confirm()` 弹窗提示用户，明确告知影响范围（如工作目录将被一并删除）。即使 `workspace` 字段为空，也应根据命名规则（`E:/workspace/{agentId}`）推断并显示路径
+- **危险操作须确认**：删除 Agent 等不可逆操作须通过 `useConfirm()` 弹窗提示用户，明确告知影响范围（如工作目录将被一并删除）。即使 `workspace` 字段为空，也应根据命名规则（`E:/workspace/{agentId}`）推断并显示路径
+- **错误反馈用 Toast**：关键路径错误（如创建/启动/停止 Agent 失败）使用 `useToast()` 替代原生 `alert()`，避免阻断用户操作
 
 ## E2E 测试标识
 

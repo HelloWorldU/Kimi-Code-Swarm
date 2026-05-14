@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { Play, Square, GitPullRequest, Trash2, Clock, FolderGit, GitBranch } from 'lucide-vue-next'
 import type { AgentTask } from '../types'
+import { useConfirm } from '../composables/useConfirm'
 
 const props = defineProps<{
   task: AgentTask
@@ -14,6 +15,8 @@ const emit = defineEmits<{
   (e: 'stop', id: string): void
   (e: 'delete', id: string): void
 }>()
+
+const { confirm } = useConfirm()
 
 const statusConfig = {
   pending: { label: '待启动', color: 'text-gray-500', bg: 'bg-gray-100', border: 'border-gray-200', dot: 'bg-gray-400' },
@@ -41,18 +44,17 @@ const reviewProgress = computed(() => {
   return { approved, total: props.task.reviews.length }
 })
 
-function confirmDelete() {
+async function handleDelete() {
   const agent = props.task
   const workspace = agent.workspace || `E:/workspace/${agent.id}`
-  const lines = [
-    `确认删除 Agent「${agent.name}」？`,
-    '',
-    `其工作目录将被一并删除：`,
-    workspace,
-    '',
-    '此操作不可撤销。',
-  ]
-  if (confirm(lines.join('\n'))) {
+  const confirmed = await confirm({
+    type: 'danger',
+    title: `删除 Agent「${agent.name}」`,
+    message: `其工作目录将被一并删除：\n${workspace}\n\n此操作不可撤销。`,
+    confirmText: '确认删除',
+    cancelText: '取消',
+  })
+  if (confirmed) {
     emit('delete', agent.id)
   }
 }
@@ -149,7 +151,7 @@ function confirmDelete() {
       </div>
       <button
         class="px-2 py-1.5 rounded-lg bg-gray-50 text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-        @click="confirmDelete"
+        @click="handleDelete"
       >
         <Trash2 class="w-3 h-3" />
       </button>

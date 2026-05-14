@@ -19,7 +19,16 @@ export default {
           800: '#166534',
           900: '#14532d',
         }
-      }
+      },
+      keyframes: {
+        shrink: {
+          from: { width: '100%' },
+          to: { width: '0%' },
+        },
+      },
+      animation: {
+        shrink: 'shrink 5s linear forwards',
+      },
     },
   },
   plugins: [],

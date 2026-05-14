@@ -10,6 +10,8 @@ import AgentDetail from './components/AgentDetail.vue'
 import CreateTaskModal from './components/CreateTaskModal.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
 import AnalyticsPanel from './components/AnalyticsPanel.vue'
+import SwarmToast from './components/SwarmToast.vue'
+import SwarmConfirmModal from './components/SwarmConfirmModal.vue'
 import { useSwarmStore } from './store/useSwarmStore'
 
 const store = useSwarmStore()
@@ -195,5 +197,11 @@ function handleLogout() {
       @close="store.setIsCreateModalOpen(false)"
       @create="store.createAgent"
     />
+
+    <!-- Global Toast -->
+    <SwarmToast />
+
+    <!-- Global Confirm Modal -->
+    <SwarmConfirmModal />
   </div>
 </template>

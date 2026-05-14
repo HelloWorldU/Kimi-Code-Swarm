@@ -23,13 +23,17 @@ Vue 3 + TypeScript + Vite + Tailwind CSS + lucide-vue-next + Tauri v2 + @tauri-a
 - `types/index.ts` — AgentTask / LogEntry / CommandCenterStats；修改前检查上下游依赖
 - `api/github.ts` — GitHub API 封装（PR 创建/合并/查询）
 - `api/ipc.ts` — Tauri IPC 适配层
+- `composables/useToast.ts` — 全局 Toast 通知（error/success/info/warning，右上角堆叠自动消失）
+- `composables/useConfirm.ts` — 可复用确认弹窗（danger/warning/info 三种类型）
 - `components/LoginView.vue` — API Key 登录页（验证 + keyring 存储）
 - `components/AgentDashboard.vue` — Agent 卡片网格（最多 5 个，点击进入详情）
-- `App.vue` — 主入口：布局框架 + 视图路由（dashboard/agent-detail/analytics）+ 全局事件处理（如文件 diff 查看）
+- `App.vue` — 主入口：布局框架 + 视图路由（dashboard/agent-detail/analytics）+ 全局事件处理（如文件 diff 查看）+ 全局 Toast/ConfirmModal 挂载
 - `components/AgentDetail.vue` — Agent 详情：指令输入 + 日志流 + PR 审阅 + 文件变更（点击通过 engine 获取 diff）
 - `components/SettingsPanel.vue` — 系统设置（GitHub Token + Kimi CLI 安装指引）
 - `components/AnalyticsPanel.vue` — 监控分析：状态分布、Token 排行、活跃/审阅任务
 - `components/TaskCard.vue` — Agent 卡片：状态 + Token 进度 + 审阅徽章
+- `components/SwarmToast.vue` — 全局 Toast 容器（动画进入/退出 + 进度条）
+- `components/SwarmConfirmModal.vue` — 全局确认弹窗（带图标、动画、类型化样式）
 
 ## 环境准备
 
@@ -105,7 +109,8 @@ PR CI 中额外运行 `check-test-sync`：若 `src/` 新增代码文件，`tests
 | PR 审阅面板 | ✅ 真实 | 含审阅者列表、进度、门控；白色简约 UI |
 | SettingsPanel（Token 配置） | ✅ 真实 | localStorage 持久化；白色简约 UI |
 | 监控分析页 | ✅ 真实 | 状态分布、Token 排行、活跃/审阅任务；白色简约 UI |
-| 删除 Agent 确认 | ✅ 真实 | `confirm()` 弹窗提示，明确告知工作目录将被一并删除；未启动的 Agent 根据命名规则推断路径显示 |
+| 删除 Agent 确认 | ✅ 真实 | `useConfirm()` 自定义弹窗，替代原生 confirm，明确告知工作目录将被一并删除；未启动的 Agent 根据命名规则推断路径显示 |
+| Toast 通知 | ✅ 真实 | `useToast()` 全局提示（错误/成功/信息/警告），替代原生 alert，不阻断操作 |
 | Agent 状态持久化 | ✅ 真实 | tauri-plugin-store 自动保存/恢复 |
 
 文档同步检测被阻断时，不直接告知需要更新哪个文档——Agent 需回顾本次会话已读文档，或查阅 AGENTS.md 地图自行定位关联文档。

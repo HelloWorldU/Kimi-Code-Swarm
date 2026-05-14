@@ -39,6 +39,8 @@ PR 创建时，Store 自动生成 `ReviewEntry[]`，包含所有其他 Agent 作
   - `components/AgentDashboard.vue` — Agent 卡片网格（最多 5 个）
   - `components/AgentDetail.vue` — Agent 详情（多轮对话聊天 UI + 日志 + PR 审阅）
   - `components/AnalyticsPanel.vue` — 数据可视化（只读聚合）
+  - `composables/useToast.ts` — 全局 Toast 通知（Store 错误/状态反馈）
+  - `composables/useConfirm.ts` — 可复用确认弹窗（危险操作确认）
 - `src-tauri/` —— 唯一有权 spawn 进程的 Rust 后端
   - `save_api_key` / `get_api_key` / `delete_api_key` — OS Keyring 操作
   - `verify_api_key` — Kimi CLI 存在性检测（拒绝 fallback），启动引擎时注入 `KIMI_API_KEY`
