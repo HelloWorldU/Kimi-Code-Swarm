@@ -32,6 +32,7 @@
 | 查看执行计划 | [`docs/PLANS.md`](docs/PLANS.md) |
 | 检查代码 AST 结构 | `ast/analyzer.ts` |
 | 使用工作流模板 | `harness/*.yaml` |
+| 查看 Agent Skill 规范 | `skills/*/SKILL.md` |
 | 运行清理脚本 | `scripts/cleanup.ts` |
 | 查看约束体系 | [`docs/CONSTRAINTS.md`](docs/CONSTRAINTS.md) |
 | **查看功能实现状态** | **[`docs/STATUS.md`](docs/STATUS.md)** |
@@ -102,6 +103,10 @@ Kimi-Code-Swarm/
 │   │   └── types.ts         Engine 类型定义
 │   └── package.json
 │
+├── skills/                ← 🎯 Agent 能力 Skill（可复用工作流规范）
+│   ├── commit/SKILL.md      Git 提交规范（Conventional Commits + 提交前检查）
+│   └── push/SKILL.md        PR 推送规范（推送前验证 + PR 生命周期管理）
+│
 ├── harness/               ← 📋 工作流模板
 │   ├── new-instance.yaml    新建 Agent 模板（v2.0 Agent Engine 架构）
 │   ├── bug-fix.yaml         修复 Bug 模板
@@ -112,7 +117,7 @@ Kimi-Code-Swarm/
     │   ├── types/
     │   ├── store/
     │   ├── components/
-    │   ├── skills/            预留目录（当前为空）
+    │   ├── composables/
     │   ├── App.vue
     │   └── main.ts
     ├── tests/                 ← 🧪 所有可运行测试集中在此
@@ -127,11 +132,22 @@ Kimi-Code-Swarm/
 
 ---
 
+## 🎯 Agent Skill 体系
+
+`skills/` 目录存放**可复用的 Agent 能力规范**。每个 Skill 是一个独立目录，内含 `SKILL.md`：
+
+| Skill | 作用 | 当前状态 |
+|-------|------|---------|
+| `skills/commit/` | 定义 commit message 规范（Conventional Commits）和提交前检查清单 | ✅ 已启用，`agent.ts` 在 `generateCommitAndPrBody` 中按此规范生成提交信息 |
+| `skills/push/` | 定义 PR 推送规范（推送前验证、PR title/body 格式、生命周期管理） | ✅ 已启用，PR 创建时自动生成符合模板的描述 |
+
+**使用方式**：Skill 目前作为**静态规范文档**被 Agent 阅读参考；`agent-engine/src/agent.ts` 的 prompt 中硬编码了核心规范要求，由 Kimi CLI 在生成 commit/PR 内容时遵循。未来可演进为 Engine 动态读取 SKILL.md 并嵌入 prompt。
+
 ## 🏗️ Harness 五层映射
 
 | 层 | 知识文档 | 代码/配置 |
 |--|----------|----------|
-| L1 Context | `AGENTS.md` + `docs/` | — |
+| L1 Context | `AGENTS.md` + `docs/` + `skills/` | — |
 | L2 Constraints | `docs/DESIGN.md` + `docs/CONSTRAINTS.md` | `ast/`, `ci/` |
 | L3 Observability | `docs/OBSERVABILITY.md` | UI 面板 |
 | L4 Entropy Mgmt | `docs/DESIGN.md` | `scripts/cleanup.ts` |
