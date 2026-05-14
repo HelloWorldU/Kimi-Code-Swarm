@@ -103,6 +103,8 @@ export class AgentEngine {
             break
           }
 
+          // 先停止 CI 轮询，避免 Agent 删除后定时器还在跑
+          agent.stopCiMonitor()
           this.broadcast({ type: 'log', agentId: cmd.agentId, entry: { id: 'system', timestamp: new Date().toISOString(), type: 'system', content: `[delete-agent] 停止 agent 进程...` } })
           await agent.stop()
           const workspace = agent.state.workspace || `E:/workspace/${agent.state.id}`

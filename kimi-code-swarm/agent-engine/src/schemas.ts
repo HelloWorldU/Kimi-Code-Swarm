@@ -11,6 +11,7 @@ export const TaskStatusSchema = z.enum([
 ])
 
 export const PrStatusSchema = z.enum(['none', 'open', 'merged', 'closed'])
+export const CiStatusSchema = z.enum(['pending', 'success', 'failure', 'unknown'])
 
 // ── LogEntry ──
 export const LogEntrySchema = z.object({
@@ -50,6 +51,7 @@ export const AgentStateSchema = z.object({
   logs: z.array(LogEntrySchema),
   reviews: z.array(ReviewEntrySchema),
   changedFiles: z.array(z.string()).optional(),
+  ciStatus: CiStatusSchema.optional(),
 })
 
 // ── EngineCommand (Discriminated Union) ──

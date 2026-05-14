@@ -9,6 +9,8 @@ export type TaskStatus =
 
 export type PrStatus = 'none' | 'open' | 'merged' | 'closed'
 
+export type CiStatus = 'pending' | 'success' | 'failure' | 'unknown'
+
 export interface ReviewEntry {
   reviewerAgentId: string
   reviewerName: string
@@ -44,6 +46,7 @@ export interface AgentState {
   logs: LogEntry[]
   reviews: ReviewEntry[]
   changedFiles?: string[]
+  ciStatus?: CiStatus
 }
 
 // ── Commands from Rust → Node.js ──

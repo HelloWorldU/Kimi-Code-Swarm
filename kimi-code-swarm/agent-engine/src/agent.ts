@@ -1,7 +1,7 @@
 import type { AgentState, LogEntry, ReviewEntry, TaskStatus, EngineEvent } from './types.js'
 import { runKimi, detectKimiCli, type KimiProcess } from './kimi.js'
 import { getChangedFiles, getFileDiff, gitAdd, gitCommit, gitPush, createBranch, cloneRepo, gitFetch, getBranchDiff, gitDeleteRemoteBranch } from './git.js'
-import { createPullRequest, mergePullRequest } from './github-api.js'
+import { createPullRequest, mergePullRequest, getPullRequest, getCheckRuns, getCheckRunLogs } from './github-api.js'
 
 interface SubmitStep {
   name: string
@@ -33,6 +33,11 @@ export class Agent {
   private running = false
   private reviewRound = 0
   private githubToken?: string
+  private ciMonitorTimer?: NodeJS.Timeout
+  private ciRetryCount = 0
+  private readonly CI_MAX_RETRIES = 3
+  private readonly CI_POLL_INTERVAL_MS = 30000
+  private readonly CI_TIMEOUT_MS = 600000
 
   constructor(
     name: string,
@@ -299,6 +304,7 @@ export class Agent {
   }
 
   async stop() {
+    this.stopCiMonitor()
     if (this.process) {
       this.process.kill()
       this.running = false
@@ -352,6 +358,13 @@ export class Agent {
 
     this.setStatus('reviewing')
 
+    // 如果已有 open PR，跳过创建，直接启动 CI 监控
+    if (this.state.prStatus === 'open' && this.state.prNumber && githubToken) {
+      this.log('system', `PR #${this.state.prNumber} 已存在，新 commit 已追加`)
+      this.startCiMonitor(githubToken)
+      return { ok: true, steps }
+    }
+
     // 如果有 GitHub Token，调用真实 API 创建 PR
     if (githubToken) {
       try {
@@ -361,6 +374,7 @@ export class Agent {
           this.state.prNumber = pr.number
           this.state.prUrl = pr.html_url
           this.log('system', `PR #${pr.number} 已创建: ${pr.html_url}`)
+          this.startCiMonitor(githubToken)
           return { ok: true, steps }
         }
       } catch (err) {
@@ -374,6 +388,98 @@ export class Agent {
     this.state.prUrl = `${this.state.repoUrl.replace(/\.git$/, '')}/pull/${this.state.prNumber}`
     this.log('system', `PR #${this.state.prNumber} 已创建（模拟，未配置 GitHub Token）`)
     return { ok: true, steps }
+  }
+
+  /**
+   * 启动 GitHub Actions CI 轮询监控
+   * PR 创建成功后调用，自动检测 CI 失败并触发修复
+   */
+  async startCiMonitor(githubToken: string): Promise<void> {
+    this.stopCiMonitor()
+
+    if (!this.state.prNumber || !githubToken) return
+
+    this.state.ciStatus = 'pending'
+    this.log('system', '开始监控 GitHub Actions CI 状态...')
+
+    const startTime = Date.now()
+
+    this.ciMonitorTimer = setInterval(async () => {
+      // 超时检查
+      if (Date.now() - startTime > this.CI_TIMEOUT_MS) {
+        this.stopCiMonitor()
+        this.state.ciStatus = 'unknown'
+        this.log('error', 'CI 监控超时（10分钟），请指挥官人工检查 CI 状态')
+        return
+      }
+
+      // 查询 PR 获取 head sha
+      const pr = await getPullRequest(githubToken, this.state.repoUrl, this.state.prNumber!)
+      if (!pr) return
+
+      // 查询 check runs
+      const checks = await getCheckRuns(githubToken, this.state.repoUrl, pr.head.sha)
+      if (!checks || checks.total_count === 0) return
+
+      // 检查是否还有进行中
+      const hasInProgress = checks.check_runs.some((r) => r.status !== 'completed')
+      if (hasInProgress) return
+
+      // 所有 check 都完成了
+      const failedRun = checks.check_runs.find((r) => r.conclusion === 'failure')
+      if (failedRun) {
+        this.stopCiMonitor()
+        this.state.ciStatus = 'failure'
+        this.log('error', `CI 失败: ${failedRun.name}`)
+
+        const logs = await getCheckRunLogs(githubToken, this.state.repoUrl, failedRun.id)
+        await this.fixBasedOnCiFailure(logs || `Check run "${failedRun.name}" failed. No logs available.`, githubToken)
+        return
+      }
+
+      // 全部通过
+      this.stopCiMonitor()
+      this.state.ciStatus = 'success'
+      this.log('system', 'GitHub Actions CI 全部通过 ✅')
+    }, this.CI_POLL_INTERVAL_MS)
+  }
+
+  /**
+   * 停止 CI 轮询定时器
+   */
+  stopCiMonitor(): void {
+    if (this.ciMonitorTimer) {
+      clearInterval(this.ciMonitorTimer)
+      this.ciMonitorTimer = undefined
+    }
+  }
+
+  /**
+   * 基于 CI 失败日志自动修复代码并重新提交
+   */
+  private async fixBasedOnCiFailure(ciLogs: string, githubToken: string): Promise<void> {
+    this.ciRetryCount++
+    if (this.ciRetryCount > this.CI_MAX_RETRIES) {
+      this.log('error', `CI 修复已达最大轮次（${this.CI_MAX_RETRIES} 次），请指挥官人工介入`)
+      this.setStatus('ready')
+      return
+    }
+
+    this.log('system', `CI 失败，第 ${this.ciRetryCount}/${this.CI_MAX_RETRIES} 轮自动修复...`)
+    const fixPrompt = `GitHub Actions CI 检查失败了，日志如下：\n\n${ciLogs}\n\n请根据上述日志修改代码文件，使其能够通过 CI 检查。直接修改相关文件，不需要额外说明。`
+    await this.runInstructionSilent(fixPrompt)
+
+    // 修复后重新检测变更
+    if (this.state.workspace) {
+      try {
+        this.state.changedFiles = await getChangedFiles(this.state.workspace)
+      } catch {
+        // 忽略检测失败
+      }
+    }
+
+    // 重新提交（autoSubmitForReview 成功后会再次启动 CI 监控）
+    await this.autoSubmitForReview()
   }
 
   /**

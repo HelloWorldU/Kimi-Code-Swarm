@@ -86,7 +86,7 @@ export async function getPullRequest(
   token: string,
   repoUrl: string,
   prNumber: number,
-): Promise<{ state: string; merged: boolean } | null> {
+): Promise<{ state: string; merged: boolean; head: { sha: string } } | null> {
   const repo = parseRepoUrl(repoUrl)
   if (!repo) return null
 
@@ -95,11 +95,84 @@ export async function getPullRequest(
   try {
     const res = await fetch(url, { headers: getHeaders(token) })
     if (!res.ok) return null
-    const data = (await res.json()) as { state: string; merged: boolean }
+    const data = (await res.json()) as { state: string; merged: boolean; head: { sha: string } }
     return data
   } catch (err) {
     const msg = `GitHub API 查询 PR 失败: ${String(err)}`
     console.error(`[github-api] ${msg}`)
     throw new Error(msg)
+  }
+}
+
+export interface CheckRun {
+  id: number
+  name: string
+  status: string
+  conclusion: string | null
+  html_url: string
+  started_at: string | null
+}
+
+export interface CheckRunsResult {
+  total_count: number
+  check_runs: CheckRun[]
+}
+
+/**
+ * 查询指定 commit 的 check runs（CI 状态）
+ */
+export async function getCheckRuns(
+  token: string,
+  repoUrl: string,
+  ref: string,
+): Promise<CheckRunsResult | null> {
+  const repo = parseRepoUrl(repoUrl)
+  if (!repo) return null
+
+  const url = `${GITHUB_API}/repos/${repo.owner}/${repo.repo}/commits/${ref}/check-runs`
+
+  try {
+    const res = await fetch(url, { headers: getHeaders(token) })
+    if (!res.ok) {
+      const err = await res.text()
+      console.error(`[github-api] getCheckRuns ${res.status}: ${err}`)
+      return null
+    }
+    return (await res.json()) as CheckRunsResult
+  } catch (err) {
+    console.error(`[github-api] getCheckRuns 异常: ${String(err)}`)
+    return null
+  }
+}
+
+/**
+ * 获取失败 check run 的日志文本
+ * GitHub 返回的是 text/plain 的日志文件，跟随重定向获取
+ */
+export async function getCheckRunLogs(
+  token: string,
+  repoUrl: string,
+  checkRunId: number,
+): Promise<string | null> {
+  const repo = parseRepoUrl(repoUrl)
+  if (!repo) return null
+
+  const url = `${GITHUB_API}/repos/${repo.owner}/${repo.repo}/check-runs/${checkRunId}/logs`
+
+  try {
+    const res = await fetch(url, {
+      headers: { ...getHeaders(token), Accept: 'application/vnd.github.v3+json' },
+      redirect: 'follow',
+    })
+    if (!res.ok) {
+      console.error(`[github-api] getCheckRunLogs ${res.status}`)
+      return null
+    }
+    // 日志可能很大，截断到 8000 字符以内
+    const text = await res.text()
+    return text.length > 8000 ? text.slice(0, 8000) + '\n...[truncated]' : text
+  } catch (err) {
+    console.error(`[github-api] getCheckRunLogs 异常: ${String(err)}`)
+    return null
   }
 }
