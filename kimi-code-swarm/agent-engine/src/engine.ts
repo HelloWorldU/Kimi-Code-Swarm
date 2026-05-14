@@ -6,6 +6,8 @@ import { rm } from 'fs/promises'
 export class AgentEngine {
   private agents = new Map<string, Agent>()
   private emit: (event: EngineEvent) => void
+  // 待审阅 PR 队列：PR 创建时没有 reviewer 的，放入此队列等待新 Agent 接单
+  private pendingReviews = new Map<string, { branch: string; githubToken?: string }>()
 
   constructor(emit: (event: EngineEvent) => void) {
     this.emit = emit
@@ -36,6 +38,41 @@ export class AgentEngine {
           )
           this.agents.set(agent.state.id, agent)
           this.broadcast({ type: 'agent-created', agent: agent.state })
+
+          // 检查是否有待审阅的 PR，自动分配新 Agent 为 reviewer 并触发审阅
+          for (const [targetId, pending] of this.pendingReviews) {
+            const target = this.agents.get(targetId)
+            if (target && target.state.status === 'reviewing') {
+              target.state.reviews.push({
+                reviewerAgentId: agent.state.id,
+                reviewerName: agent.state.name,
+                status: 'pending',
+              })
+              this.broadcast({
+                type: 'log',
+                agentId: targetId,
+                entry: {
+                  id: 'system',
+                  timestamp: new Date().toISOString(),
+                  type: 'system',
+                  content: `新 Agent「${agent.state.name}」已加入，自动指派审阅 PR`,
+                },
+              })
+              agent.performReview(target.state.branch, target.state.id, (reviewerId, targetAgentId, approved) => {
+                const targetAgent = this.agents.get(targetAgentId)
+                if (!targetAgent) return
+                targetAgent.submitReview(reviewerId, approved)
+                if (targetAgent.canMerge() && targetAgent.state.status === 'reviewing') {
+                  this.pendingReviews.delete(targetAgentId)
+                  targetAgent.mergePr(pending.githubToken).catch((err) => {
+                    this.broadcast({ type: 'error', message: `自动合并失败: ${String(err)}` })
+                  })
+                }
+              }).catch((err) => {
+                this.broadcast({ type: 'error', message: `自动审阅失败: ${String(err)}` })
+              })
+            }
+          }
           break
         }
 
@@ -121,6 +158,7 @@ export class AgentEngine {
             console.error(`[engine] ${msg}`)
             this.broadcast({ type: 'log', agentId: cmd.agentId, entry: { id: 'system', timestamp: new Date().toISOString(), type: 'error', content: msg } })
           }
+          this.pendingReviews.delete(cmd.agentId)
           this.agents.delete(cmd.agentId)
           break
         }
@@ -141,6 +179,7 @@ export class AgentEngine {
                 target.submitReview(reviewerId, approved)
                 // 全部 approved 后自动合并
                 if (target.canMerge() && target.state.status === 'reviewing') {
+                  this.pendingReviews.delete(targetId)
                   target.mergePr(cmd.githubToken).catch((err) => {
                     this.broadcast({ type: 'error', message: `自动合并失败: ${String(err)}` })
                   })
@@ -149,6 +188,24 @@ export class AgentEngine {
                 this.broadcast({ type: 'error', message: `自动审阅失败: ${String(err)}` })
               })
             }
+          }
+
+          // 如果没有 reviewer，加入待审队列，等新 Agent 接单
+          if (agent.state.reviews.length === 0) {
+            this.pendingReviews.set(agent.state.id, {
+              branch: agent.state.branch,
+              githubToken: cmd.githubToken,
+            })
+            this.broadcast({
+              type: 'log',
+              agentId: agent.state.id,
+              entry: {
+                id: 'system',
+                timestamp: new Date().toISOString(),
+                type: 'system',
+                content: 'PR 已创建，当前无可用审阅者，进入待审队列等待新 Agent 加入',
+              },
+            })
           }
           break
         }
@@ -174,6 +231,7 @@ export class AgentEngine {
 
           // 全部 approved → 自动合并
           if (agent.canMerge()) {
+            this.pendingReviews.delete(agent.state.id)
             await agent.mergePr(cmd.githubToken)
             break
           }
