@@ -91,6 +91,17 @@ Kimi-Code-Swarm/
 ├── scripts/               ← 🤖 自动化脚本
 │   └── cleanup.ts           熵管理清理脚本
 │
+├── agent-engine/          ← 🤖 Agent Engine（Node.js + TypeScript）
+│   ├── src/
+│   │   ├── agent.ts         Agent 核心逻辑（生命周期 + 自动提交 + 审阅）
+│   │   ├── engine.ts        Engine 编排（多 Agent 管理 + 命令路由）
+│   │   ├── git.ts           Git 操作封装
+│   │   ├── kimi.ts          Kimi CLI 检测与调用
+│   │   ├── github-api.ts    GitHub REST API 封装
+│   │   ├── schemas.ts       Zod 运行时验证
+│   │   └── types.ts         Engine 类型定义
+│   └── package.json
+│
 ├── harness/               ← 📋 工作流模板
 │   ├── new-instance.yaml    新建 Agent 模板（v2.0 Agent Engine 架构）
 │   ├── bug-fix.yaml         修复 Bug 模板
@@ -101,7 +112,7 @@ Kimi-Code-Swarm/
     │   ├── types/
     │   ├── store/
     │   ├── components/
-    │   ├── skills/
+    │   ├── skills/            预留目录（当前为空）
     │   ├── App.vue
     │   └── main.ts
     ├── tests/                 ← 🧪 所有可运行测试集中在此
@@ -143,6 +154,14 @@ Kimi-Code-Swarm/
 cd kimi-code-swarm
 npm install          # 自动配置 Git hooks
 npm run dev          # localhost:5173（浏览器模式）
+```
+
+Tauri 桌面模式（需要 Rust）：
+
+```bash
+cd kimi-code-swarm
+npm install          # 安装前端依赖
+cargo tauri dev      # 启动 Tauri 开发模式（ Rust 后端 + Vue 前端）
 ```
 
 首次打开 App 后在登录页输入 API Key（所有 Agent 共享同一个 Key），验证通过后存入系统 Keyring。

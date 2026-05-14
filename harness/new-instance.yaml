@@ -37,7 +37,7 @@ steps:
        git add → git commit → git push → 创建 PR
        若有 GitHub Token：调用 GitHub API 创建真实 PR
        若无 Token：生成 Mock PR 号
-       pre-commit / lint / typecheck 失败时：将 stderr 回传给 Kimi CLI 自动修复，重试最多 3 轮
+       pre-commit / lint / typecheck 失败时：将完整执行日志（stdout + stderr + exit code）全量回传给 Kimi CLI 自动修复，重试最多 3 轮
      状态 = reviewing，自动指派其他 Agent 审阅
      注：`submit-for-review` 命令仍保留为手动 fallback / 覆盖入口
 

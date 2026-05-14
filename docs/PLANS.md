@@ -70,7 +70,7 @@ MVP 已实现（`scripts/health-check.ts`）。当前覆盖 doc-map 有效性、
 
 | 债务 | 优先级 | 影响 | 计划解决 |
 |------|--------|------|---------|
-| AST fixers 自动修复 | P1 | 分析器能发现问题但无法自动修复 | 下一迭代 |
+| AST fixers 自动修复 | ✅ | `ast/fixers/error-handling.ts` 已实现 `--fix` 模式（自动注入 `log.error`）；其他规则 fixer 待补充 | 长期迭代 |
 | Token 趋势图表 | P1 | 监控不完整 | 接入图表库后 |
 | `scripts/cleanup.ts` 循环清理 | P2 | 熵管理逻辑未实现；质量等级扫描 | AST dead-code 已覆盖核心需求，降级为 P2 |
 | health-check 扩展检查项 | P2 | 模板漂移、文档过时等 | 长期迭代 |
