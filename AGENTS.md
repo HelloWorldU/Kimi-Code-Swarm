@@ -134,14 +134,11 @@ Kimi-Code-Swarm/
 
 ## 🎯 Agent Skill 体系
 
-`skills/` 目录存放**可复用的 Agent 能力规范**。每个 Skill 是一个独立目录，内含 `SKILL.md`：
+`skills/` 目录存放**可复用的 Agent 能力规范**（Skill）。每个 Skill 是一个独立目录，内含 `SKILL.md`。完整清单和接入状态见 [`skills/AGENTS.md`](skills/AGENTS.md)。
 
-| Skill | 作用 | 当前状态 |
-|-------|------|---------|
-| `skills/commit/` | 定义 commit message 规范（Conventional Commits）和提交前检查清单 | ✅ 已启用，`agent.ts` 在 `generateCommitAndPrBody` 中按此规范生成提交信息 |
-| `skills/push/` | 定义 PR 推送规范（推送前验证、PR title/body 格式、生命周期管理） | ✅ 已启用，PR 创建时自动生成符合模板的描述 |
-
-**使用方式**：Skill 目前作为**静态规范文档**被 Agent 阅读参考；`agent-engine/src/agent.ts` 的 prompt 中硬编码了核心规范要求，由 Kimi CLI 在生成 commit/PR 内容时遵循。未来可演进为 Engine 动态读取 SKILL.md 并嵌入 prompt。
+**当前 Skill**：
+- `skills/commit/` — Commit message 规范（✅ 已接入代码，动态读取）
+- `skills/push/` — PR 推送规范（⚡ 静态规范，待演进）
 
 ## 🏗️ Harness 五层映射
 
