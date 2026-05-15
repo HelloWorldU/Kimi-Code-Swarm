@@ -134,7 +134,7 @@ type EngineEvent =
 
 ```ts
 // 优先级：直接可执行文件 → Python 模块调用
-const CANDIDATES = ['kimi', 'C:\Python312\Scripts\kimi.exe']
+const CANDIDATES = ['kimi', 'C:\\Python312\\Scripts\\kimi.exe']
 const PYTHON_CANDIDATES = [
   { python: 'py', args: ['-3.12', '-m', 'kimi'] },
   { python: 'python3.12', args: ['-m', 'kimi'] },

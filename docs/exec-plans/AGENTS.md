@@ -10,6 +10,8 @@
 |------|------|-------------|
 | `critical-bugs-resolved.md` | 已解决的关键 Bug 根因表（按时间倒序） | **遇到奇怪问题先查这个**，避免重复踩坑 |
 | `tech-debt-tracker.md` | 技术债务追踪表 | 计划大规模重构前看 |
+| `pr-workflow-alignment.md` | PR 工作流对齐记录 | 审阅/合并流程变更时看 |
+| `active/task-system.md` | 活跃任务系统计划 | 任务系统迭代时看 |
 
 ---
 

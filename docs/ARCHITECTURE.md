@@ -50,8 +50,8 @@ PR 创建时，Store 自动生成 `ReviewEntry[]`，包含所有其他 Agent 作
 
 | 角色 | 职责范围 | 关键目录 |
 |------|---------|---------|
-| **UI Agent** (`SwarmUI`) | Vue 组件、页面布局、样式交互、前端体验优化 | `src/components/`, `src/App.vue` |
-| **Core Agent** (`SwarmCore`) | Tauri IPC、Rust 后端、Agent Engine、进程管理 | `src-tauri/`, `src/api/ipc.ts` |
+| **UI Agent** (`SwarmUI`) | Vue 组件、页面布局、样式交互、前端体验优化 | `kimi-code-swarm/src/components/`, `kimi-code-swarm/src/App.vue` |
+| **Core Agent** (`SwarmCore`) | Tauri IPC、Rust 后端、Agent Engine、进程管理 | `kimi-code-swarm/src-tauri/`, `kimi-code-swarm/src/api/ipc.ts` |
 | **Docs Agent** (`SwarmDocs`) | 文档维护、STATUS 更新、check-docs 修复、知识库同步 | `docs/`, `AGENTS.md` |
 | **Review Agent** (`SwarmReview`) | PR 审阅、代码质量检查、约束合规确认 | `ci/`, `ast/`, PR 审阅队列 |
 | **Tools Agent** (`SwarmTools`) | 定期脚本执行、dead code 清理、健康检查、熵管理 | `scripts/`, `ast/rules/dead-code.ts` |
@@ -187,4 +187,4 @@ Agent Engine 用 TypeScript 编写，Rust 直接启动。详见 [`docs/CLI_HARNE
 Playwright 通过 WebView2 CDP（`--remote-debugging-port=9222`）连接 Tauri 窗口：
 - 仅验证前端 DOM 交互（登录 → 创建 Agent → Dashboard 验证）
 - 不覆盖 Rust IPC、Agent Engine 进程、Git 操作等后端逻辑
-- 后端集成测试待实现（见 `docs/STATUS.md`）
+- 后端集成测试 ✅ 已实现（AgentEngine 完整生命周期 9 个测试全部通过，见 `docs/STATUS.md`）

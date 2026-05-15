@@ -5,3 +5,4 @@
 ## 目录
 
 - `core-beliefs.md` —— 不可妥协的工程信念
+- `ast-parser-vs-regex.md` —— AST 分析器迁移决策（正则 vs TypeScript ESTree）
