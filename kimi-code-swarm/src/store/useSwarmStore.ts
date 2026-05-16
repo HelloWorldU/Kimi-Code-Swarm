@@ -50,7 +50,13 @@ async function startAgentEngine() {
     await spawnAgentEngine()
     initEngineListeners()
   } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
     log.error('Failed to start agent engine:', e)
+    toast.add({
+      type: 'error',
+      title: 'Agent 引擎启动失败',
+      message: msg,
+    })
   }
 }
 

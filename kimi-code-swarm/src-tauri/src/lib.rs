@@ -6,8 +6,23 @@ use std::collections::HashSet;
 use tauri::Emitter;
 use tauri::Manager;
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
 const KEYRING_SERVICE: &str = "kimi-code-swarm";
 const KEYRING_ACCOUNT: &str = "api-key";
+
+// Windows: prevent console window popup when spawning child processes
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+#[cfg(windows)]
+fn hide_console(cmd: &mut Command) {
+    cmd.creation_flags(CREATE_NO_WINDOW);
+}
+
+#[cfg(not(windows))]
+fn hide_console(_cmd: &mut Command) {}
 
 // ── Global process tracking ──
 static ACTIVE_PIDS: LazyLock<Mutex<HashSet<u32>>> = LazyLock::new(|| Mutex::new(HashSet::new()));
@@ -36,9 +51,12 @@ struct AgentEngineEvent {
 
 // ── Helper: find agent-engine directory ──
 fn agent_engine_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let mut diagnostics = Vec::new();
+
     // Try app root (development: project root)
     let app_root = app.path().app_local_data_dir()
         .map_err(|e| format!("Failed to get app dir: {}", e))?;
+    diagnostics.push(format!("app_local_data_dir={:?} -> exists={}", app_root, app_root.exists()));
 
     // Development layout: app binary is in target/debug/ under src-tauri/
     // agent-engine is at ../agent-engine relative to src-tauri/
@@ -47,30 +65,71 @@ fn agent_engine_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
         .map(|p| p.join("agent-engine"));
 
     if let Some(ref p) = dev_path {
+        diagnostics.push(format!("dev_path={:?} -> exists={}", p, p.exists()));
         if p.exists() {
+            log::info!("[agent_engine_dir] found at dev_path: {:?}", p);
             return Ok(p.clone());
         }
     }
 
     // Fallback: try sibling of src-tauri (for cargo run from src-tauri dir)
     let fallback = PathBuf::from("../agent-engine");
+    diagnostics.push(format!("fallback={:?} -> exists={}", fallback, fallback.exists()));
     if fallback.exists() {
+        log::info!("[agent_engine_dir] found at fallback: {:?}", fallback);
         return Ok(fallback);
     }
 
-    // Production: bundle agent-engine alongside the app
+    // Production: app bundle resource directory (Tauri bundles agent-engine via bundle.resources)
+    if let Ok(resource_dir) = app.path().resource_dir() {
+        let resource_path = resource_dir.join("agent-engine");
+        diagnostics.push(format!("resource_dir={:?} -> agent-engine={:?} -> exists={}", resource_dir, resource_path, resource_path.exists()));
+        if resource_path.exists() {
+            log::info!("[agent_engine_dir] found at resource_dir: {:?}", resource_path);
+            return Ok(resource_path);
+        }
+    } else {
+        diagnostics.push("resource_dir: FAILED to resolve".to_string());
+    }
+
+    // Production: executable directory (fallback for portable installs)
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            let exe_sibling = exe_dir.join("agent-engine");
+            diagnostics.push(format!("exe_dir={:?} -> agent-engine={:?} -> exists={}", exe_dir, exe_sibling, exe_sibling.exists()));
+            if exe_sibling.exists() {
+                log::info!("[agent_engine_dir] found at exe_dir: {:?}", exe_sibling);
+                return Ok(exe_sibling);
+            }
+        } else {
+            diagnostics.push(format!("exe_dir={:?} -> parent=None", exe_path));
+        }
+    } else {
+        diagnostics.push("current_exe: FAILED to resolve".to_string());
+    }
+
+    // Production: app local data dir
     let prod_path = app_root.join("agent-engine");
+    diagnostics.push(format!("prod_path={:?} -> exists={}", prod_path, prod_path.exists()));
     if prod_path.exists() {
+        log::info!("[agent_engine_dir] found at prod_path: {:?}", prod_path);
         return Ok(prod_path);
     }
 
-    Err(format!("Cannot find agent-engine directory. Tried: {:?}, {:?}, {:?}", dev_path, fallback, prod_path))
+    let error_msg = format!(
+        "Cannot find agent-engine directory.\n\nDiagnostics:\n{}\n\nPossible causes:\n1. agent-engine not bundled in installer (check tauri.conf.json bundle.resources)\n2. Installed to unexpected location\n3. Running from wrong working directory",
+        diagnostics.join("\n")
+    );
+    log::error!("{}", error_msg);
+    Err(error_msg)
 }
 
 // ── Git / Shell commands ──
 #[tauri::command]
 fn exec_git(dir: String, args: Vec<String>) -> Result<String, String> {
-    let output = Command::new("git")
+    let mut cmd = Command::new("git");
+    hide_console(&mut cmd);
+    let output = cmd
         .args(&args)
         .current_dir(&dir)
         .output()
@@ -85,7 +144,9 @@ fn exec_git(dir: String, args: Vec<String>) -> Result<String, String> {
 
 #[tauri::command]
 fn exec_command(cmd: String, args: Vec<String>, cwd: String) -> Result<String, String> {
-    let output = Command::new(&cmd)
+    let mut command = Command::new(&cmd);
+    hide_console(&mut command);
+    let output = command
         .args(&args)
         .current_dir(&cwd)
         .output()
@@ -101,7 +162,9 @@ fn exec_command(cmd: String, args: Vec<String>, cwd: String) -> Result<String, S
 // ── Process spawn / kill (legacy direct spawn) ──
 #[tauri::command]
 fn spawn_process(app: tauri::AppHandle, cmd: String, args: Vec<String>, cwd: String) -> Result<u32, String> {
-    let mut child = Command::new(&cmd)
+    let mut command = Command::new(&cmd);
+    hide_console(&mut command);
+    let mut child = command
         .args(&args)
         .current_dir(&cwd)
         .stdout(Stdio::piped())
@@ -149,7 +212,9 @@ fn spawn_process(app: tauri::AppHandle, cmd: String, args: Vec<String>, cwd: Str
 fn kill_process(pid: u32) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
-        let _ = Command::new("taskkill")
+        let mut cmd = Command::new("taskkill");
+        hide_console(&mut cmd);
+        let _ = cmd
             .args(["/PID", &pid.to_string(), "/T", "/F"])
             .output();
     }
@@ -193,20 +258,24 @@ fn spawn_agent_engine(app: tauri::AppHandle) -> Result<u32, String> {
 
     let mut cmd_builder = if tsx_cli.exists() {
         let mut cmd = Command::new("node");
+        hide_console(&mut cmd);
         cmd.arg(&tsx_cli).arg("src/index.ts");
         cmd
     } else if tsx_bin.exists() {
         let mut cmd = Command::new("node");
+        hide_console(&mut cmd);
         cmd.arg(&tsx_bin).arg("src/index.ts");
         cmd
     } else {
         // fallback: try npx via cmd /c on Windows to inherit PATH
         if cfg!(target_os = "windows") {
             let mut cmd = Command::new("cmd");
+            hide_console(&mut cmd);
             cmd.args(["/c", "npx", "tsx", "src/index.ts"]);
             cmd
         } else {
             let mut cmd = Command::new("npx");
+            hide_console(&mut cmd);
             cmd.args(["tsx", "src/index.ts"]);
             cmd
         }
@@ -223,11 +292,39 @@ fn spawn_agent_engine(app: tauri::AppHandle) -> Result<u32, String> {
         log::info!("[spawn_agent_engine] KIMI_API_KEY injected");
     }
 
+    // Log the exact command being executed for diagnostics
+    log::info!("[spawn_agent_engine] engine_dir={:?}", engine_dir);
+    log::info!("[spawn_agent_engine] tsx_cli exists={} tsx_bin exists={}", tsx_cli.exists(), tsx_bin.exists());
+    log::info!("[spawn_agent_engine] node in PATH={}", Command::new("node").arg("--version").output().is_ok());
+
     let mut child = cmd_builder
         .spawn()
-        .map_err(|e| format!("Failed to spawn agent engine: {}", e))?;
+        .map_err(|e| format!(
+            "Failed to spawn agent engine: {}. \
+             Common cause: 'node' not found in PATH. \
+             Please install Node.js 22+ and ensure it's in your system PATH.",
+            e
+        ))?;
 
     let pid = child.id();
+    log::info!("[spawn_agent_engine] engine started with pid={}", pid);
+
+    // Health check: verify the engine didn't crash immediately (e.g. missing node_modules)
+    std::thread::sleep(std::time::Duration::from_millis(300));
+    match child.try_wait() {
+        Ok(Some(status)) => {
+            // Read first line of stderr for crash reason
+            let mut stderr_reader = BufReader::new(child.stderr.take().unwrap());
+            let mut first_stderr = String::new();
+            let _ = stderr_reader.read_line(&mut first_stderr);
+            return Err(format!(
+                "Agent engine crashed immediately (exit code: {:?}).\n\nstderr: {}\n\nEngine dir: {:?}\n\nCommon causes:\n1. Missing node_modules (corrupted install)\n2. Node.js version incompatible\n3. Antivirus blocked tsx execution",
+                status.code(), first_stderr.trim(), engine_dir
+            ));
+        }
+        _ => {}
+    }
+
     let stdin = Arc::new(Mutex::new(child.stdin.take().unwrap()));
 
     {
@@ -340,8 +437,10 @@ fn verify_api_key(key: String) -> Result<bool, String> {
     // Try to detect kimi CLI
     let candidates = ["kimi", "C:\\Python312\\Scripts\\kimi.exe"];
     let mut found = false;
-    for cmd in &candidates {
-        if Command::new(cmd).args(["--version"]).output().is_ok() {
+    for c in &candidates {
+        let mut cmd = Command::new(c);
+        hide_console(&mut cmd);
+        if cmd.args(["--version"]).output().is_ok() {
             found = true;
             break;
         }

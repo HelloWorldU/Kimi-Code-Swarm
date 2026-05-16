@@ -35,6 +35,9 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "resources": {
+      "../agent-engine": "agent-engine"
+    },
     "android": {
       "debugApplicationIdSuffix": ".debug"
     }
