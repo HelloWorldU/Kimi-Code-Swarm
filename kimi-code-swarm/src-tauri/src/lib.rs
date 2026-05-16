@@ -309,22 +309,34 @@ fn spawn_agent_engine(app: tauri::AppHandle) -> Result<u32, String> {
         e
     ))?;
 
-    // Try local tsx CLI module first to avoid PATH / npx issues
+    // Production: use pre-compiled dist/index.js (no tsx runtime needed)
+    // Development: fallback to tsx src/index.ts
+    let dist_js = engine_dir.join("dist/index.js");
+    let src_ts = engine_dir.join("src/index.ts");
     let tsx_cli = engine_dir.join("node_modules/tsx/dist/cli.mjs");
     let tsx_bin = engine_dir.join("node_modules/.bin/tsx");
 
-    let mut cmd_builder = if tsx_cli.exists() {
+    let mut cmd_builder = if dist_js.exists() {
+        log::info!("[spawn_agent_engine] using pre-compiled dist/index.js");
         let mut cmd = Command::new(&node_exe);
         hide_console(&mut cmd);
-        cmd.arg(&tsx_cli).arg("src/index.ts");
+        cmd.arg(&dist_js);
+        cmd
+    } else if tsx_cli.exists() {
+        log::info!("[spawn_agent_engine] using tsx cli.mjs (dev mode)");
+        let mut cmd = Command::new(&node_exe);
+        hide_console(&mut cmd);
+        cmd.arg(&tsx_cli).arg(&src_ts);
         cmd
     } else if tsx_bin.exists() {
+        log::info!("[spawn_agent_engine] using tsx bin (dev mode)");
         let mut cmd = Command::new(&node_exe);
         hide_console(&mut cmd);
-        cmd.arg(&tsx_bin).arg("src/index.ts");
+        cmd.arg(&tsx_bin).arg(&src_ts);
         cmd
     } else {
         // fallback: try npx via cmd /c on Windows to inherit PATH
+        log::warn!("[spawn_agent_engine] falling back to npx tsx");
         if cfg!(target_os = "windows") {
             let mut cmd = Command::new("cmd");
             hide_console(&mut cmd);
@@ -510,8 +522,28 @@ fn verify_api_key(key: String) -> Result<bool, String> {
     Ok(true)
 }
 
+#[cfg(windows)]
+extern "system" {
+    fn AllocConsole() -> i32;
+}
+
+#[cfg(windows)]
+fn open_debug_console() {
+    unsafe {
+        AllocConsole();
+    }
+    println!("========================================");
+    println!("  Kimi Code Swarm - Debug Console");
+    println!("  后端日志将输出到这里");
+    println!("========================================");
+}
+
+#[cfg(not(windows))]
+fn open_debug_console() {}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    open_debug_console();
     tauri::Builder::default()
         .plugin(
             tauri_plugin_log::Builder::default()
