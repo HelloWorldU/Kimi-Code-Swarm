@@ -103,7 +103,7 @@ function handleSubmit() {
                 Token 预算上限: <span class="text-swarm-600 font-semibold">{{ tokenBudget.toLocaleString() }}</span>
               </label>
               <input
-                v-model="tokenBudget"
+                v-model.number="tokenBudget"
                 type="range"
                 min="10000"
                 max="200000"
