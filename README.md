@@ -40,6 +40,11 @@
 | 图标 | lucide-vue-next |
 | 桌面壳 | Tauri v2 |
 
+> ⚠️ **平台限制**：当前代码和验证主要在 **Windows** 上完成。Rust 侧包含 Windows 特定的进程管理逻辑（`CREATE_NO_WINDOW`、`taskkill`、硬编码 `C:
+vm4w
+odejs
+ode.exe` 探测等），macOS/Linux 需要额外适配才能运行。浏览器开发模式（`npm run dev`）不受此限制。
+
 ---
 
 ## 🚀 快速启动
@@ -83,7 +88,7 @@ npm run tauri dev
    - **一个 Key 供所有 Agent 共享**——指挥官输入一次，App 自动注入到每个 Agent 的 CLI 进程中
    - 验证通过后存入系统 Keyring（Tauri）或 localStorage（浏览器），**不会明文保存**
 3. 进入 Dashboard → 点击「新建 Agent」→ 输入仓库地址和指令
-4. 点击「启动」→ App 自动 clone 仓库到 `E:/workspace/{agent-id}`
+4. 点击「启动」→ App 自动 clone 仓库到工作目录（Windows 默认 `E:/workspace/{agent-id}`）
 5. 在对话窗口中与 Agent 多轮交互
 
 ---

@@ -27,7 +27,7 @@
 - 单一 Node.js 进程管理所有 Agent 生命周期
 - Rust 通过 stdin/stdout JSON Lines 与 Engine 通信
 - Engine 按需 spawn Kimi CLI 子进程
-- 好处：状态集中、便于监控、跨平台兼容性好
+- 好处：状态集中、便于监控
 
 ### 废弃文件
 - `harness/new-instance.yaml` v1.0 已过时，重写为 v2.0 版本

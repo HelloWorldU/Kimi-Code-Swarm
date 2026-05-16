@@ -58,6 +58,7 @@
 | E2E 测试 | ⚡ | Playwright smoke 测试已可运行：登录 → 创建 Agent → 验证 Dashboard；浏览器 Mock 模式（无需 Tauri 后端），Rust IPC / Engine 进程 / Git 真实路径仍需集成测试覆盖 | `tests/e2e/smoke.spec.ts` |
 | 后端集成测试 | ✅ | AgentEngine 完整生命周期（create/start/stop/instruct/review/merge/delete/ping/diff/error）9 个测试全部通过；降级行为已验证 | `tests/integration/engine.spec.ts` |
 | 生产构建验证 | 🚧 | 已打通：resources 打包 + node.exe 探测 + dist 预编译 + 依赖补全；尚未接入 CI 自动化验证 | `src-tauri/tauri.conf.json`, `src-tauri/src/lib.rs` |
+| 平台兼容性 | ⚡ | **Windows 为主**。Rust 进程管理含 Windows-only 分支（`CREATE_NO_WINDOW`、`taskkill`、硬编码 nvm 路径、cmd /c fallback）；macOS/Linux 待适配 | `src-tauri/src/lib.rs` |
 
 ---
 
