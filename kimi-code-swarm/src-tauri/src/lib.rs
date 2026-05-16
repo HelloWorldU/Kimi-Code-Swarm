@@ -49,6 +49,56 @@ struct AgentEngineEvent {
     line: String,
 }
 
+// ── Helper: find node.exe (nvm-windows installs node outside system PATH) ──
+fn find_node_exe() -> Result<PathBuf, String> {
+    // 1. Common installation paths (nvm-windows, official installer, etc.)
+    let common_paths = [
+        r"C:\nvm4w\nodejs\node.exe",
+        r"C:\Program Files\nodejs\node.exe",
+        r"C:\Program Files (x86)\nodejs\node.exe",
+        r"C:\nodejs\node.exe",
+    ];
+    for p in &common_paths {
+        let path = PathBuf::from(p);
+        if path.exists() {
+            log::info!("[find_node_exe] found at common path: {:?}", path);
+            return Ok(path);
+        }
+    }
+
+    // 2. Search PATH (GUI app may inherit official installer PATH but not nvm shell PATH)
+    if let Ok(path_env) = std::env::var("PATH") {
+        for dir in path_env.split(';') {
+            let candidate = PathBuf::from(dir).join("node.exe");
+            if candidate.exists() {
+                log::info!("[find_node_exe] found in PATH: {:?}", candidate);
+                return Ok(candidate);
+            }
+        }
+    }
+
+    // 3. Try "where node" on Windows (system tool, usually in PATH)
+    #[cfg(windows)]
+    {
+        let mut cmd = Command::new("where");
+        hide_console(&mut cmd);
+        if let Ok(output) = cmd.arg("node").output() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            if let Some(line) = stdout.lines().next() {
+                let path = PathBuf::from(line.trim());
+                if path.exists() {
+                    log::info!("[find_node_exe] found via 'where node': {:?}", path);
+                    return Ok(path);
+                }
+            }
+        }
+    }
+
+    // 4. Fallback: hope "node" is in PATH
+    log::warn!("[find_node_exe] node.exe not found in common paths or PATH, falling back to 'node'");
+    Ok(PathBuf::from("node"))
+}
+
 // ── Helper: find agent-engine directory ──
 fn agent_engine_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     let mut diagnostics = Vec::new();
@@ -252,17 +302,24 @@ fn spawn_agent_engine(app: tauri::AppHandle) -> Result<u32, String> {
     };
 
     // Use tsx to run TypeScript directly (handles .js -> .ts resolution)
+    // Resolve node.exe path (nvm-windows may not be in GUI app PATH)
+    let node_exe = find_node_exe().map_err(|e| format!(
+        "Cannot find Node.js runtime: {}. \
+         Please install Node.js 22+ (https://nodejs.org/) and ensure node.exe is accessible.",
+        e
+    ))?;
+
     // Try local tsx CLI module first to avoid PATH / npx issues
     let tsx_cli = engine_dir.join("node_modules/tsx/dist/cli.mjs");
     let tsx_bin = engine_dir.join("node_modules/.bin/tsx");
 
     let mut cmd_builder = if tsx_cli.exists() {
-        let mut cmd = Command::new("node");
+        let mut cmd = Command::new(&node_exe);
         hide_console(&mut cmd);
         cmd.arg(&tsx_cli).arg("src/index.ts");
         cmd
     } else if tsx_bin.exists() {
-        let mut cmd = Command::new("node");
+        let mut cmd = Command::new(&node_exe);
         hide_console(&mut cmd);
         cmd.arg(&tsx_bin).arg("src/index.ts");
         cmd
@@ -294,16 +351,15 @@ fn spawn_agent_engine(app: tauri::AppHandle) -> Result<u32, String> {
 
     // Log the exact command being executed for diagnostics
     log::info!("[spawn_agent_engine] engine_dir={:?}", engine_dir);
+    log::info!("[spawn_agent_engine] node_exe={:?}", node_exe);
     log::info!("[spawn_agent_engine] tsx_cli exists={} tsx_bin exists={}", tsx_cli.exists(), tsx_bin.exists());
-    log::info!("[spawn_agent_engine] node in PATH={}", Command::new("node").arg("--version").output().is_ok());
 
     let mut child = cmd_builder
         .spawn()
         .map_err(|e| format!(
             "Failed to spawn agent engine: {}. \
-             Common cause: 'node' not found in PATH. \
-             Please install Node.js 22+ and ensure it's in your system PATH.",
-            e
+             Engine dir: {:?}  Node: {:?}",
+            e, engine_dir, node_exe
         ))?;
 
     let pid = child.id();
