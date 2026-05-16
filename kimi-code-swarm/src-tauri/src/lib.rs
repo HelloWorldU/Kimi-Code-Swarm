@@ -60,24 +60,16 @@ fn find_node_exe() -> Result<PathBuf, String> {
     ];
     for p in &common_paths {
         let path = PathBuf::from(p);
-        if path.exists() {
-            log::info!("[find_node_exe] found at common path: {:?}", path);
-            return Ok(path);
-        }
+        if path.exists() { return Ok(path); }
     }
 
-    // 2. Search PATH (GUI app may inherit official installer PATH but not nvm shell PATH)
     if let Ok(path_env) = std::env::var("PATH") {
         for dir in path_env.split(';') {
             let candidate = PathBuf::from(dir).join("node.exe");
-            if candidate.exists() {
-                log::info!("[find_node_exe] found in PATH: {:?}", candidate);
-                return Ok(candidate);
-            }
+            if candidate.exists() { return Ok(candidate); }
         }
     }
 
-    // 3. Try "where node" on Windows (system tool, usually in PATH)
     #[cfg(windows)]
     {
         let mut cmd = Command::new("where");
@@ -86,16 +78,11 @@ fn find_node_exe() -> Result<PathBuf, String> {
             let stdout = String::from_utf8_lossy(&output.stdout);
             if let Some(line) = stdout.lines().next() {
                 let path = PathBuf::from(line.trim());
-                if path.exists() {
-                    log::info!("[find_node_exe] found via 'where node': {:?}", path);
-                    return Ok(path);
-                }
+                if path.exists() { return Ok(path); }
             }
         }
     }
 
-    // 4. Fallback: hope "node" is in PATH
-    log::warn!("[find_node_exe] node.exe not found in common paths or PATH, falling back to 'node'");
     Ok(PathBuf::from("node"))
 }
 
@@ -115,63 +102,30 @@ fn agent_engine_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
         .map(|p| p.join("agent-engine"));
 
     if let Some(ref p) = dev_path {
-        diagnostics.push(format!("dev_path={:?} -> exists={}", p, p.exists()));
-        if p.exists() {
-            log::info!("[agent_engine_dir] found at dev_path: {:?}", p);
-            return Ok(p.clone());
-        }
+        if p.exists() { return Ok(p.clone()); }
     }
 
-    // Fallback: try sibling of src-tauri (for cargo run from src-tauri dir)
     let fallback = PathBuf::from("../agent-engine");
-    diagnostics.push(format!("fallback={:?} -> exists={}", fallback, fallback.exists()));
-    if fallback.exists() {
-        log::info!("[agent_engine_dir] found at fallback: {:?}", fallback);
-        return Ok(fallback);
-    }
+    if fallback.exists() { return Ok(fallback); }
 
-    // Production: app bundle resource directory (Tauri bundles agent-engine via bundle.resources)
     if let Ok(resource_dir) = app.path().resource_dir() {
         let resource_path = resource_dir.join("agent-engine");
-        diagnostics.push(format!("resource_dir={:?} -> agent-engine={:?} -> exists={}", resource_dir, resource_path, resource_path.exists()));
-        if resource_path.exists() {
-            log::info!("[agent_engine_dir] found at resource_dir: {:?}", resource_path);
-            return Ok(resource_path);
-        }
-    } else {
-        diagnostics.push("resource_dir: FAILED to resolve".to_string());
+        if resource_path.exists() { return Ok(resource_path); }
     }
 
-    // Production: executable directory (fallback for portable installs)
     if let Ok(exe_path) = std::env::current_exe() {
         if let Some(exe_dir) = exe_path.parent() {
             let exe_sibling = exe_dir.join("agent-engine");
-            diagnostics.push(format!("exe_dir={:?} -> agent-engine={:?} -> exists={}", exe_dir, exe_sibling, exe_sibling.exists()));
-            if exe_sibling.exists() {
-                log::info!("[agent_engine_dir] found at exe_dir: {:?}", exe_sibling);
-                return Ok(exe_sibling);
-            }
-        } else {
-            diagnostics.push(format!("exe_dir={:?} -> parent=None", exe_path));
+            if exe_sibling.exists() { return Ok(exe_sibling); }
         }
-    } else {
-        diagnostics.push("current_exe: FAILED to resolve".to_string());
     }
 
-    // Production: app local data dir
     let prod_path = app_root.join("agent-engine");
-    diagnostics.push(format!("prod_path={:?} -> exists={}", prod_path, prod_path.exists()));
-    if prod_path.exists() {
-        log::info!("[agent_engine_dir] found at prod_path: {:?}", prod_path);
-        return Ok(prod_path);
-    }
+    if prod_path.exists() { return Ok(prod_path); }
 
-    let error_msg = format!(
-        "Cannot find agent-engine directory.\n\nDiagnostics:\n{}\n\nPossible causes:\n1. agent-engine not bundled in installer (check tauri.conf.json bundle.resources)\n2. Installed to unexpected location\n3. Running from wrong working directory",
-        diagnostics.join("\n")
-    );
-    log::error!("{}", error_msg);
-    Err(error_msg)
+    Err(format!(
+        "Cannot find agent-engine directory. Tried: dev, fallback, resource_dir, exe_dir, app_local_data_dir"
+    ))
 }
 
 // ── Git / Shell commands ──
@@ -314,7 +268,6 @@ fn spawn_agent_engine(app: tauri::AppHandle) -> Result<u32, String> {
     let dist_js = engine_dir.join("dist/index.js");
     let src_ts = engine_dir.join("src/index.ts");
     let tsx_cli = engine_dir.join("node_modules/tsx/dist/cli.mjs");
-    let tsx_bin = engine_dir.join("node_modules/.bin/tsx");
 
     let mut cmd_builder = if dist_js.exists() {
         log::info!("[spawn_agent_engine] using pre-compiled dist/index.js");
@@ -328,26 +281,8 @@ fn spawn_agent_engine(app: tauri::AppHandle) -> Result<u32, String> {
         hide_console(&mut cmd);
         cmd.arg(&tsx_cli).arg(&src_ts);
         cmd
-    } else if tsx_bin.exists() {
-        log::info!("[spawn_agent_engine] using tsx bin (dev mode)");
-        let mut cmd = Command::new(&node_exe);
-        hide_console(&mut cmd);
-        cmd.arg(&tsx_bin).arg(&src_ts);
-        cmd
     } else {
-        // fallback: try npx via cmd /c on Windows to inherit PATH
-        log::warn!("[spawn_agent_engine] falling back to npx tsx");
-        if cfg!(target_os = "windows") {
-            let mut cmd = Command::new("cmd");
-            hide_console(&mut cmd);
-            cmd.args(["/c", "npx", "tsx", "src/index.ts"]);
-            cmd
-        } else {
-            let mut cmd = Command::new("npx");
-            hide_console(&mut cmd);
-            cmd.args(["tsx", "src/index.ts"]);
-            cmd
-        }
+        return Err("Cannot find dist/index.js or tsx. Please run 'npm run build' in agent-engine/".to_string());
     };
 
     cmd_builder
@@ -358,24 +293,16 @@ fn spawn_agent_engine(app: tauri::AppHandle) -> Result<u32, String> {
 
     if let Some(key) = api_key {
         cmd_builder.env("KIMI_API_KEY", key);
-        log::info!("[spawn_agent_engine] KIMI_API_KEY injected");
     }
-
-    // Log the exact command being executed for diagnostics
-    log::info!("[spawn_agent_engine] engine_dir={:?}", engine_dir);
-    log::info!("[spawn_agent_engine] node_exe={:?}", node_exe);
-    log::info!("[spawn_agent_engine] tsx_cli exists={} tsx_bin exists={}", tsx_cli.exists(), tsx_bin.exists());
 
     let mut child = cmd_builder
         .spawn()
         .map_err(|e| format!(
-            "Failed to spawn agent engine: {}. \
-             Engine dir: {:?}  Node: {:?}",
+            "Failed to spawn agent engine: {}. Engine dir: {:?}  Node: {:?}",
             e, engine_dir, node_exe
         ))?;
 
     let pid = child.id();
-    log::info!("[spawn_agent_engine] engine started with pid={}", pid);
 
     // Health check: verify the engine didn't crash immediately (e.g. missing node_modules)
     std::thread::sleep(std::time::Duration::from_millis(300));
@@ -522,23 +449,15 @@ fn verify_api_key(key: String) -> Result<bool, String> {
     Ok(true)
 }
 
-#[cfg(windows)]
-extern "system" {
-    fn AllocConsole() -> i32;
-}
-
-#[cfg(windows)]
+// Debug console: only opens in dev builds (cargo tauri dev), not production
+#[cfg(all(windows, debug_assertions))]
 fn open_debug_console() {
-    unsafe {
-        AllocConsole();
-    }
-    println!("========================================");
-    println!("  Kimi Code Swarm - Debug Console");
-    println!("  后端日志将输出到这里");
-    println!("========================================");
+    extern "system" { fn AllocConsole() -> i32; }
+    unsafe { AllocConsole(); }
+    println!("[Kimi Code Swarm] Debug console open");
 }
 
-#[cfg(not(windows))]
+#[cfg(not(all(windows, debug_assertions)))]
 fn open_debug_console() {}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

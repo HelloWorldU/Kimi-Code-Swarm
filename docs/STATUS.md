@@ -29,7 +29,7 @@
 | Git 自动化（clone/checkout/commit/push） | ✅ | Tauri 环境通过 IPC 执行真实 git | `src/api/ipc.ts` |
 | GitHub API（PR 创建/合并/查询） | ✅ | 配置 GitHub Token 后 Agent Engine 调用真实 GitHub REST API；无 Token 降级为 Mock | `agent-engine/src/github-api.ts` |
 | 全员审阅门控 | ✅ | 后端严格检查 reviews 全 approved；Tauri 模式下 reviewer Agent 自动运行 kimi CLI 审阅代码变更（解析 LGTM 关键词）；如有 reject 则被审阅 Agent 自动根据意见修改代码并重新提交（最多 3 轮）；浏览器模式下需指挥官手动审阅；**PR 合并可由指挥官手动触发或全员审阅通过后自动合并** | `src/store/useSwarmStore.ts`, `agent-engine/src/agent.ts`, `agent-engine/src/engine.ts` |
-| Agent Engine 进程管理 | ✅ | Rust 后台 spawn Node.js Agent Engine，stdin/stdout 管道通信；Windows 优先使用本地 `tsx.cmd` 避免 PATH 继承问题 | `src-tauri/src/lib.rs`, `agent-engine/src/index.ts` |
+| Agent Engine 进程管理 | ✅ | Rust 后台 spawn Node.js Agent Engine，stdin/stdout 管道通信；生产环境用预编译 `dist/index.js`，开发环境 fallback 到 tsx；Windows 主动探测 `node.exe` 路径（nvm-windows 兼容） | `src-tauri/src/lib.rs`, `agent-engine/src/index.ts` |
 | Kimi CLI 接入 | ✅ | `sendInstruction` 调用 `kimi --print --quiet`，实时 stdout 流式捕获，可取消 | `src/store/useSwarmStore.ts` |
 | Token 预算控制 | ✅ | sendInstruction 前检查预算；process-output 中按输出行长度估算并累加；耗尽时自动 kill 进程 | `src/store/useSwarmStore.ts` |
 | Agent 多轮对话交互 | ✅ | 聊天式气泡 UI，支持 input/output/system/error 消息类型；ready/stopped/completed 状态下可持续对话；working 状态显示执行中指示器；**日志已分流**（system/error 技术日志带组件前缀+颜色走终端 stderr，input/output 及关键状态变更进 UI）；**stop-agent 已修复**（前端乐观更新 + await IPC） | `src/components/AgentDetail.vue`, `src/store/useSwarmStore.ts`, `agent-engine/src/agent.ts` |
@@ -57,7 +57,8 @@
 | 监控分析页 | ✅ | 任务状态分布、Token 消耗排行、活跃任务、审阅队列 | `src/components/AnalyticsPanel.vue` |
 | E2E 测试 | ⚡ | Playwright smoke 测试已可运行：登录 → 创建 Agent → 验证 Dashboard；浏览器 Mock 模式（无需 Tauri 后端），Rust IPC / Engine 进程 / Git 真实路径仍需集成测试覆盖 | `tests/e2e/smoke.spec.ts` |
 | 后端集成测试 | ✅ | AgentEngine 完整生命周期（create/start/stop/instruct/review/merge/delete/ping/diff/error）9 个测试全部通过；降级行为已验证 | `tests/integration/engine.spec.ts` |
+| 生产构建验证 | 🚧 | 已打通：resources 打包 + node.exe 探测 + dist 预编译 + 依赖补全；尚未接入 CI 自动化验证 | `src-tauri/tauri.conf.json`, `src-tauri/src/lib.rs` |
 
 ---
 
-*Last updated: 2026-05-14*
+*Last updated: 2026-05-16*
