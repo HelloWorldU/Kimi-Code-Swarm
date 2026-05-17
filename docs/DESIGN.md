@@ -2,6 +2,13 @@
 
 > Kimi-Code-Swarm 的顶层设计。
 
+## 核心信念
+
+1. **Agent = Model + Harness**。模型决定天花板，Harness 决定能否摸到天花板。
+2. **地图即边界**。AGENTS.md 只当目录，细节去 docs/ 按需加载。
+3. **约束即教学**。报错必须附带修复方法。
+4. **仓库即事实源**。Slack 对 Agent 等于不存在。
+
 ## 核心公式
 
 ```
@@ -34,7 +41,7 @@
 | L1 Context | `AGENTS.md` + `docs/` | 上下文分层，按需加载 | ✅ 完整 |
 | L2 Constraints | `docs/CONSTRAINTS.md` + `ci/` + `ast/` | 机械化约束（类型/Linter/自定义 ESLint 规则/AST/文档同步/测试/Dead Code 检测，报错地图式自定位） | ✅ CI 流水线 + pre-commit hook（npm install 自动配置）：typecheck → lint → analyze → test → check-docs → check-test → build |
 | L2.5 Shell | `src-tauri/` | Tauri v2 桌面壳层：Rust 主进程 + Vue 渲染进程 | ✅ IPC 命令已就绪（git / spawn / kill / keyring / store） |
-| L3 Observability | `docs/OBSERVABILITY.md` + UI 面板 | 实时监控 + 质量等级 | ✅ UI 面板已就绪 |
+| L3 Observability | UI 面板 + 染色日志 | Metrics(✅ Token/实例) / Logs(✅ 染色流) / Traces(⏳ 待实现) | ✅ UI 面板已就绪 |
 | L4 Entropy Mgmt | `scripts/cleanup.ts` + `scripts/health-check.ts` | 循环清理 + 定期一致性检查（信息供给型） | ✅ health-check 已实现 |
 | L5 Source of Truth | 仓库即唯一知识源 | 所有决策写入文件 | ✅ 文档与代码同步更新 |
 

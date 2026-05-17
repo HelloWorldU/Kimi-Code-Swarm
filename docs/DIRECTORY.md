@@ -12,15 +12,12 @@ Kimi-Code-Swarm/
 │   ├── FRONTEND.md          前端编码规范 + 命令
 │   ├── CLI_HARNESS.md       CLI 进程接入设计
 │   ├── COMPONENT_PATTERNS.md Vue 组件规范
-│   ├── TOKEN_MONITORING.md  Token 监控设计
-│   ├── OBSERVABILITY.md     可观测性三层设计
 │   ├── PLANS.md             执行计划索引
 │   ├── STATUS.md            功能实现状态单一事实源
 │   ├── DIRECTORY.md         ← 📂 本文档
 │   ├── design-docs/         设计决策记录
 │   ├── exec-plans/          活跃/已完成计划 + 技术债务
 │   ├── product-specs/       产品规格
-│   └── references/          外部参考资料
 ├── ast/                   ← 🔧 AST 结构约束代码
 │   ├── analyzer.ts          分析器入口
 │   ├── rules/               规则定义

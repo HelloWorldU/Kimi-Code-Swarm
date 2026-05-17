@@ -99,8 +99,7 @@ typecheck → lint → analyze → test → check-docs → check-test-sync → b
 | `FRONTEND.md` | 技术栈、编码规范、命令 |
 | `COMPONENT_PATTERNS.md` | 组件模板、命名规范 |
 | `CLI_HARNESS.md` | CLI 进程接入规范 |
-| `OBSERVABILITY.md` | 可观测性设计 |
-| `TOKEN_MONITORING.md` | Token 预算与监控 |
+| `STATUS.md` | 功能状态 + 可观测性状态 |
 | `PLANS.md` | 执行计划索引 |
 
 ### 3. Skill 工作流模板 (`harness/*.yaml`)

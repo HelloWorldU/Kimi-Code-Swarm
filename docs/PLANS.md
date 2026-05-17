@@ -75,3 +75,5 @@ MVP 已实现（`scripts/health-check.ts`）。当前覆盖 doc-map 有效性、
 | `scripts/cleanup.ts` 循环清理 | P2 | 熵管理逻辑未实现；质量等级扫描 | AST dead-code 已覆盖核心需求，降级为 P2 |
 | health-check 扩展检查项 | P2 | 模板漂移、文档过时等 | 长期迭代 |
 | pre-commit hook Windows 兼容 | ✅ | 已添加 `ci/hooks/pre-commit.cmd` | — |
+| AST Parser 迁移（正则 → ESTree） | P2 | 正则无法区分代码/字符串/注释，新语法变体需持续打补丁 | 触发条件：新语法变体再次导致约束失效 |
+| Windows 路径兼容性测试 | P2 | 目前只在单台 Windows 机器验证 | 增加 CI 矩阵或多机测试 |
