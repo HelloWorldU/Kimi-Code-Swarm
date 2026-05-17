@@ -55,7 +55,7 @@
 cd kimi-code-swarm
 npm install          # 自动配置 Git hooks
 npm run dev          # localhost:5173
-cargo tauri dev      # Tauri 桌面模式
+npx tauri dev        # Tauri 桌面模式
 ```
 
 首次打开 App 输入 API Key，验证通过后存入系统 Keyring。
