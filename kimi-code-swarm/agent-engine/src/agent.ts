@@ -1,7 +1,7 @@
 import type { AgentState, LogEntry, ReviewEntry, TaskStatus, EngineEvent } from './types.js'
 import { runKimi, detectKimiCli, type KimiProcess } from './kimi.js'
 import { getChangedFiles, getStagedFiles, getFileDiff, gitAdd, gitCommit, gitPush, createBranch, cloneRepo, gitFetch, getBranchDiff, gitDeleteRemoteBranch } from './git.js'
-import { createPullRequest, mergePullRequest, getPullRequest, getCheckRuns, getCheckRunLogs } from './github-api.js'
+import { createPullRequest, mergePullRequest, getPullRequest, getPullRequestReviews, getCheckRuns, getCheckRunLogs, submitPullRequestReview } from './github-api.js'
 import { readFile } from 'fs/promises'
 
 interface SubmitStep {
@@ -46,6 +46,7 @@ export class Agent {
     instruction: string,
     tokenBudget: number,
     emit: (event: EngineEvent) => void,
+    private onPrCreated?: (agentId: string, branch: string, githubToken?: string) => Promise<void> | void,
   ) {
     this.emit = emit
     this.state = {
@@ -378,6 +379,7 @@ export class Agent {
     if (this.state.prStatus === 'open' && this.state.prNumber && githubToken) {
       this.log('system', `PR #${this.state.prNumber} 已存在，新 commit 已追加`)
       this.startCiMonitor(githubToken)
+      this.notifyPrCreated()
       return { ok: true, steps }
     }
 
@@ -391,6 +393,7 @@ export class Agent {
           this.state.prUrl = pr.html_url
           this.log('system', `PR #${pr.number} 已创建: ${pr.html_url}`)
           this.startCiMonitor(githubToken)
+          this.notifyPrCreated()
           return { ok: true, steps }
         }
       } catch (err) {
@@ -403,6 +406,7 @@ export class Agent {
     this.state.prNumber = Math.floor(Math.random() * 100) + 1
     this.state.prUrl = `${this.state.repoUrl.replace(/\.git$/, '')}/pull/${this.state.prNumber}`
     this.log('system', `PR #${this.state.prNumber} 已创建（模拟，未配置 GitHub Token）`)
+    this.notifyPrCreated()
     return { ok: true, steps }
   }
 
@@ -534,16 +538,30 @@ export class Agent {
     }
   }
 
-  canMerge(): boolean {
+  async canMerge(githubToken?: string): Promise<boolean> {
+    // 有 GitHub Token 时以 GitHub API 为准
+    if (githubToken && this.state.prNumber) {
+      const reviews = await getPullRequestReviews(githubToken, this.state.repoUrl, this.state.prNumber)
+      if (reviews) {
+        // 取每个用户的最新 review 状态
+        const latestByUser = new Map<string, string>()
+        for (const r of reviews) {
+          latestByUser.set(r.user.login, r.state)
+        }
+        const approvedCount = Array.from(latestByUser.values()).filter((s) => s === 'APPROVED').length
+        return approvedCount >= 1
+      }
+    }
+    // 回退到内部状态（Mock 模式或无 Token）
     if (this.state.reviews.length === 0) return true
     return this.state.reviews.every((r) => r.status === 'approved')
   }
 
   async mergePr(githubToken?: string) {
     if (this.state.status !== 'reviewing') return
-    if (!this.canMerge()) {
-      const approved = this.state.reviews.filter((r) => r.status === 'approved').length
-      this.log('error', `合并被拒绝：需等待全员审阅通过（${approved}/${this.state.reviews.length}）`)
+    const canMerge = await this.canMerge(githubToken)
+    if (!canMerge) {
+      this.log('error', '合并被拒绝：GitHub 上 review 未满足分支保护规则要求')
       return
     }
 
@@ -597,20 +615,38 @@ export class Agent {
     this.log('system', 'PR 被打回，Agent 继续修改')
   }
 
-  submitReview(reviewerAgentId: string, approved: boolean) {
+  private notifyPrCreated() {
+    if (this.onPrCreated) {
+      Promise.resolve(this.onPrCreated(this.state.id, this.state.branch, this.githubToken)).catch((err) => {
+        this.log('error', `PR 创建后通知 engine 失败: ${String(err)}`)
+      })
+    }
+  }
+
+  async submitReview(reviewerAgentId: string, approved: boolean, comment?: string) {
     if (this.state.status !== 'reviewing') return
     const review = this.state.reviews.find((r) => r.reviewerAgentId === reviewerAgentId)
     if (!review) return
+
+    // 同步到 GitHub
+    if (this.githubToken && this.state.prNumber) {
+      const event = approved ? 'APPROVE' : 'REQUEST_CHANGES'
+      const ok = await submitPullRequestReview(
+        this.githubToken,
+        this.state.repoUrl,
+        this.state.prNumber,
+        event,
+        comment || (approved ? '自动审阅通过' : '自动审阅发现潜在问题'),
+      )
+      if (!ok) {
+        this.log('error', 'GitHub review 提交失败，仅更新内部状态')
+      }
+    }
 
     review.status = approved ? 'approved' : 'rejected'
     review.reviewedAt = new Date().toISOString()
     const action = approved ? '通过' : '拒绝'
     this.log('system', `Agent「${review.reviewerName}」审阅${action}了此 PR`)
-
-    const approvedCount = this.state.reviews.filter((r) => r.status === 'approved').length
-    if (approvedCount === this.state.reviews.length) {
-      this.log('system', '全员审阅通过，等待指挥官合并')
-    }
   }
 
   async getFileDiff(filePath: string): Promise<string> {
@@ -885,20 +921,20 @@ PR_BODY:
   async performReview(
     targetBranch: string,
     targetAgentId: string,
-    onComplete: (reviewerId: string, targetId: string, approved: boolean) => void,
+    onComplete: (reviewerId: string, targetId: string, approved: boolean, comment: string) => void,
   ) {
     if (this.state.status !== 'ready') {
       this.log('system', `当前状态 ${this.state.status}，跳过自动审阅`)
-      onComplete(this.state.id, targetAgentId, false)
+      onComplete(this.state.id, targetAgentId, false, '当前状态非 ready，跳过审阅')
       return
     }
 
     try {
       const result = await this.runReview(targetBranch)
-      onComplete(this.state.id, targetAgentId, result.approved)
+      onComplete(this.state.id, targetAgentId, result.approved, result.comment)
     } catch (err) {
       this.log('error', `自动审阅执行异常: ${String(err)}`)
-      onComplete(this.state.id, targetAgentId, false)
+      onComplete(this.state.id, targetAgentId, false, `审阅异常: ${String(err)}`)
     }
   }
 

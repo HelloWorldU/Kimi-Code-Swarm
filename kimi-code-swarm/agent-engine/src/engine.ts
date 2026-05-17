@@ -35,6 +35,7 @@ export class AgentEngine {
             cmd.payload.instruction,
             cmd.payload.tokenBudget,
             this.broadcast,
+            (agentId, branch, token) => this.triggerReviews(agentId, branch, token),
           )
           this.agents.set(agent.state.id, agent)
           this.broadcast({ type: 'agent-created', agent: agent.state })
@@ -58,11 +59,12 @@ export class AgentEngine {
                   content: `新 Agent「${agent.state.name}」已加入，自动指派审阅 PR`,
                 },
               })
-              agent.performReview(target.state.branch, target.state.id, (reviewerId, targetAgentId, approved) => {
+              agent.performReview(target.state.branch, target.state.id, async (reviewerId, targetAgentId, approved, comment) => {
                 const targetAgent = this.agents.get(targetAgentId)
                 if (!targetAgent) return
-                targetAgent.submitReview(reviewerId, approved)
-                if (targetAgent.canMerge() && targetAgent.state.status === 'reviewing') {
+                await targetAgent.submitReview(reviewerId, approved, comment)
+                const canMerge = await targetAgent.canMerge(pending.githubToken)
+                if (canMerge && targetAgent.state.status === 'reviewing') {
                   this.pendingReviews.delete(targetAgentId)
                   targetAgent.mergePr(pending.githubToken).catch((err) => {
                     this.broadcast({ type: 'error', message: `自动合并失败: ${String(err)}` })
@@ -168,47 +170,8 @@ export class AgentEngine {
         case 'submit-for-review': {
           const agent = this.agents.get(cmd.agentId)
           if (!agent || (agent.state.status !== 'working' && agent.state.status !== 'ready')) return
-          agent.assignReviewers(Array.from(this.agents.values()))
           await agent.submitForReview(cmd.githubToken)
-
-          // 触发自动审阅：让每个 reviewer Agent 异步执行审阅
-          for (const review of agent.state.reviews) {
-            const reviewer = this.agents.get(review.reviewerAgentId)
-            if (reviewer && reviewer.state.id !== agent.state.id) {
-              reviewer.performReview(agent.state.branch, agent.state.id, (reviewerId, targetId, approved) => {
-                const target = this.agents.get(targetId)
-                if (!target) return
-                target.submitReview(reviewerId, approved)
-                // 全部 approved 后自动合并
-                if (target.canMerge() && target.state.status === 'reviewing') {
-                  this.pendingReviews.delete(targetId)
-                  target.mergePr(cmd.githubToken).catch((err) => {
-                    this.broadcast({ type: 'error', message: `自动合并失败: ${String(err)}` })
-                  })
-                }
-              }).catch((err) => {
-                this.broadcast({ type: 'error', message: `自动审阅失败: ${String(err)}` })
-              })
-            }
-          }
-
-          // 如果没有 reviewer，加入待审队列，等新 Agent 接单
-          if (agent.state.reviews.length === 0) {
-            this.pendingReviews.set(agent.state.id, {
-              branch: agent.state.branch,
-              githubToken: cmd.githubToken,
-            })
-            this.broadcast({
-              type: 'log',
-              agentId: agent.state.id,
-              entry: {
-                id: 'system',
-                timestamp: new Date().toISOString(),
-                type: 'system',
-                content: 'PR 已创建，当前无可用审阅者，进入待审队列等待新 Agent 加入',
-              },
-            })
-          }
+          this.triggerReviews(agent.state.id, agent.state.branch, cmd.githubToken)
           break
         }
 
@@ -227,12 +190,13 @@ export class AgentEngine {
         case 'submit-review': {
           const agent = this.agents.get(cmd.agentId)
           if (!agent) break
-          agent.submitReview(cmd.reviewerAgentId, cmd.approved)
+          await agent.submitReview(cmd.reviewerAgentId, cmd.approved, cmd.comment)
 
           if (agent.state.status !== 'reviewing') break
 
           // 全部 approved → 自动合并
-          if (agent.canMerge()) {
+          const canMerge = await agent.canMerge(cmd.githubToken)
+          if (canMerge) {
             this.pendingReviews.delete(agent.state.id)
             await agent.mergePr(cmd.githubToken)
             break
@@ -277,6 +241,47 @@ export class AgentEngine {
       const msg = String(err)
       console.error(`[engine] handleCommand 异常: ${msg}`)
       this.broadcast({ type: 'error', message: msg })
+    }
+  }
+
+  private triggerReviews(agentId: string, branch: string, githubToken?: string) {
+    const target = this.agents.get(agentId)
+    if (!target || target.state.status !== 'reviewing') return
+
+    target.assignReviewers(Array.from(this.agents.values()))
+
+    for (const review of target.state.reviews) {
+      const reviewer = this.agents.get(review.reviewerAgentId)
+      if (reviewer && reviewer.state.id !== target.state.id) {
+        reviewer.performReview(branch, agentId, async (reviewerId, targetId, approved, comment) => {
+          const t = this.agents.get(targetId)
+          if (!t) return
+          await t.submitReview(reviewerId, approved, comment)
+          const canMerge = await t.canMerge(githubToken)
+          if (canMerge && t.state.status === 'reviewing') {
+            this.pendingReviews.delete(targetId)
+            t.mergePr(githubToken).catch((err) => {
+              this.broadcast({ type: 'error', message: `自动合并失败: ${String(err)}` })
+            })
+          }
+        }).catch((err) => {
+          this.broadcast({ type: 'error', message: `自动审阅失败: ${String(err)}` })
+        })
+      }
+    }
+
+    if (target.state.reviews.length === 0) {
+      this.pendingReviews.set(agentId, { branch, githubToken })
+      this.broadcast({
+        type: 'log',
+        agentId,
+        entry: {
+          id: 'system',
+          timestamp: new Date().toISOString(),
+          type: 'system',
+          content: 'PR 已创建，当前无可用审阅者，进入待审队列等待新 Agent 加入',
+        },
+      })
     }
   }
 

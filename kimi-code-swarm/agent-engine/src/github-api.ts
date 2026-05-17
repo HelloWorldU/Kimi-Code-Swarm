@@ -148,6 +148,62 @@ export async function getCheckRuns(
 }
 
 /**
+ * 获取 Pull Request 的所有 reviews
+ */
+export async function getPullRequestReviews(
+  token: string,
+  repoUrl: string,
+  prNumber: number,
+): Promise<{ id: number; state: string; user: { login: string }; body: string; submitted_at: string }[] | null> {
+  const repo = parseRepoUrl(repoUrl)
+  if (!repo) return null
+
+  const url = `${GITHUB_API}/repos/${repo.owner}/${repo.repo}/pulls/${prNumber}/reviews`
+
+  try {
+    const res = await fetch(url, { headers: getHeaders(token) })
+    if (!res.ok) {
+      console.error(`[github-api] getReviews ${res.status}`)
+      return null
+    }
+    return (await res.json()) as { id: number; state: string; user: { login: string }; body: string; submitted_at: string }[]
+  } catch (err) {
+    console.error(`[github-api] getReviews 异常: ${String(err)}`)
+    return null
+  }
+}
+
+/**
+ * 提交 Pull Request Review（approve / request_changes / comment）
+ */
+export async function submitPullRequestReview(
+  token: string,
+  repoUrl: string,
+  prNumber: number,
+  event: 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT',
+  body?: string,
+): Promise<boolean> {
+  const repo = parseRepoUrl(repoUrl)
+  if (!repo) return false
+
+  const url = `${GITHUB_API}/repos/${repo.owner}/${repo.repo}/pulls/${prNumber}/reviews`
+  const payload = JSON.stringify({ event, body: body || '' })
+
+  try {
+    const res = await fetch(url, { method: 'POST', headers: getHeaders(token), body: payload })
+    if (!res.ok) {
+      const err = await res.text()
+      console.error(`[github-api] submitReview ${res.status}: ${err}`)
+      return false
+    }
+    return true
+  } catch (err) {
+    console.error(`[github-api] submitReview 异常: ${String(err)}`)
+    return false
+  }
+}
+
+/**
  * 获取失败 check run 的日志文本
  * 优先使用 GitHub Actions job logs API（check-runs 的 logs_url 经常为 null）
  */

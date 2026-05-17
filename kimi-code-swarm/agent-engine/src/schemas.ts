@@ -98,6 +98,7 @@ export const EngineCommandSchema = z.discriminatedUnion('type', [
     agentId: z.string().min(1),
     reviewerAgentId: z.string().min(1),
     approved: z.boolean(),
+    comment: z.string().optional(),
     githubToken: z.string().optional(),
   }),
   z.object({
