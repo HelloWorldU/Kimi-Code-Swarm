@@ -28,7 +28,8 @@
 - 🎯 **任务派发**：点击新建任务，App 自动 clone 仓库、切分支、启动 CLI
 - 📝 **指令输入**：指挥官给 Agent 下达自然语言指令
 - 📊 **实时监控**：Token 消耗、Git 分支、PR 状态、进程存活
-- 🔍 **PR 审阅**：在 App 内查看 diff、合并或打回
+- 🤖 **自动提交审阅**：Agent 完成指令后自动 `git add/commit/push` 并创建 PR；pre-commit 失败时全量日志回传修复（最多 3 轮）
+- 🔍 **PR 审阅**：在 App 内查看 diff、合并或打回；全员审阅门控（其余 Agent 必须全部通过）
 - ⚡ **并发开发**：多个 Agent 在独立目录互不干扰
 
 ## 技术栈
@@ -36,14 +37,11 @@
 | 层级 | 技术 |
 |------|------|
 | 前端 | Vue 3 + TypeScript + Vite + Tailwind CSS |
-| 构建 | Vite |
+| 桌面壳 | Tauri v2 (Rust) |
+| Agent Engine | Node.js + TypeScript + Zod |
 | 图标 | lucide-vue-next |
-| 桌面壳 | Tauri v2 |
 
-> ⚠️ **平台限制**：当前代码和验证主要在 **Windows** 上完成。Rust 侧包含 Windows 特定的进程管理逻辑（`CREATE_NO_WINDOW`、`taskkill`、硬编码 `C:
-vm4w
-odejs
-ode.exe` 探测等），macOS/Linux 需要额外适配才能运行。浏览器开发模式（`npm run dev`）不受此限制。
+> ⚠️ **平台限制**：当前代码和验证主要在 **Windows** 上完成。Rust 进程管理含 Windows-only 逻辑（`CREATE_NO_WINDOW`、`taskkill`、nvm-windows 路径探测），macOS/Linux 需适配。浏览器开发模式（`npm run dev`）不受此限制。
 
 ---
 
@@ -96,19 +94,22 @@ npm run tauri dev
 ## 文档结构
 
 ```
-AGENTS.md        ← 地图（Agent 启动先读）
-docs/            ← 知识库（架构/设计/规范/产品规格）
-  ├── DESIGN.md
-  ├── ARCHITECTURE.md
-  ├── FRONTEND.md
-  ├── COMPONENT_PATTERNS.md
-  ├── CONSTRAINTS.md
-  ├── PLANS.md
-  └── product-specs/
-ast/             ← AST 结构约束
-ci/              ← CI 配置与 hooks
-scripts/         ← 自动化脚本（health-check / setup-hooks）
-kimi-code-swarm/ ← 前端应用
+AGENTS.md        ← 🗺️ 地图（Agent 启动先读）
+docs/            ← 📚 知识库（按需加载）
+  ├── DESIGN.md           顶层设计 + Harness 五层架构
+  ├── ARCHITECTURE.md     系统架构、数据流、模块边界
+  ├── FRONTEND.md         前端编码规范
+  ├── COMPONENT_PATTERNS.md  Vue 组件规范
+  ├── CONSTRAINTS.md      约束体系（CI / AST / pre-commit）
+  ├── STATUS.md           功能实现状态单一事实源
+  ├── PLANS.md            执行计划 + 技术债务
+  ├── CLI_HARNESS.md      CLI 进程接入设计
+  └── product-specs/      产品规格
+ast/             ← 🔧 AST 结构约束代码
+ci/              ← ✅ CI 配置与 git hooks
+scripts/         ← 🤖 自动化脚本（health-check / cleanup）
+skills/          ← 🎯 Agent 能力规范（commit / push / debug）
+kimi-code-swarm/ ← 💻 前端应用 + Agent Engine
 ```
 
 ## 许可证
