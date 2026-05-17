@@ -102,14 +102,65 @@ B 恢复 `ready` 时（如从 `working` → `ready` 或 `stopped` → `ready`）
 
 ---
 
-## 5. 验收清单（修复后验证用）
+## 5. GitHub PR Review 真实同步
 
+### 触发条件
+Reviewer Agent 完成 `performReview`，回调 `submitReview(approved, comment)`。
+
+### 当前行为 ❌
+```
+performReview 返回 {approved, comment}
+→ 回调只传递 approved（布尔值），comment 被丢弃
+→ submitReview() 只更新内存状态：review.status = 'approved'
+→ 日志输出："Agent「xxx」审阅通过了此 PR"
+→ ❌ 没有调用 GitHub API
+→ ❌ GitHub PR 页面上没有任何 review 记录
+→ ❌ 打开 PR 链接看不到任何评论或 approve 标记
+```
+
+### 期望行为 ✅
+```
+performReview 返回 {approved, comment}
+→ 回调传递 approved + comment
+→ submitReview() 更新内存状态
+→ 调用 GitHub API: POST /repos/.../pulls/{prNumber}/reviews
+   {
+     "event": "APPROVE" | "REQUEST_CHANGES",
+     "body": comment  // kimi 的审阅意见（如 "LGTM" 或具体问题描述）
+   }
+→ GitHub PR 页面上显示真实的 review 记录
+→ 内部状态与 GitHub 状态保持一致
+```
+
+### 链路缺口明细
+
+| 环节 | 当前 | 期望 |
+|------|------|------|
+| `github-api.ts` | 无 `submitPullRequestReview` | 新增 API 封装 |
+| `performReview` 回调 | `(reviewerId, targetId, approved)` | `(reviewerId, targetId, approved, comment)` |
+| `submitReview` 签名 | `(reviewerAgentId, approved)` | `(reviewerAgentId, approved, comment?)` |
+| `submitReview` 实现 | 只改内存 | 先调 GitHub API，再改内存 |
+
+---
+
+## 6. 验收清单（修复后验证用）
+
+### 审阅触发
 - [ ] Agent A 自动执行完指令 → PR 创建 → 其他 ready Agent 自动审阅
-- [ ] 全部 approved → 自动合并 → 状态变为 completed
-- [ ] 有 rejected → 自动修改 → 重新提交 → 重新审阅（最多 3 轮）
+- [ ] 手动点击"提交审阅"和自动流程行为一致
 - [ ] 单 Agent 创建 PR → 进入 pending 队列 → 创建新 Agent B → B 自动审阅
 - [ ] Agent B 在 working 时被指派为 reviewer → B 完成自身任务恢复 ready → B 自动补审阅
-- [ ] 手动点击"提交审阅"和自动流程行为一致
+
+### 审阅结果处理
+- [ ] 全部 approved → 自动合并 → 状态变为 completed
+- [ ] 有 rejected → 自动修改 → 重新提交 → 重新审阅（最多 3 轮）
+
+### GitHub 真实同步
+- [ ] reviewer 审阅通过后，GitHub PR 页面上显示 "Approved" review
+- [ ] reviewer 审阅拒绝后，GitHub PR 页面上显示 "Requested changes" review
+- [ ] GitHub review body 包含 kimi 的审阅意见（comment）
+- [ ] 打开 PR 链接能看到所有 reviewer 的审阅记录
+- [ ] 内部 reviews 状态与 GitHub PR 的 review 状态一致
 
 ---
 
