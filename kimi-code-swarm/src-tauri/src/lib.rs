@@ -362,15 +362,7 @@ fn spawn_agent_engine(app: tauri::AppHandle) -> Result<u32, String> {
 
 #[tauri::command]
 fn send_to_engine(command: String) -> Result<(), String> {
-    // 按「字符」而非「字节」截断：&command[..120] 会在多字节 UTF-8（如中文）字符中间
-    // 切开并 panic（byte index N is not a char boundary），中文指令必崩，曾导致发送消息整个 App 闪退。
-    let log_cmd = if command.len() > 120 {
-        let head: String = command.chars().take(120).collect();
-        format!("{}... ({} bytes)", head, command.len())
-    } else {
-        command.clone()
-    };
-    log::info!("[send_to_engine] {}", log_cmd);
+    log::info!("[send_to_engine] {} bytes", command.len());
     let handle = ENGINE_HANDLE.lock().unwrap();
     let stdin = handle.as_ref()
         .ok_or("Agent engine not running")?;
