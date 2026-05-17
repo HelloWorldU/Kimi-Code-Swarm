@@ -448,15 +448,30 @@ fn verify_api_key(key: String) -> Result<bool, String> {
     Ok(true)
 }
 
-// Debug console: only opens in dev builds (cargo tauri dev), not production
-#[cfg(all(windows, debug_assertions))]
+/// ===================================================================
+/// DEBUG CONSOLE SWITCH
+/// ===================================================================
+/// 设为 `true` 时，无论 debug/release build 都会附加控制台窗口，
+/// 用于查看 Rust 后端 + Agent Engine 的实时 stderr 日志。
+///
+/// 使用方式（比生产打包快 3~4 倍）：
+/// 1. 将此常量改为 `true`
+/// 2. `cd src-tauri && cargo build`（~30s，debug 编译）
+/// 3. 在 cmd 中运行 `..\target\debug\kimi-code-swarm.exe`，复现 bug，看日志
+/// 4. 修完后改回 `false`，再跑 `cargo tauri build` 出正式包
+/// ===================================================================
+const DEBUG_CONSOLE: bool = false;
+
+#[cfg(windows)]
 fn open_debug_console() {
-    extern "system" { fn AllocConsole() -> i32; }
-    unsafe { AllocConsole(); }
-    println!("[Kimi Code Swarm] Debug console open");
+    if DEBUG_CONSOLE {
+        extern "system" { fn AllocConsole() -> i32; }
+        unsafe { AllocConsole(); }
+        println!("[Kimi Code Swarm] Debug console open");
+    }
 }
 
-#[cfg(not(all(windows, debug_assertions)))]
+#[cfg(not(windows))]
 fn open_debug_console() {}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
