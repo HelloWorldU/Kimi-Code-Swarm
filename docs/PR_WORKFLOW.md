@@ -60,7 +60,9 @@ create-agent B
 ```
 
 ### 期望行为
-保持不变。单 Agent 时进入 pending 队列是正确的兜底设计。
+单 Agent → PR 创建 → `assignReviewers` 返回空数组 → 进入 `pendingReviews` 队列 → **必须等待创建新 Agent B** → B 审阅 approve → GitHub 满足 required approvals → 才能合并。
+
+**不存在"单 Agent 直接合并"的场景**（除非仓库未开 "Require approvals"，但那样审阅门控无意义）。
 
 ---
 
