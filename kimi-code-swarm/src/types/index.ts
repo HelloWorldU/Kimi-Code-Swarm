@@ -40,7 +40,7 @@ export interface AgentTask {
 export interface LogEntry {
   id: string
   timestamp: string
-  type: 'system' | 'input' | 'output' | 'error'
+  type: 'system' | 'input' | 'output' | 'error' | 'think' | 'tool_call' | 'tool_result' | 'mcp'
   content: string
   tokens?: number
 }

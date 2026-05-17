@@ -17,7 +17,7 @@ export const CiStatusSchema = z.enum(['pending', 'success', 'failure', 'unknown'
 export const LogEntrySchema = z.object({
   id: z.string().min(1),
   timestamp: z.string().datetime(),
-  type: z.enum(['system', 'input', 'output', 'error']),
+  type: z.enum(['system', 'input', 'output', 'error', 'think', 'tool_call', 'tool_result', 'mcp']),
   content: z.string(),
   tokens: z.number().int().nonnegative().optional(),
 })
@@ -124,6 +124,17 @@ export const EngineEventSchema = z.discriminatedUnion('type', [
     agentId: z.string().min(1),
     line: z.string(),
     isStderr: z.boolean(),
+  }),
+  z.object({
+    type: z.literal('agent-stream'),
+    agentId: z.string().min(1),
+    chunk: z.discriminatedUnion('type', [
+      z.object({ type: z.literal('text'), content: z.string() }),
+      z.object({ type: z.literal('think'), content: z.string() }),
+      z.object({ type: z.literal('tool_call'), name: z.string(), arguments: z.string(), id: z.string() }),
+      z.object({ type: z.literal('tool_result'), content: z.string(), toolCallId: z.string().optional() }),
+      z.object({ type: z.literal('mcp'), name: z.string(), arguments: z.string(), id: z.string() }),
+    ]),
   }),
   z.object({
     type: z.literal('agent-exit'),

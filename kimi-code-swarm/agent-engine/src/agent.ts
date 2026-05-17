@@ -201,7 +201,7 @@ export class Agent {
     }
 
     try {
-      this.process = runKimi(kimiPath, this.state.workspace, instruction)
+      this.process = runKimi(kimiPath, this.state.workspace, instruction, { streamJson: true, thinking: true })
     } catch (err) {
       this.log('error', `启动 Kimi CLI 失败: ${String(err)}`)
       this.setStatus('ready')
@@ -210,19 +210,61 @@ export class Agent {
     this.state.pid = this.process.pid
     // Log the exact command line for observability / debugging
     this.log('system', `Kimi CLI 已启动 (PID: ${this.process.pid})`)
-    this.log('system', `命令: ${kimiPath} --work-dir ${this.state.workspace} --prompt "..." --print --final-message-only`)
+    this.log('system', `命令: ${kimiPath} --work-dir ${this.state.workspace} --prompt "..." --print --output-format stream-json --thinking`)
     this.running = true
 
-    // stdout reader — accumulate full response, emit as single log entry at the end
+    // stdout reader — parse stream-json and emit structured streaming chunks in real-time
     const outputLines: string[] = []
+    let hasStreamedText = false
     ;(async () => {
       try {
         for await (const line of this.process!.stdout) {
           if (!this.running) break
           const estimated = Math.max(1, Math.floor(line.length / 4))
           this.state.tokenUsed = Math.min(this.state.tokenUsed + estimated, this.state.tokenBudget)
-          outputLines.push(line)
-          this.emit({ type: 'agent-output', agentId: this.state.id, line, isStderr: false })
+
+          // Try to parse as stream-json structured output
+          let parsed = false
+          try {
+            const json = JSON.parse(line)
+            if (json.role === 'assistant') {
+              if (Array.isArray(json.content)) {
+                for (const chunk of json.content) {
+                  if (chunk.type === 'think' && chunk.think) {
+                    this.emit({ type: 'agent-stream', agentId: this.state.id, chunk: { type: 'think', content: chunk.think } })
+                  } else if (chunk.type === 'text' && chunk.text) {
+                    this.emit({ type: 'agent-stream', agentId: this.state.id, chunk: { type: 'text', content: chunk.text } })
+                    hasStreamedText = true
+                  }
+                }
+              }
+              if (Array.isArray(json.tool_calls)) {
+                for (const tc of json.tool_calls) {
+                  if (tc.type === 'function') {
+                    const name = tc.function?.name || 'unknown'
+                    const args = tc.function?.arguments || '{}'
+                    const id = tc.id || ''
+                    const isMcp = name.toLowerCase().includes('mcp')
+                    this.emit({ type: 'agent-stream', agentId: this.state.id, chunk: { type: isMcp ? 'mcp' : 'tool_call', name, arguments: args, id } })
+                  }
+                }
+              }
+              parsed = true
+            } else if (json.role === 'tool') {
+              const content = Array.isArray(json.content)
+                ? json.content.map((c: any) => c.text || '').join('')
+                : String(json.content)
+              this.emit({ type: 'agent-stream', agentId: this.state.id, chunk: { type: 'tool_result', content, toolCallId: json.tool_call_id } })
+              parsed = true
+            }
+          } catch {
+            // Not a valid stream-json line — treat as raw text
+          }
+
+          if (!parsed) {
+            outputLines.push(line)
+            this.emit({ type: 'agent-output', agentId: this.state.id, line, isStderr: false })
+          }
 
           if (this.state.tokenUsed >= this.state.tokenBudget) {
             this.process!.kill()
@@ -270,8 +312,9 @@ export class Agent {
     this.process = undefined  // 清理引用，避免 stop() 再次 kill 已死进程
 
     // Record complete output as a single log entry so the UI renders one bubble
+    // Skip if text was already streamed in real-time to avoid duplicates
     const fullOutput = outputLines.join('\n')
-    if (fullOutput) {
+    if (fullOutput && !hasStreamedText) {
       this.log('output', fullOutput)
     }
 
