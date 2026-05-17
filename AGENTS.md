@@ -1,108 +1,65 @@
 # Kimi-Code-Swarm
 
-> **本地 Agent 指挥中心 App**。指挥官通过 UI 派任务、监进度、审 PR。  
-> 本文档是**地图，不是手册**。细节按需去 `docs/` 加载。
+> **本地 Agent 指挥中心 App**。指挥官通过 UI 派任务、监进度、审 PR。
+> 本文档是**索引**，规则去 `skills/`，细节去 `docs/` 按需加载。
 
 ---
 
-## 项目定位
+## 快速决策树
 
-> **Harness Engineering 的实践场**——约束即代码、机械化检查、文档单一事实源、熵管理。  
-> 最大价值是**验证方法论**，而非售卖开箱即用的产品。
+| 场景 | 加载文档 | 检查清单 |
+|------|---------|---------|
+| 新建/修改代码 | `docs/FRONTEND.md` | build → lint → analyze → test |
+| 修复 Bug | `skills/debug/SKILL.md` | 日志定位 → 修复 → 留痕 → 验证 |
+| 提交代码 | `skills/commit/SKILL.md` | typecheck → lint → analyze → check-docs |
+| 推 PR | `skills/push/SKILL.md` | CI 通过 → 审阅 → 合并 |
+| 查看功能状态 | `docs/STATUS.md` | 状态同步 |
+| 架构决策 | `docs/DESIGN.md` + `docs/ARCHITECTURE.md` | Plan Mode |
 
 ---
 
-## 🧭 我想…
+## 黄金原则
+
+1. **地图即边界** — 只读 `AGENTS.md`，细节去 `docs/` 按需加载；口头约定等于不存在
+2. **代码变，文档必须同步变** — 被 check-docs 阻断时回顾本次已读文档
+3. **约束即代码** — 不能自动检查的约定等于不存在
+4. **改完必须验证** — build → test → lint/analyze 全部通过才允许合入
+5. **debug 必加日志** — 看不出根因时禁止盲猜，加日志定位；修复后留痕
+
+---
+
+## 技能索引
+
+| 技能 | 文件 |
+|------|------|
+| Commit 规范 | `skills/commit/SKILL.md` |
+| PR 推送 | `skills/push/SKILL.md` |
+| Debug 规范 | `skills/debug/SKILL.md` |
+
+## 文档索引
 
 | 我想… | 去这里 |
 |-------|--------|
-| 理解系统设计哲学 | [`docs/DESIGN.md`](docs/DESIGN.md) |
-| 了解系统架构 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
-| 了解产品规格 | [`docs/product-specs/index.md`](docs/product-specs/index.md) |
-| 写前端代码 | [`docs/FRONTEND.md`](docs/FRONTEND.md) |
-| 接入 CLI 进程 | [`docs/CLI_HARNESS.md`](docs/CLI_HARNESS.md) |
-| 组件规范 | [`docs/COMPONENT_PATTERNS.md`](docs/COMPONENT_PATTERNS.md) |
-| Token 监控设计 | [`docs/TOKEN_MONITORING.md`](docs/TOKEN_MONITORING.md) |
-| 可观测性 | [`docs/OBSERVABILITY.md`](docs/OBSERVABILITY.md) |
-| 查看执行计划 | [`docs/PLANS.md`](docs/PLANS.md) |
-| **查看功能实现状态** | **[`docs/STATUS.md`](docs/STATUS.md)** |
-| 检查代码 AST 结构 | `ast/analyzer.ts` |
-| 使用工作流模板 | `harness/*.yaml` |
-| 查看 Agent Skill 规范 | `skills/*/SKILL.md` |
-| 查看约束体系 | [`docs/CONSTRAINTS.md`](docs/CONSTRAINTS.md) |
-| 跑 CI 流水线 | `npm run ci` |
-| 检查文档同步 | `npm run check-docs` |
+| 理解系统设计 | `docs/DESIGN.md` |
+| 了解架构 | `docs/ARCHITECTURE.md` |
+| 写前端代码 | `docs/FRONTEND.md` |
+| 组件规范 | `docs/COMPONENT_PATTERNS.md` |
+| 查看功能状态 | `docs/STATUS.md` |
+| 完整目录结构 | `docs/DIRECTORY.md` |
 
 ---
 
-## ⚡ 黄金原则
-
-1. **地图即边界** —— 只读 `AGENTS.md`，细节去 `docs/` 按需加载。
-2. **仓库是唯一事实源** —— Slack/口头约定对 Agent 等于不存在。
-3. **执行即更新文档** —— 代码变更后必须同步更新相关文档；被 check-docs 阻断时回顾本次会话查阅过的文档。代码和文档不一致是 Harness 退化。
-4. **功能状态必须披露** —— 实现后须在 [`docs/STATUS.md`](docs/STATUS.md) 标记状态。Agent 遗忘上下文时，STATUS.md 是第一恢复点。
-5. **约束即代码** —— 所有规则必须机械可执行。不能自动检查的约定等于不存在。
-6. **代码改动必验证** —— 改完后必须实际 build、启动 app、运行测试、过 lint/analyze，全部通过后才允许合入。纯文档/配置改动除外。
-7. **debug 必加日志** —— 代码看不出根因时，禁止盲猜。立即增加日志（`src/utils/logger.ts`）把运行时状态打出来；修复后在注释或 commit 中记录根因。反复盲修同一 bug 是效率灾难。
-
----
-
-## 🗺️ 目录结构
-
-```
-Kimi-Code-Swarm/
-├── AGENTS.md              ← 🗺️ 地图（本文档）
-├── README.md              ← 人类友好的项目介绍
-├── docs/                  ← 📚 知识库（Agent 按需加载）
-├── ast/                   ← 🔧 AST 结构约束代码
-├── ci/                    ← ✅ CI 约束配置
-├── scripts/               ← 🤖 自动化脚本
-├── skills/                ← 🎯 Agent 能力 Skill（可复用工作流规范）
-├── harness/               ← 📋 工作流模板（new-instance / bug-fix / new-task / auto-test）
-└── kimi-code-swarm/       ← 💻 前端应用（Vue3 + Vite + Tailwind + Tauri v2）
-    ├── src/                 前端源码
-    ├── agent-engine/        Node.js Agent Engine（进程管理 + Git/GitHub 自动化）
-    └── tests/               🧪 单元 / 集成 / E2E 测试
-```
-
----
-
-## 🎯 Agent Skill 体系
-
-`skills/` 目录存放可复用的 Agent 能力规范（Skill），每个 Skill 是一个独立目录，内含 `SKILL.md`。完整清单和接入状态见 [`skills/AGENTS.md`](skills/AGENTS.md)。
-
-**当前 Skill**：
-- `skills/commit/` — Commit message 规范（✅ 已接入代码，动态读取）
-- `skills/push/` — PR 推送规范（⚡ 静态规范，待演进）
-
----
-
-## 🏗️ Harness 五层映射
-
-| 层 | 知识文档 | 代码/配置 |
-|--|----------|----------|
-| L1 Context | `AGENTS.md` + `docs/` + `skills/` | — |
-| L2 Constraints | `docs/DESIGN.md` + `docs/CONSTRAINTS.md` | `ast/`, `ci/` |
-| L3 Observability | `docs/OBSERVABILITY.md` | UI 面板 |
-| L4 Entropy Mgmt | `docs/DESIGN.md` | `scripts/cleanup.ts` |
-| L5 Source of Truth | 仓库即唯一知识源 | — |
-
----
-
-## 🚀 快速启动
-
-前置条件：**Node.js 22+**、**Git**、**Kimi CLI**（`py -3.12 -m pip install kimi-cli`）、**Kimi API Key**
+## 快速启动
 
 ```bash
 cd kimi-code-swarm
 npm install          # 自动配置 Git hooks
-npm run dev          # localhost:5173（浏览器模式）
+npm run dev          # localhost:5173
+cargo tauri dev      # Tauri 桌面模式
 ```
 
-Tauri 桌面模式（需要 Rust）：`cargo tauri dev`
-
-首次打开 App 后在登录页输入 API Key，验证通过后存入系统 Keyring。
+首次打开 App 输入 API Key，验证通过后存入系统 Keyring。
 
 ---
 
-*Map version: 2026-05-15*
+*Map version: 2026-05-16*

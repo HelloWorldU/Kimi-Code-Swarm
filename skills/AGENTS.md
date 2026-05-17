@@ -8,8 +8,9 @@
 
 | Skill | 作用 | 代码接入状态 | 关键文件 |
 |-------|------|-------------|---------|
-| `commit/` | Commit message 规范（Conventional Commits）和提交前检查清单 | ✅ **动态读取** — `agent.ts` 的 `generateCommitAndPrBody()` 运行时读取本 skill 作为 prompt 事实源 | `SKILL.md` |
-| `push/` | PR 推送规范（推送前验证、PR title/body 格式、生命周期管理） | ⚡ **静态规范** — 工程师参考文档；PR title/body/生命周期已由 `agent.ts` 其他逻辑覆盖，推送前验证尚未接入 | `SKILL.md` |
+| `commit/` | Commit message 规范（Conventional Commits）和提交前检查清单 | ✅ **动态读取** — `agent.ts` 运行时读取 | `SKILL.md` |
+| `push/` | PR 推送规范（推送前验证、PR title/body 格式、生命周期管理） | ⚡ **静态规范** — 尚未接入代码 | `SKILL.md` |
+| `debug/` | Bug 修复规范（日志定位、禁止盲猜、根因留痕） | ⚡ **静态规范** — 由 AGENTS.md 索引，Agent 按需加载 | `SKILL.md` |
 
 ---
 
