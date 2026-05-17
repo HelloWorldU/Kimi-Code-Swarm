@@ -170,4 +170,26 @@ performReview 返回 {approved, comment}
 
 ---
 
+## 7. 已知设计缺口：硬编码路径
+
+### 当前问题
+以下路径在核心代码中硬编码，换机器/盘符/安装位置后功能失效：
+
+| 位置 | 硬编码值 | 用途 | 影响 |
+|------|---------|------|------|
+| `agent.ts:147` | `E:/workspace` | Agent 工作目录根 | 换盘符后无法创建工作空间 |
+| `engine.ts:112` | `E:/workspace/${id}` | delete-agent 时清理目录的 fallback | 清理到错误位置或失败 |
+| `kimi.ts:8` | `C:\Python312\Scripts\kimi.exe` | Kimi CLI 探测路径 | Python 装在其他位置时找不到 CLI |
+| `lib.rs` | `C:\nvm4w\nodejs\node.exe` | Node.js 探测路径 | 非 nvm-windows 用户找不到 node |
+
+### 期望行为
+- 工作目录根路径：从配置读取（如 `~/.config/kcs/workspace` 或用户自定义）
+- 外部工具路径：环境变量 > 配置 > 自动探测 > 友好报错，禁止硬编码绝对路径
+- 只有 `tests/` 中允许硬编码路径（测试用例隔离、可预期）
+
+### 原则（vllm 经验）
+> **非 `tests/` 代码禁止包含硬编码绝对路径**。路径应通过配置、环境变量或运行时探测获取。这是可移植性的底线。
+
+---
+
 *Document created: 2026-05-17*

@@ -120,6 +120,7 @@ typecheck → lint → analyze → test → check-docs → check-test-sync → b
 | 状态色语义 | running=emerald, idle=blue, error=red, queued=amber, stopped=gray |
 | Store 修改规范 | 状态必须通过 `useSwarmStore` 方法修改 |
 | Bug 反复修复 | 同一 bug 反复出现 → 必须先加 Logger 日志定位根因 → 修复后留痕（根因说明）。禁止盲修。 |
+| **禁止硬编码绝对路径** | **非 `tests/` 代码禁止包含硬编码绝对路径**（如 `E:/workspace`、`C:\Python312\...`、`C:\nvm4w\...`）。路径应通过配置、环境变量或运行时探测获取。`tests/` 中允许硬编码（测试用例隔离、可预期）。这是可移植性的底线（vllm 经验）。 |
 | Harness 合规 | bug-fix 分支修改 src/ 代码后，必须同步更新 `docs/`、`exec-plans/` 或 `harness/bug-fix.yaml`。文档是单一事实源。 |
 | 代码改动验证 | 任何代码变更必须走 build → start → test → lint/analyze 闭环，全部通过才能开 PR。未验证代码禁止合入 main。 |
 
