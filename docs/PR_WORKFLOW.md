@@ -1,6 +1,6 @@
 # PR 工作流场景文档
 
-> 全员审阅门控的完整场景、当前行为与期望行为对照。用于功能对齐和测试验证。
+> PR 审阅门控的完整场景、当前行为与期望行为对照。以 **GitHub 分支保护规则** 为唯一事实源，App 内部状态跟随 GitHub。用于功能对齐和测试验证。
 
 ---
 
@@ -33,7 +33,7 @@ sendInstruction 完成
 ```
 
 ### 期望行为
-自动路径和手动路径行为完全一致：PR 创建后自动指派 reviewer、触发审阅、处理结果。
+自动路径和手动路径行为完全一致：PR 创建后自动指派 reviewer、触发审阅、处理结果。合并决策以 GitHub API 返回的真实 review 状态为准，不强制要求 App 内全员通过。
 
 ---
 
@@ -83,7 +83,10 @@ assignReviewers(allAgents)
 B 后续恢复 `ready` 后，**不会自动补审阅**。A 的 PR 永远等不到 B 的结果，卡在 `reviewing` 状态。
 
 ### 期望行为
-B 恢复 `ready` 时（如从 `working` → `ready` 或 `stopped` → `ready`），engine 检查是否有待审阅的 PR 需要 B 审阅，如果有则自动触发 `performReview`。
+**取消"全员通过"强制要求。** 合并决策以 GitHub 分支保护规则为准：
+- 如果 GitHub 已满足 required approvals（如仓库设置只需 1 个），即使 B 未审阅也可合并
+- B 恢复 `ready` 后是否补审阅，不影响合并决策，仅作为补充审阅
+- 如果仓库设置了 "dismiss stale reviews"，重新 push 后会重置 review 状态，此时需要重新审阅
 
 ---
 
@@ -98,7 +101,7 @@ B 恢复 `ready` 时（如从 `working` → `ready` 或 `stopped` → `ready`）
 | completed | 任务结束 | **不能**审阅他人 PR |
 
 ### 关键缺口
-`stopped` / `completed` 状态的 Agent 被加入 reviews 列表后，performReview 直接跳过且不再重试。应改为：这些状态的 Agent 被恢复后自动补审阅。
+`stopped` / `completed` 状态的 Agent 被加入 reviews 列表后，performReview 直接跳过。**不再强制要求全员通过，以 GitHub API 查询的 review 状态为合并依据。**
 
 ---
 
@@ -151,16 +154,17 @@ performReview 返回 {approved, comment}
 - [ ] 单 Agent 创建 PR → 进入 pending 队列 → 创建新 Agent B → B 自动审阅
 - [ ] Agent B 在 working 时被指派为 reviewer → B 完成自身任务恢复 ready → B 自动补审阅
 
-### 审阅结果处理
-- [ ] 全部 approved → 自动合并 → 状态变为 completed
-- [ ] 有 rejected → 自动修改 → 重新提交 → 重新审阅（最多 3 轮）
+### 审阅结果处理（以 GitHub 为准）
+- [ ] GitHub API 返回满足 required approvals → 自动合并 → 状态变为 completed
+- [ ] GitHub API 返回 changes requested / review 不足 → 自动修改 → 重新提交 → 重新审阅（最多 3 轮）
 
 ### GitHub 真实同步
 - [ ] reviewer 审阅通过后，GitHub PR 页面上显示 "Approved" review
 - [ ] reviewer 审阅拒绝后，GitHub PR 页面上显示 "Requested changes" review
 - [ ] GitHub review body 包含 kimi 的审阅意见（comment）
 - [ ] 打开 PR 链接能看到所有 reviewer 的审阅记录
-- [ ] 内部 reviews 状态与 GitHub PR 的 review 状态一致
+- [ ] `canMerge()` 改为查询 GitHub API（`GET /pulls/{prNumber}` 或列出 reviews），以 GitHub 返回的真实 review 状态为合并依据
+- [ ] App 内 reviews 状态与 GitHub PR 的 review 状态一致（或允许 GitHub 领先）
 
 ---
 
