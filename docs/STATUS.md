@@ -28,7 +28,7 @@
 | Agent 状态持久化 | ✅ | tauri-plugin-store 自动保存/恢复 Agent 列表 | `src/store/useSwarmStore.ts` |
 | Git 自动化（clone/checkout/commit/push） | ✅ | Tauri 环境通过 IPC 执行真实 git | `src/api/ipc.ts` |
 | GitHub API（PR 创建/合并/查询） | ✅ | 配置 GitHub Token 后 Agent Engine 调用真实 GitHub REST API；无 Token 降级为 Mock | `agent-engine/src/github-api.ts` |
-| 全员审阅门控 | ✅ | 后端严格检查 reviews 全 approved；Tauri 模式下 reviewer Agent 自动运行 kimi CLI 审阅代码变更（解析 LGTM 关键词）；如有 reject 则被审阅 Agent 自动根据意见修改代码并重新提交（最多 3 轮）；浏览器模式下需指挥官手动审阅；**PR 合并可由指挥官手动触发或全员审阅通过后自动合并** | `src/store/useSwarmStore.ts`, `agent-engine/src/agent.ts`, `agent-engine/src/engine.ts` |
+| 全员审阅门控 | 🚧 | PR 创建 + CI 监控 + 审阅结果处理（approve/reject/fix）已实现；**reviewer 自动指派和触发在手动提交审阅时工作，但在 Agent 自动流程（`sendInstruction` → `autoSubmitForReview`）中缺失** —— `agent.ts` 内部 `submitForReview` 未调用 `assignReviewers`，也未触发 `performReview`，导致自动执行完指令后没有 reviewer 介入 | `src/store/useSwarmStore.ts`, `agent-engine/src/agent.ts`, `agent-engine/src/engine.ts` |
 | Agent Engine 进程管理 | ✅ | Rust 后台 spawn Node.js Agent Engine，stdin/stdout 管道通信；生产环境用预编译 `dist/index.js`，开发环境 fallback 到 tsx；Windows 主动探测 `node.exe` 路径（nvm-windows 兼容） | `src-tauri/src/lib.rs`, `agent-engine/src/index.ts` |
 | Kimi CLI 接入 | ✅ | `sendInstruction` 调用 `kimi --print --quiet`，实时 stdout 流式捕获，可取消 | `src/store/useSwarmStore.ts` |
 | Token 预算控制 | ✅ | sendInstruction 前检查预算；process-output 中按输出行长度估算并累加；耗尽时自动 kill 进程 | `src/store/useSwarmStore.ts` |
