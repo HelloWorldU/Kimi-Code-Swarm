@@ -5,10 +5,19 @@
 
 ---
 
+## ⚠️ 接到任务，先对齐
+
+**动手写任何实现代码前，必须先执行 `skills/task-intake/SKILL.md`** —— 需求澄清 → 文档清单 → 场景与预期（含失败路径）→ 完整呈现给用户、获得明确批准 → 才允许写代码。
+
+> 听到需求就直接开写 = 违规。这一条凌驾于下方所有黄金原则之上。
+
+---
+
 ## 快速决策树
 
 | 场景 | 加载文档 | 检查清单 |
 |------|---------|---------|
+| 接到任何新任务 | `skills/task-intake/SKILL.md` | 对齐批准后才动手 |
 | 新建/修改代码 | `docs/FRONTEND.md` | build → lint → analyze → test |
 | 修复 Bug | `skills/debug/SKILL.md` | 日志定位 → 修复 → 留痕 → 验证 |
 | 提交代码 | `skills/commit/SKILL.md` | typecheck → lint → analyze → check-docs |
@@ -20,6 +29,7 @@
 
 ## 黄金原则
 
+0. **先对齐再写码** — 接到任务先走 `skills/task-intake/SKILL.md`：需求澄清 → 场景与预期 → 对齐 → 批准后才写实现；听到需求直接开写 = 违规
 1. **地图即边界** — 只读 `AGENTS.md`，细节去 `docs/` 按需加载；口头约定等于不存在
 2. **代码变，文档必须同步变** — 被 check-docs 阻断时回顾本次已读文档
 3. **约束即代码** — 不能自动检查的约定等于不存在
@@ -32,6 +42,7 @@
 
 | 技能 | 文件 |
 |------|------|
+| 任务接入门控 | `skills/task-intake/SKILL.md` |
 | Commit 规范 | `skills/commit/SKILL.md` |
 | PR 推送 | `skills/push/SKILL.md` |
 | Debug 规范 | `skills/debug/SKILL.md` |
@@ -62,4 +73,4 @@ npx tauri dev        # Tauri 桌面模式
 
 ---
 
-*Map version: 2026-05-16*
+*Map version: 2026-05-18*
