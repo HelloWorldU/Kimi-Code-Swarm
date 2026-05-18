@@ -183,6 +183,8 @@ Rust `spawn_agent_engine()` 需要找到 `agent-engine` 目录并启动 Node.js 
 | 生产 | `node dist/index.js` | `tsc` 预编译，无需 tsx 运行时 |
 | 开发 | `node node_modules/tsx/dist/cli.mjs src/index.ts` | tsx 现场转译，方便迭代 |
 
+> 生产用的 `dist/` 由打包自动生成：`tauri.conf.json` 的 `beforeBuildCommand` 串联了 `npm run build:engine`（即 `tsc`），且 `agent-engine/tsconfig.json` 开启 `noEmitOnError` —— 类型错误会直接中断打包，而非漏进 `dist/`。CI（`npm run ci`）通过 `typecheck:engine` 单独校验 agent-engine。
+
 ### Node.js 路径探测
 
 Windows 上 nvm-windows 不写入系统 PATH，GUI 进程继承不到。`find_node_exe()` 主动探测：
@@ -198,6 +200,7 @@ ode.exe` 等）
 - 不要用硬编码的相对路径 `'agent-engine'`。Tauri Dev 模式下 `cargo run` 的 CWD 是 `src-tauri/`，`agent-engine` 会指向 `src-tauri/agent-engine`（不存在），必须用 `../agent-engine`。
 - 生产环境必须通过 `bundle.resources` 把 agent-engine 打进安装包，否则安装后找不到目录。
 - 开发时隐式依赖（如 zod 通过父级 `node_modules` 解析）会在打包后暴露，所有依赖必须显式声明在 `package.json` 中。
+- `agent-engine` 是独立子包，有自己的 `tsconfig.json`；根目录的 `typecheck`/`lint`/`build` **不覆盖**它。CI 必须显式 `typecheck:engine`、打包必须显式 `build:engine`，否则 agent-engine 的类型错误会静默漏过（曾发生过半删变量导致编译失败却被 CI 放行）。
 
 ## TypeScript 执行方案
 

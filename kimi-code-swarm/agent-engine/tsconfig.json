@@ -5,6 +5,7 @@
     "moduleResolution": "NodeNext",
     "esModuleInterop": true,
     "strict": true,
+    "noEmitOnError": true,
     "skipLibCheck": true,
     "outDir": "./dist",
     "rootDir": "./src",

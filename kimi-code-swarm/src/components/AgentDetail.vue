@@ -59,6 +59,14 @@ function handleSendInstruction() {
   instruction.value = ''
 }
 
+function handleKeydown(e: KeyboardEvent) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault()
+    handleSendInstruction()
+  }
+  // Shift+Enter 默认换行，不拦截
+}
+
 watch(() => props.agent.logs.length, async () => {
   await nextTick()
   if (scrollRef.value) {
@@ -246,7 +254,7 @@ watch(() => props.agent.status, async () => {
       <template v-for="log in agent.logs" :key="log.id">
         <!-- User Message -->
         <div v-if="log.type === 'input'" class="flex justify-end">
-          <div class="flex items-end gap-2 max-w-[85%]">
+          <div class="flex items-end gap-2 max-w-[85%] min-w-0">
             <div class="bg-swarm-600 text-white rounded-2xl rounded-tr-sm px-4 py-2.5 shadow-sm">
               <p class="text-sm whitespace-pre-wrap break-words leading-relaxed">{{ log.content }}</p>
               <div class="flex items-center justify-end gap-2 mt-1">
@@ -262,7 +270,7 @@ watch(() => props.agent.status, async () => {
 
         <!-- Agent Message -->
         <div v-else-if="log.type === 'output'" class="flex justify-start">
-          <div class="flex items-end gap-2 max-w-[85%]">
+          <div class="flex items-end gap-2 max-w-[85%] min-w-0">
             <div class="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center shrink-0 mb-1">
               <Bot class="w-3.5 h-3.5 text-blue-600" />
             </div>
@@ -277,7 +285,7 @@ watch(() => props.agent.status, async () => {
 
         <!-- Thinking Message -->
         <div v-else-if="log.type === 'think'" class="flex justify-start">
-          <div class="flex items-end gap-2 max-w-[85%]">
+          <div class="flex items-end gap-2 max-w-[85%] min-w-0">
             <div class="w-7 h-7 rounded-full bg-amber-100 flex items-center justify-center shrink-0 mb-1">
               <Brain class="w-3.5 h-3.5 text-amber-600" />
             </div>
@@ -293,7 +301,7 @@ watch(() => props.agent.status, async () => {
 
         <!-- Tool Call / MCP Message -->
         <div v-else-if="log.type === 'tool_call' || log.type === 'mcp'" class="flex justify-start">
-          <div class="flex items-end gap-2 max-w-[85%]">
+          <div class="flex items-end gap-2 max-w-[85%] min-w-0">
             <div class="w-7 h-7 rounded-full bg-purple-100 flex items-center justify-center shrink-0 mb-1">
               <Wrench v-if="log.type === 'tool_call'" class="w-3.5 h-3.5 text-purple-600" />
               <Server v-else class="w-3.5 h-3.5 text-purple-600" />
@@ -310,7 +318,7 @@ watch(() => props.agent.status, async () => {
 
         <!-- Tool Result Message -->
         <div v-else-if="log.type === 'tool_result'" class="flex justify-start">
-          <div class="flex items-end gap-2 max-w-[85%]">
+          <div class="flex items-end gap-2 max-w-[85%] min-w-0">
             <div class="w-7 h-7 rounded-full bg-green-100 flex items-center justify-center shrink-0 mb-1">
               <CheckCircle class="w-3.5 h-3.5 text-green-600" />
             </div>
@@ -377,12 +385,18 @@ watch(() => props.agent.status, async () => {
 
       <!-- Ready / Stopped / Completed: Chat Input -->
       <div v-else-if="canSendMessage">
-        <form class="flex gap-2" @submit.prevent="handleSendInstruction">
-          <input
+        <form class="flex gap-2 items-end" @submit.prevent="handleSendInstruction">
+          <textarea
             v-model="instruction"
-            type="text"
             :placeholder="agent.status === 'stopped' ? 'Agent 已停止，发送消息将继续执行...' : '输入消息与 Agent 对话...'"
-            class="flex-1 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-swarm-500 focus:ring-1 focus:ring-swarm-500/30 transition-all"
+            rows="1"
+            class="flex-1 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:border-swarm-500 focus:ring-1 focus:ring-swarm-500/30 transition-all resize-none overflow-hidden leading-relaxed"
+            @keydown="handleKeydown"
+            @input="(e: Event) => {
+              const target = e.target as HTMLTextAreaElement
+              target.style.height = 'auto'
+              target.style.height = target.scrollHeight + 'px'
+            }"
           />
           <button
             type="submit"
@@ -405,12 +419,12 @@ watch(() => props.agent.status, async () => {
 
       <!-- Working: Disabled Input + Stop -->
       <div v-else-if="agent.status === 'working'">
-        <form class="flex gap-2" @submit.prevent>
-          <input
-            type="text"
+        <form class="flex gap-2 items-end" @submit.prevent>
+          <textarea
             disabled
             placeholder="Agent 执行中，请等待完成后再发送..."
-            class="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-400 cursor-not-allowed"
+            rows="1"
+            class="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-400 cursor-not-allowed resize-none overflow-hidden leading-relaxed"
           />
           <button
             type="button"

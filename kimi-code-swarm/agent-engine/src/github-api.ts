@@ -87,7 +87,7 @@ export async function getPullRequest(
   token: string,
   repoUrl: string,
   prNumber: number,
-): Promise<{ state: string; merged: boolean; head: { sha: string } } | null> {
+): Promise<{ state: string; merged: boolean; head: { sha: string }; user: { login: string } } | null> {
   const repo = parseRepoUrl(repoUrl)
   if (!repo) return null
 
@@ -96,12 +96,27 @@ export async function getPullRequest(
   try {
     const res = await fetch(url, { headers: getHeaders(token) })
     if (!res.ok) return null
-    const data = (await res.json()) as { state: string; merged: boolean; head: { sha: string } }
+    const data = (await res.json()) as { state: string; merged: boolean; head: { sha: string }; user: { login: string } }
     return data
   } catch (err) {
     const msg = `GitHub API 查询 PR 失败: ${String(err)}`
     console.error(`[github-api] ${msg}`)
     throw new Error(msg)
+  }
+}
+
+/**
+ * 获取当前 Token 对应的 GitHub 用户名
+ */
+export async function getAuthenticatedUser(token: string): Promise<string | null> {
+  try {
+    const res = await fetch(`${GITHUB_API}/user`, { headers: getHeaders(token) })
+    if (!res.ok) return null
+    const data = (await res.json()) as { login: string }
+    return data.login
+  } catch (err) {
+    console.error(`[github-api] getAuthenticatedUser 异常: ${String(err)}`)
+    return null
   }
 }
 
@@ -182,9 +197,9 @@ export async function submitPullRequestReview(
   prNumber: number,
   event: 'APPROVE' | 'REQUEST_CHANGES' | 'COMMENT',
   body?: string,
-): Promise<boolean> {
+): Promise<{ ok: boolean; error?: string }> {
   const repo = parseRepoUrl(repoUrl)
-  if (!repo) return false
+  if (!repo) return { ok: false }
 
   const url = `${GITHUB_API}/repos/${repo.owner}/${repo.repo}/pulls/${prNumber}/reviews`
   const payload = JSON.stringify({ event, body: body || '' })
@@ -194,12 +209,12 @@ export async function submitPullRequestReview(
     if (!res.ok) {
       const err = await res.text()
       console.error(`[github-api] submitReview ${res.status}: ${err}`)
-      return false
+      return { ok: false, error: err }
     }
-    return true
+    return { ok: true }
   } catch (err) {
     console.error(`[github-api] submitReview 异常: ${String(err)}`)
-    return false
+    return { ok: false, error: String(err) }
   }
 }
 

@@ -46,6 +46,7 @@ export interface AgentState {
   prStatus: PrStatus
   prNumber?: number
   prUrl?: string
+  prAuthor?: string
   tokenUsed: number
   tokenBudget: number
   pid?: number

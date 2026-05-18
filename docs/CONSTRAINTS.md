@@ -12,6 +12,7 @@
 | 约束 | 工具 | 触发方式 | 失败后果 |
 |------|------|---------|---------|
 | TypeScript 类型检查 | `vue-tsc --noEmit` | `npm run typecheck` / CI | 编译失败 |
+| TypeScript 类型检查（agent-engine） | `tsc --noEmit` | `npm run typecheck:engine` / CI | 编译失败 |
 | 代码质量检查 | ESLint (`eslint.config.mjs`) | `npm run lint` / CI | 阻断流水线 |
 | ESLint 关键规则 | `no-var`, `prefer-const`, `@typescript-eslint/no-unused-vars` | 实时 / CI | 阻断提交 |
 

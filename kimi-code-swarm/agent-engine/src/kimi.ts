@@ -1,5 +1,6 @@
 import { spawn, execFile, exec } from 'child_process'
 import { promisify } from 'util'
+import { createInterface } from 'readline'
 
 const execFileAsync = promisify(execFile)
 
@@ -121,19 +122,17 @@ export function runKimi(
 
   const pid = child.pid!
 
-  async function* readStream(stream: import('stream').Readable): AsyncGenerator<string> {
-    for await (const chunk of stream) {
-      const text = chunk.toString()
-      for (const line of text.split('\n')) {
-        yield line
-      }
+  async function* readLines(stream: import('stream').Readable): AsyncGenerator<string> {
+    const rl = createInterface({ input: stream, crlfDelay: Infinity })
+    for await (const line of rl) {
+      yield line
     }
   }
 
   return {
     pid,
-    stdout: readStream(child.stdout!),
-    stderr: readStream(child.stderr!),
+    stdout: readLines(child.stdout!),
+    stderr: readLines(child.stderr!),
     wait: () => {
       // 如果进程已经退出，立即返回，避免重复监听已触发的 close 事件
       if (child.exitCode !== null || child.signalCode !== null) {

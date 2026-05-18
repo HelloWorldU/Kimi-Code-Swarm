@@ -35,7 +35,7 @@ const emit = defineEmits<{...}>()
 - `CreateTaskModal.vue` — 表单弹窗组件：新建 Agent 的信息收集与提交，Vue `<Transition>` 原生过渡动画
 - `SwarmConfirmModal.vue` — 确认弹窗组件：类型化图标 + 双按钮确认/取消，配合 useConfirm composable
 - `SwarmToast.vue` — Toast 通知组件：类型化图标 + 进度条 + 自动消失，配合 useToast composable
-- `AgentDetail.vue` — 聊天式多轮对话组件：Header + Info + PR 审阅 + 文件变更 + 聊天消息区（input/output/system/error/think/tool_call/mcp/tool_result 气泡）+ 输入框。日期字段通过 new Date(string).toLocaleTimeString() 显示
+- `AgentDetail.vue` — 聊天式多轮对话组件：Header + Info + PR 审阅 + 文件变更 + 聊天消息区（input/output/system/error/think/tool_call/mcp/tool_result 气泡）+ `<textarea>` 输入框（Enter 发送 / Shift+Enter 换行，自动增高）。日期字段通过 new Date(string).toLocaleTimeString() 显示
 - `TaskCard.vue` — 卡片组件：Agent 状态 + Token 进度 + 审阅徽章；删除操作通过 `useConfirm()` 调用自定义确认弹窗
 - `AnalyticsPanel.vue` — 数据展示型组件：状态分布、Token 排行、任务列表
 - `SettingsPanel.vue` — 纯信息展示型设置面板，使用 lucide 图标 + code 标签展示命令指引

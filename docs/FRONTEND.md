@@ -29,7 +29,7 @@ Vue 3 + TypeScript + Vite + Tailwind CSS + lucide-vue-next + Tauri v2 + @tauri-a
 - `components/SwarmConfirmModal.vue` — 确认弹窗组件：支持 danger/warning/info 类型，配合 useConfirm 使用
 - `components/SwarmToast.vue` — Toast 通知组件：支持 error/success/info/warning，自动消失
 - `App.vue` — 主入口：布局框架 + 视图路由（dashboard/agent-detail/analytics）+ 全局事件处理（如文件 diff 查看）
-- `components/AgentDetail.vue` — Agent 详情：指令输入 + 日志流（含 think / tool_call / mcp / tool_result 结构化渲染）+ PR 审阅 + 文件变更（点击通过 engine 获取 diff）
+- `components/AgentDetail.vue` — Agent 详情：`<textarea>` 指令输入（Enter 发送 / Shift+Enter 换行，自动增高）+ 日志流（含 think / tool_call / mcp / tool_result 结构化渲染）+ PR 审阅 + 文件变更（点击通过 engine 获取 diff）
 - `composables/useConfirm.ts` — 全局确认弹窗状态管理（命令式 API）
 - `composables/useToast.ts` — 全局 Toast 通知状态管理（命令式 API）
 - `components/SettingsPanel.vue` — 系统设置（GitHub Token + Kimi CLI 安装指引）
@@ -66,8 +66,9 @@ npm run dev         # 开发服务器（浏览器模式）
 ```bash
 cd kimi-code-swarm
 npm run dev           # 开发服务器
-npm run typecheck     # TypeScript 类型检查
-npm run lint          # ESLint 代码检查（含自定义规则：前端禁 spawn）
+npm run typecheck        # TypeScript 类型检查（前端 src/）
+npm run typecheck:engine # TypeScript 类型检查（agent-engine 子包，独立 tsc）
+npm run lint             # ESLint 代码检查（含自定义规则：前端禁 spawn）
 npm run lint:fix      # ESLint 自动修复
 npm run analyze       # AST 结构分析（扫描 src + tests）
 npm run check-docs    # 文档同步检测 + Harness 合规检查（硬约束）
@@ -76,7 +77,8 @@ npm run test          # Vitest 单元测试
 npm run test:watch    # Vitest 监听模式
 npx playwright test   # E2E 测试（需先 cargo tauri dev）
 npm run ci            # 完整流水线：typecheck → lint → analyze → test → check-docs → check-test-sync → build
-npm run build         # 生产构建
+npm run build         # 生产构建（前端）
+npm run build:engine  # 生产构建（agent-engine 子包，tsc 编译到 dist/）
 ```
 
 ## 提交前检查

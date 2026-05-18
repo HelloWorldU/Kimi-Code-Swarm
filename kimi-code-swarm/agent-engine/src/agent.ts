@@ -1,7 +1,7 @@
 import type { AgentState, LogEntry, ReviewEntry, TaskStatus, EngineEvent } from './types.js'
 import { runKimi, detectKimiCli, type KimiProcess } from './kimi.js'
 import { getChangedFiles, getStagedFiles, getFileDiff, gitAdd, gitCommit, gitPush, createBranch, cloneRepo, gitFetch, getBranchDiff, gitDeleteRemoteBranch } from './git.js'
-import { createPullRequest, mergePullRequest, getPullRequest, getPullRequestReviews, getCheckRuns, getCheckRunLogs, submitPullRequestReview } from './github-api.js'
+import { createPullRequest, mergePullRequest, getPullRequest, getPullRequestReviews, getCheckRuns, getCheckRunLogs, submitPullRequestReview, getAuthenticatedUser } from './github-api.js'
 import { readFile } from 'fs/promises'
 
 interface SubmitStep {
@@ -34,6 +34,7 @@ export class Agent {
   private running = false
   private reviewRound = 0
   private githubToken?: string
+  private githubUser?: string
   private ciMonitorTimer?: NodeJS.Timeout
   private ciRetryCount = 0
   private readonly CI_MAX_RETRIES = 3
@@ -174,6 +175,20 @@ export class Agent {
     }
   }
 
+  private buildContextPrompt(instruction: string): string {
+    // 正序遍历 logs，从早到晚拼接完整对话历史
+    const history: string[] = []
+    for (const log of this.state.logs) {
+      if (log.type === 'input' || log.type === 'output') {
+        // 跳过当前正在发送的这条 input（它已在 sendInstruction 里被 push 进 logs）
+        if (log.type === 'input' && log.content === instruction) continue
+        const prefix = log.type === 'input' ? 'User' : 'Assistant'
+        history.push(`${prefix}: ${log.content}`)
+      }
+    }
+    return history.join('\n\n')
+  }
+
   async sendInstruction(instruction: string, githubToken?: string) {
     // Allow continuing conversation from stopped or completed state
     if (this.state.status === 'stopped' || this.state.status === 'completed') {
@@ -201,8 +216,12 @@ export class Agent {
       return
     }
 
+    // 拼接历史上下文 + 当前指令
+    const history = this.buildContextPrompt(instruction)
+    const fullPrompt = history ? `${history}\n\nUser: ${instruction}` : instruction
+
     try {
-      this.process = runKimi(kimiPath, this.state.workspace, instruction, { streamJson: true, thinking: true })
+      this.process = runKimi(kimiPath, this.state.workspace, fullPrompt, { streamJson: true, thinking: true })
     } catch (err) {
       this.log('error', `启动 Kimi CLI 失败: ${String(err)}`)
       this.setStatus('ready')
@@ -216,7 +235,7 @@ export class Agent {
 
     // stdout reader — parse stream-json and emit structured streaming chunks in real-time
     const outputLines: string[] = []
-    let hasStreamedText = false
+    let streamJsonOk = false
     ;(async () => {
       try {
         for await (const line of this.process!.stdout) {
@@ -235,7 +254,6 @@ export class Agent {
                     this.emit({ type: 'agent-stream', agentId: this.state.id, chunk: { type: 'think', content: chunk.think } })
                   } else if (chunk.type === 'text' && chunk.text) {
                     this.emit({ type: 'agent-stream', agentId: this.state.id, chunk: { type: 'text', content: chunk.text } })
-                    hasStreamedText = true
                   }
                 }
               }
@@ -262,6 +280,11 @@ export class Agent {
             // Not a valid stream-json line — treat as raw text
           }
 
+          if (parsed && !streamJsonOk) {
+            streamJsonOk = true
+            this.log('system', 'stream-json 解析成功')
+          }
+
           if (!parsed) {
             outputLines.push(line)
             this.emit({ type: 'agent-output', agentId: this.state.id, line, isStderr: false })
@@ -272,6 +295,9 @@ export class Agent {
             this.log('error', 'Token 预算已耗尽，Agent 执行被中断')
             break
           }
+        }
+        if (!streamJsonOk) {
+          this.log('error', 'stream-json 解析失败：本次会话未收到任何有效的结构化流式输出')
         }
       } catch (err) {
         this.log('error', `stdout reader 异常: ${String(err)}`)
@@ -315,7 +341,7 @@ export class Agent {
     // Record complete output as a single log entry so the UI renders one bubble
     // Skip if text was already streamed in real-time to avoid duplicates
     const fullOutput = outputLines.join('\n')
-    if (fullOutput && !hasStreamedText) {
+    if (fullOutput && !streamJsonOk) {
       this.log('output', fullOutput)
     }
 
@@ -421,6 +447,14 @@ export class Agent {
     // 如果已有 open PR，跳过创建，直接启动 CI 监控
     if (this.state.prStatus === 'open' && this.state.prNumber && githubToken) {
       this.log('system', `PR #${this.state.prNumber} 已存在，新 commit 已追加`)
+      // 补录 PR 作者，并缓存当前 Token 用户（旧数据可能没有）
+      if (!this.githubUser) {
+        this.githubUser = await getAuthenticatedUser(githubToken) || undefined
+      }
+      if (!this.state.prAuthor) {
+        const pr = await getPullRequest(githubToken, this.state.repoUrl, this.state.prNumber)
+        if (pr) this.state.prAuthor = pr.user.login
+      }
       this.startCiMonitor(githubToken)
       this.notifyPrCreated()
       return { ok: true, steps }
@@ -434,6 +468,11 @@ export class Agent {
           this.state.prStatus = 'open'
           this.state.prNumber = pr.number
           this.state.prUrl = pr.html_url
+          // 记录 PR 作者，并缓存当前 Token 用户（自审场景判断用）
+          if (!this.githubUser) {
+            this.githubUser = await getAuthenticatedUser(githubToken) || undefined
+          }
+          this.state.prAuthor = this.githubUser
           this.log('system', `PR #${pr.number} 已创建: ${pr.html_url}`)
           this.startCiMonitor(githubToken)
           this.notifyPrCreated()
@@ -582,11 +621,20 @@ export class Agent {
   }
 
   async canMerge(githubToken?: string): Promise<boolean> {
-    // 有 GitHub Token 时以 GitHub API 为准
-    if (githubToken && this.state.prNumber) {
+    // 单账号产品 fail-open：身份判不出时回退到内部 reviews 状态
+    if (githubToken && this.state.prNumber && this.state.prAuthor && this.githubUser) {
+      if (this.githubUser === this.state.prAuthor) {
+        // 自审场景：GitHub 不允许自己 approve 自己，以内部 reviews 状态为准
+        if (this.state.reviews.length === 0) return true
+        const allApproved = this.state.reviews.every((r) => r.status === 'approved')
+        if (allApproved) {
+          this.log('system', '自审场景：内部 review 全部通过，准备通过管理员权限合并')
+        }
+        return allApproved
+      }
+      // 多人协作场景：以 GitHub API 为准
       const reviews = await getPullRequestReviews(githubToken, this.state.repoUrl, this.state.prNumber)
       if (reviews) {
-        // 取每个用户的最新 review 状态
         const latestByUser = new Map<string, string>()
         for (const r of reviews) {
           latestByUser.set(r.user.login, r.state)
@@ -595,7 +643,8 @@ export class Agent {
         return approvedCount >= 1
       }
     }
-    // 回退到内部状态（Mock 模式或无 Token）
+
+    // 无 Token / 未获取到身份 / Mock 模式 → 回退到内部状态
     if (this.state.reviews.length === 0) return true
     return this.state.reviews.every((r) => r.status === 'approved')
   }
@@ -673,16 +722,35 @@ export class Agent {
 
     // 同步到 GitHub
     if (this.githubToken && this.state.prNumber) {
-      const event = approved ? 'APPROVE' : 'REQUEST_CHANGES'
-      const ok = await submitPullRequestReview(
-        this.githubToken,
-        this.state.repoUrl,
-        this.state.prNumber,
-        event,
-        comment || (approved ? '自动审阅通过' : '自动审阅发现潜在问题'),
-      )
-      if (!ok) {
-        this.log('error', 'GitHub review 提交失败，仅更新内部状态')
+      const reviewBody = comment || (approved ? '自动审阅通过' : '自动审阅发现潜在问题')
+      const isSelfReview = this.githubUser && this.state.prAuthor && this.githubUser === this.state.prAuthor
+
+      if (isSelfReview) {
+        // 自审场景：proactive 直接发 COMMENT，不猜 GitHub 错误串
+        const result = await submitPullRequestReview(
+          this.githubToken,
+          this.state.repoUrl,
+          this.state.prNumber,
+          'COMMENT',
+          `[自审] ${reviewBody}\n\n> 注：GitHub 不允许 PR 作者 approve 自己的 PR，此评论仅作为审阅记录。`,
+        )
+        if (result.ok) {
+          this.log('system', '自审场景：审阅意见已作为 comment 发布到 GitHub PR')
+        } else {
+          this.log('system', '自审场景：审阅意见发布 comment 失败，仅保留内部审阅状态')
+        }
+      } else {
+        const event = approved ? 'APPROVE' : 'REQUEST_CHANGES'
+        const result = await submitPullRequestReview(
+          this.githubToken,
+          this.state.repoUrl,
+          this.state.prNumber,
+          event,
+          reviewBody,
+        )
+        if (!result.ok) {
+          this.log('error', `GitHub review 提交失败: ${result.error || '未知错误'}`)
+        }
       }
     }
 

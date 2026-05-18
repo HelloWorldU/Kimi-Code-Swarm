@@ -43,6 +43,7 @@ export const AgentStateSchema = z.object({
   prStatus: PrStatusSchema,
   prNumber: z.number().int().positive().optional(),
   prUrl: z.string().url().optional(),
+  prAuthor: z.string().optional(),
   tokenUsed: z.number().int().nonnegative(),
   tokenBudget: z.number().int().positive(),
   pid: z.number().int().positive().optional(),

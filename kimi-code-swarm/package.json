@@ -6,8 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:engine": "npm --prefix agent-engine run build",
     "preview": "vite preview",
     "typecheck": "vue-tsc --noEmit",
+    "typecheck:engine": "npm --prefix agent-engine run typecheck",
     "lint": "eslint src --ext .ts,.vue",
     "lint:fix": "eslint src --ext .ts,.vue --fix",
     "analyze": "npx tsx ../ast/analyzer.ts src tests",
@@ -16,7 +18,7 @@
     "health-check": "npx tsx ../scripts/health-check.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "ci": "npm run typecheck && npm run lint && npm run analyze && npm run check-docs && npm run test && npm run build",
+    "ci": "npm run typecheck && npm run typecheck:engine && npm run lint && npm run analyze && npm run check-docs && npm run test && npm run build",
     "postinstall": "node ../scripts/setup-hooks.js"
   },
   "devDependencies": {

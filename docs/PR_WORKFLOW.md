@@ -148,7 +148,68 @@ performReview 返回 {approved, comment}
 
 ---
 
-## 6. 验收清单（修复后验证用）
+## 6. 自审场景（单账号多工作区）
+
+### 场景描述
+用户只有一个 GitHub 账号（如 `HelloWorldU`），通过多个本地工作区并行开发。每个 Agent 使用同一个 GitHub Token：
+- Agent A 完成代码变更 → 创建 PR（作者为 `HelloWorldU`）
+- Agent B 被指派审阅 → 调用 GitHub API 提交 APPROVE review
+
+### 问题
+GitHub REST API 返回 **422 Unprocessable Entity**：
+```
+"Review Can not approve your own pull request"
+```
+因为 reviewer 和 PR 作者使用的是同一个 GitHub 账号，GitHub 不允许自审。
+
+### 解决
+#### 身份缓存
+创建/复用 PR 时通过 `GET /user` 获取当前 Token 对应的 GitHub 用户名，**在 Agent 实例上缓存一次**（`githubUser`）。一个会话内 token 不变，避免每次 `canMerge` / `submitReview` 重复调用 `/user`。
+
+#### 合并决策
+`canMerge()` 中识别自审场景：
+1. 若 `githubUser` 已缓存且 `prAuthor` 存在：
+   - `githubUser === prAuthor` → 自审，以 **内部 reviews 状态** 为合并依据
+   - `githubUser !== prAuthor` → 多人协作，查询 GitHub API reviews
+2. 若 `githubUser` 未获取到（网络抖动/限流）→ **fail-open**，回退到内部 reviews 状态，避免合并被静默卡死
+3. 调用 `mergePullRequest` 时，GitHub 会因为用户是仓库管理员而自动 **bypass 分支保护规则**
+
+#### 审阅意见同步（proactive COMMENT）
+`submitReview` 调用 GitHub API **之前**先用缓存的 `githubUser` 与 `prAuthor` 做 proactive 判断：
+
+```
+githubUser === prAuthor
+  → 自审场景：直接发送 COMMENT review（不先发 APPROVE 猜 422）
+     {
+       "event": "COMMENT",
+       "body": "[自审] 自动审阅通过\n\n> 注：GitHub 不允许 PR 作者 approve 自己的 PR，此评论仅作为审阅记录。"
+     }
+  → PR 页面上显示 review comment（非 approved 标记）
+
+githubUser !== prAuthor
+  → 多人协作：正常发送 APPROVE / REQUEST_CHANGES
+```
+
+优势：不猜 GitHub 错误字符串（避免文案变更导致失效），通过/不通过行为一致（都发 COMMENT），且省掉一次注定失败的 APPROVE 请求。
+
+### 行为对照
+
+| 场景 | `submitReview` GitHub 行为 | `canMerge` 判断逻辑 | 合并方式 |
+|------|---------------------------|---------------------|----------|
+| 多人协作（prAuthor ≠ 当前用户）| 正常发送 APPROVE / REQUEST_CHANGES | 查询 GitHub API reviews，需满足 required approvals | 正常合并 |
+| 自审（prAuthor = 当前用户）| **proactive 直接发送 COMMENT** | 内部 reviews 全部 approved 即可 | 管理员权限 bypass 合并 |
+| 身份获取失败（githubUser 为 null）| 正常发送 APPROVE / REQUEST_CHANGES | **fail-open：回退到内部 reviews** | 内部审阅通过即可合并 |
+
+### 关键日志
+```
+[Agent] 自审场景：内部 review 全部通过，准备通过管理员权限合并
+[GitHub] 自审场景：审阅意见已作为 comment 发布到 GitHub PR
+[GitHub] PR #x 已合并到 main（GitHub）
+```
+
+---
+
+## 7. 验收清单（修复后验证用）
 
 ### 审阅触发
 - [ ] Agent A 自动执行完指令 → PR 创建 → 其他 ready Agent 自动审阅
@@ -167,6 +228,13 @@ performReview 返回 {approved, comment}
 - [ ] 打开 PR 链接能看到所有 reviewer 的审阅记录
 - [ ] `canMerge()` 改为查询 GitHub API（`GET /pulls/{prNumber}` 或列出 reviews），以 GitHub 返回的真实 review 状态为合并依据
 - [ ] App 内 reviews 状态与 GitHub PR 的 review 状态一致（或允许 GitHub 领先）
+
+### 自审场景（单账号多工作区）
+- [ ] Agent A 创建 PR → Agent B（同一 GitHub 账号）审阅 → `submitReview` 发送 APPROVE 被 422 拒绝
+- [ ] 422 拒绝后自动降级为发送 `COMMENT` review，PR 页面可见审阅记录
+- [ ] `canMerge` 识别 `prAuthor === 当前用户`，以内部 reviews 状态为合并依据
+- [ ] 内部审阅全部通过后自动调用 `mergePullRequest`，GitHub 管理员权限 bypass 分支保护
+- [ ] PR 成功合并，状态变为 `completed`，远程分支自动清理
 
 ---
 
