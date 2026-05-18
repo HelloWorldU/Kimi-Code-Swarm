@@ -64,15 +64,33 @@ export interface KimiProcess {
   kill(): void
 }
 
+export interface RunKimiOptions {
+  /** 使用 --output-format stream-json 获取结构化流式输出（含 thinking / tool_call / mcp） */
+  streamJson?: boolean
+  /** 启用 --thinking 让模型输出思考过程 */
+  thinking?: boolean
+}
+
 export function runKimi(
   kimiPath: string,
   workspace: string,
   instruction: string,
+  options: RunKimiOptions = {},
 ): KimiProcess {
-  // Kimi CLI 1.41.0 usage: kimi --work-dir <dir> --prompt "<text>" --print --final-message-only
+  // Kimi CLI 1.41.0 usage: kimi --work-dir <dir> --prompt "<text>" --print [...options]
   // --print: run in print mode (non-interactive)
-  // --final-message-only: only output the final assistant message
-  const baseArgs = ['--work-dir', workspace, '--prompt', instruction, '--print', '--final-message-only']
+  // --output-format stream-json: structured streaming output (thinking / tool_calls / text)
+  // --final-message-only: only output the final assistant message (fallback for silent mode)
+  const baseArgs = ['--work-dir', workspace, '--prompt', instruction, '--print']
+  if (options.streamJson) {
+    baseArgs.push('--output-format', 'stream-json')
+  }
+  if (options.thinking) {
+    baseArgs.push('--thinking')
+  }
+  if (!options.streamJson) {
+    baseArgs.push('--final-message-only')
+  }
   let spawnCmd = kimiPath
   let spawnArgs: string[]
   if (kimiPath === '__MODULE__') {

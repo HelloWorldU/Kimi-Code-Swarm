@@ -1,5 +1,5 @@
 import { reactive, computed } from 'vue'
-import type { AgentTask, ReviewEntry } from '../types'
+import type { AgentTask, ReviewEntry, LogEntry } from '../types'
 import { createLogger } from '../utils/logger'
 import { useToast } from '../composables/useToast'
 import {
@@ -92,9 +92,37 @@ function handleEngineEvent(event: Record<string, unknown>) {
       break
     }
     case 'agent-output': {
+      // Raw stdout line — engine now streams structured chunks via agent-stream,
+      // so no-op here to avoid duplicate rendering.
+      break
+    }
+    case 'agent-stream': {
       const agent = state.agents.find((a) => a.id === event.agentId)
       if (!agent) return
-      // Token estimation handled by engine, just append log if needed
+      const chunk = event.chunk as { type: string; content?: string; name?: string; arguments?: string }
+      if (chunk.type === 'text' && chunk.content) {
+        const lastLog = agent.logs[agent.logs.length - 1]
+        if (lastLog && lastLog.type === 'output') {
+          lastLog.content += chunk.content
+        } else {
+          agent.logs.push({ id: generateId(), timestamp: new Date().toISOString(), type: 'output', content: chunk.content })
+        }
+      } else if (chunk.type === 'think' && chunk.content) {
+        const lastLog = agent.logs[agent.logs.length - 1]
+        if (lastLog && lastLog.type === 'think') {
+          lastLog.content += chunk.content
+        } else {
+          agent.logs.push({ id: generateId(), timestamp: new Date().toISOString(), type: 'think', content: chunk.content })
+        }
+      } else if (chunk.type === 'tool_call' || chunk.type === 'mcp') {
+        const display = chunk.name
+          ? `${chunk.name}(${chunk.arguments || '{}'})`
+          : String(chunk.content || '')
+        agent.logs.push({ id: generateId(), timestamp: new Date().toISOString(), type: chunk.type as LogEntry['type'], content: display })
+      } else if (chunk.type === 'tool_result' && chunk.content) {
+        agent.logs.push({ id: generateId(), timestamp: new Date().toISOString(), type: 'tool_result', content: chunk.content })
+      }
+      agent.lastActivity = new Date().toISOString()
       break
     }
     case 'agent-exit': {

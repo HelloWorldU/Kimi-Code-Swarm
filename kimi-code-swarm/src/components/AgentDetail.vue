@@ -3,7 +3,7 @@ import { ref, computed, watch, nextTick } from 'vue'
 import {
   ArrowLeft, Send, Terminal, AlertCircle, CheckCircle, Play,
   GitPullRequest, GitMerge, RotateCcw, Square, Clock, XCircle, FileCode,
-  User, Bot, Loader2
+  User, Bot, Loader2, Brain, Wrench, Server
 } from 'lucide-vue-next'
 import type { AgentTask } from '../types'
 
@@ -270,6 +270,55 @@ watch(() => props.agent.status, async () => {
               <p class="text-sm whitespace-pre-wrap break-words leading-relaxed">{{ log.content }}</p>
               <div class="flex items-center gap-2 mt-1">
                 <span class="text-[10px] text-gray-400">{{ new Date(log.timestamp).toLocaleTimeString() }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Thinking Message -->
+        <div v-else-if="log.type === 'think'" class="flex justify-start">
+          <div class="flex items-end gap-2 max-w-[85%]">
+            <div class="w-7 h-7 rounded-full bg-amber-100 flex items-center justify-center shrink-0 mb-1">
+              <Brain class="w-3.5 h-3.5 text-amber-600" />
+            </div>
+            <div class="bg-amber-50 text-amber-800 rounded-2xl rounded-tl-sm px-4 py-2.5 shadow-sm border border-amber-100">
+              <p class="text-xs font-medium text-amber-600 mb-1">Thinking</p>
+              <p class="text-sm whitespace-pre-wrap break-words leading-relaxed">{{ log.content }}</p>
+              <div class="flex items-center gap-2 mt-1">
+                <span class="text-[10px] text-amber-400">{{ new Date(log.timestamp).toLocaleTimeString() }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tool Call / MCP Message -->
+        <div v-else-if="log.type === 'tool_call' || log.type === 'mcp'" class="flex justify-start">
+          <div class="flex items-end gap-2 max-w-[85%]">
+            <div class="w-7 h-7 rounded-full bg-purple-100 flex items-center justify-center shrink-0 mb-1">
+              <Wrench v-if="log.type === 'tool_call'" class="w-3.5 h-3.5 text-purple-600" />
+              <Server v-else class="w-3.5 h-3.5 text-purple-600" />
+            </div>
+            <div class="bg-purple-50 text-purple-800 rounded-2xl rounded-tl-sm px-4 py-2.5 shadow-sm border border-purple-100">
+              <p class="text-xs font-medium text-purple-600 mb-1">{{ log.type === 'mcp' ? 'MCP' : 'Tool Call' }}</p>
+              <p class="text-sm whitespace-pre-wrap break-words leading-relaxed font-mono text-xs">{{ log.content }}</p>
+              <div class="flex items-center gap-2 mt-1">
+                <span class="text-[10px] text-purple-400">{{ new Date(log.timestamp).toLocaleTimeString() }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tool Result Message -->
+        <div v-else-if="log.type === 'tool_result'" class="flex justify-start">
+          <div class="flex items-end gap-2 max-w-[85%]">
+            <div class="w-7 h-7 rounded-full bg-green-100 flex items-center justify-center shrink-0 mb-1">
+              <CheckCircle class="w-3.5 h-3.5 text-green-600" />
+            </div>
+            <div class="bg-green-50 text-green-800 rounded-2xl rounded-tl-sm px-4 py-2.5 shadow-sm border border-green-100">
+              <p class="text-xs font-medium text-green-600 mb-1">Tool Result</p>
+              <p class="text-sm whitespace-pre-wrap break-words leading-relaxed font-mono text-xs">{{ log.content }}</p>
+              <div class="flex items-center gap-2 mt-1">
+                <span class="text-[10px] text-green-400">{{ new Date(log.timestamp).toLocaleTimeString() }}</span>
               </div>
             </div>
           </div>

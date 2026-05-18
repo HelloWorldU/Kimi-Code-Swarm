@@ -20,7 +20,7 @@ Vue 3 + TypeScript + Vite + Tailwind CSS + lucide-vue-next + Tauri v2 + @tauri-a
 
 - `store/useSwarmStore.ts` — UI 状态管理；业务逻辑委托给 Node.js Agent 引擎
 - `kimi-code-swarm/agent-engine/src/engine.ts` — Node.js Agent 编排引擎（生命周期 + Kimi CLI + Token 监控）
-- `types/index.ts` — AgentTask / LogEntry / CommandCenterStats；修改前检查上下游依赖
+- `types/index.ts` — AgentTask / LogEntry（含 think / tool_call / tool_result / mcp 类型）/ CommandCenterStats；修改前检查上下游依赖
 - `api/github.ts` — GitHub API 封装（PR 创建/合并/查询）
 - `api/ipc.ts` — Tauri IPC 适配层
 - `components/LoginView.vue` — API Key 登录页（验证 + keyring 存储）
@@ -29,7 +29,7 @@ Vue 3 + TypeScript + Vite + Tailwind CSS + lucide-vue-next + Tauri v2 + @tauri-a
 - `components/SwarmConfirmModal.vue` — 确认弹窗组件：支持 danger/warning/info 类型，配合 useConfirm 使用
 - `components/SwarmToast.vue` — Toast 通知组件：支持 error/success/info/warning，自动消失
 - `App.vue` — 主入口：布局框架 + 视图路由（dashboard/agent-detail/analytics）+ 全局事件处理（如文件 diff 查看）
-- `components/AgentDetail.vue` — Agent 详情：指令输入 + 日志流 + PR 审阅 + 文件变更（点击通过 engine 获取 diff）
+- `components/AgentDetail.vue` — Agent 详情：指令输入 + 日志流（含 think / tool_call / mcp / tool_result 结构化渲染）+ PR 审阅 + 文件变更（点击通过 engine 获取 diff）
 - `composables/useConfirm.ts` — 全局确认弹窗状态管理（命令式 API）
 - `composables/useToast.ts` — 全局 Toast 通知状态管理（命令式 API）
 - `components/SettingsPanel.vue` — 系统设置（GitHub Token + Kimi CLI 安装指引）
@@ -106,7 +106,7 @@ PR CI 中额外运行 `check-test-sync`：若 `src/` 新增代码文件，`tests
 | Agent Dashboard（最多5个） | ✅ 真实 | 卡片网格，数量限制，点击进入详情；白色简约 UI |
 | Agent 详情页 | ✅ 真实 | 指令输入 + 实时日志 + PR 审阅 + 文件变更；白色简约 UI |
 | 新建 Agent 弹窗 | ✅ 真实 | 白色简约 UI |
-| 实时日志流 | ✅ 真实 | spawn_process + process-output 事件推送 |
+| 实时日志流 | ✅ 真实 | spawn_process + agent-stream 事件推送（支持 text / think / tool_call / mcp / tool_result 分片）|
 | PR 审阅面板 | ✅ 真实 | 含审阅者列表、进度、门控；白色简约 UI |
 | SettingsPanel（Token 配置） | ✅ 真实 | localStorage 持久化；白色简约 UI |
 | 监控分析页 | ✅ 真实 | 状态分布、Token 排行、活跃/审阅任务；白色简约 UI |
