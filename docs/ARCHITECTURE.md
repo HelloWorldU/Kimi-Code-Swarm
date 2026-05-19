@@ -80,6 +80,11 @@ PR 创建时，Store 自动生成 `ReviewEntry[]`，包含所有其他 Agent 作
 - `agent-stream` 推送结构化 chunk（`text` / `think` / `tool_call` / `mcp` / `tool_result`），Store 根据类型拼接或新增 `LogEntry`
 - `agent-output` 事件不再写入 UI 日志（避免与 `agent-stream` 重复渲染）
 
+**状态同步事件 (`agent-state`)**:
+- Engine 通过 `agent-state` 推送 Agent 完整状态快照，Store 增量更新对应字段
+- 覆盖字段：`status`、`workspace`、`branch`、`prStatus`、`prNumber`、`prUrl`、`pid`、`tokenUsed`、`lastActivity`、`reviews`、`changedFiles`
+- 更新完成后调用 `persistAgents()` 持久化到 `tauri-plugin-store`
+
 ## 登录流程
 
 `login()` 执行验证链：

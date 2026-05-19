@@ -82,6 +82,7 @@ export type EngineEvent =
   | { type: 'agent-stream'; agentId: string; chunk: StreamChunk }
   | { type: 'agent-exit'; agentId: string; code: number | null }
   | { type: 'agent-status'; agentId: string; status: TaskStatus }
+| { type: 'agent-state'; agentId: string; state: AgentState }
   | { type: 'log'; agentId: string; entry: LogEntry }
   | { type: 'file-changed'; agentId: string; files: string[] }
   | { type: 'diff-result'; agentId: string; filePath: string; diff: string }

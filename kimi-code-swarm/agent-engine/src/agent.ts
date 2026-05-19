@@ -140,6 +140,11 @@ export class Agent {
   private setStatus(status: TaskStatus) {
     this.state.status = status
     this.emit({ type: 'agent-status', agentId: this.state.id, status })
+    this.syncState()
+  }
+
+  private syncState() {
+    this.emit({ type: 'agent-state', agentId: this.state.id, state: this.state })
   }
 
   async start() {
@@ -162,6 +167,7 @@ export class Agent {
     try {
       await cloneRepo(this.state.repoUrl, targetDir, parentDir)
       this.state.workspace = targetDir
+      this.syncState()
       this.log('system', `仓库已克隆到 ${targetDir}`)
 
       await createBranch(targetDir, this.state.branch)
@@ -455,6 +461,7 @@ export class Agent {
         const pr = await getPullRequest(githubToken, this.state.repoUrl, this.state.prNumber)
         if (pr) this.state.prAuthor = pr.user.login
       }
+      this.syncState()
       this.startCiMonitor(githubToken)
       this.notifyPrCreated()
       return { ok: true, steps }
@@ -474,6 +481,7 @@ export class Agent {
           }
           this.state.prAuthor = this.githubUser
           this.log('system', `PR #${pr.number} 已创建: ${pr.html_url}`)
+          this.syncState()
           this.startCiMonitor(githubToken)
           this.notifyPrCreated()
           return { ok: true, steps }
@@ -487,6 +495,7 @@ export class Agent {
     this.state.prStatus = 'open'
     this.state.prNumber = Math.floor(Math.random() * 100) + 1
     this.state.prUrl = `${this.state.repoUrl.replace(/\.git$/, '')}/pull/${this.state.prNumber}`
+    this.syncState()
     this.log('system', `PR #${this.state.prNumber} 已创建（模拟，未配置 GitHub Token）`)
     this.notifyPrCreated()
     return { ok: true, steps }
@@ -662,9 +671,9 @@ export class Agent {
       try {
         const ok = await mergePullRequest(githubToken, this.state.repoUrl, this.state.prNumber)
         if (ok) {
-          this.setStatus('completed')
           this.state.prStatus = 'merged'
           this.state.reviews = []
+          this.setStatus('completed')
           this.log('system', `PR #${this.state.prNumber} 已合并到 main（GitHub）`)
           // 合并成功后清理远程分支，避免仓库堆积垃圾分支
           if (this.state.workspace) {
@@ -684,9 +693,9 @@ export class Agent {
     }
 
     // 无 Token 时降级为 Mock
-    this.setStatus('completed')
     this.state.prStatus = 'merged'
     this.state.reviews = []
+    this.setStatus('completed')
     this.log('system', `PR #${this.state.prNumber} 已合并到 main（模拟）`)
     // Mock 模式下同样清理远程分支
     if (this.state.workspace) {
@@ -701,9 +710,9 @@ export class Agent {
 
   rejectPr() {
     if (this.state.status !== 'reviewing') return
-    this.setStatus('working')
     this.state.prStatus = 'none'
     this.state.reviews = []
+    this.setStatus('working')
     this.log('system', 'PR 被打回，Agent 继续修改')
   }
 
@@ -756,6 +765,7 @@ export class Agent {
 
     review.status = approved ? 'approved' : 'rejected'
     review.reviewedAt = new Date().toISOString()
+    this.syncState()
     const action = approved ? '通过' : '拒绝'
     this.log('system', `Agent「${review.reviewerName}」审阅${action}了此 PR`)
   }
@@ -779,6 +789,7 @@ export class Agent {
         status: 'pending' as const,
       }))
     this.state.reviews = reviewers
+    this.syncState()
     if (reviewers.length > 0) {
       this.log('system', `已指派 ${reviewers.length} 个 Agent 进行审阅`)
     }

@@ -50,6 +50,11 @@ export class AgentEngine {
                 status: 'pending',
               })
               this.broadcast({
+                type: 'agent-state',
+                agentId: targetId,
+                state: target.state,
+              })
+              this.broadcast({
                 type: 'log',
                 agentId: targetId,
                 entry: {
