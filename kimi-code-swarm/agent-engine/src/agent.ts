@@ -36,6 +36,8 @@ export class Agent {
   private githubToken?: string
   private githubUser?: string
   private autoSubmitting = false
+  /** 正在进行的审阅 target id 集合，防止延后重试对同一 target 重复 runReview */
+  private activeReviews = new Set<string>()
   private ciMonitorTimer?: NodeJS.Timeout
   private ciRetryCount = 0
   private readonly CI_MAX_RETRIES = 3
@@ -498,7 +500,7 @@ export class Agent {
 
     this.setStatus('reviewing')
 
-    // 如果已有 open PR，跳过创建，直接启动 CI 监控
+    // 已有 open PR：跳过创建，只启动 CI 监控（审阅由 CI 通过后触发）
     if (this.state.prStatus === 'open' && this.state.prNumber && githubToken) {
       this.log('system', `PR #${this.state.prNumber} 已存在，新 commit 已追加`)
       // 补录 PR 作者，并缓存当前 Token 用户（旧数据可能没有）
@@ -511,11 +513,10 @@ export class Agent {
       }
       this.syncState()
       this.startCiMonitor(githubToken)
-      this.notifyPrCreated()
       return { ok: true, steps }
     }
 
-    // 如果有 GitHub Token，调用真实 API 创建 PR
+    // 有 GitHub Token：调用真实 API 创建 PR
     if (githubToken) {
       try {
         const pr = await createPullRequest(githubToken, this.state.repoUrl, this.state.branch, prTitle, prBody)
@@ -531,15 +532,17 @@ export class Agent {
           this.log('system', `PR #${pr.number} 已创建: ${pr.html_url}`)
           this.syncState()
           this.startCiMonitor(githubToken)
-          this.notifyPrCreated()
           return { ok: true, steps }
         }
+        this.log('error', 'GitHub API 创建 PR 失败：返回空结果')
       } catch (err) {
         this.log('error', `GitHub API 创建 PR 失败: ${String(err)}`)
       }
+      // 有 token 但创建失败 → 真失败，交回 autoSubmitForReview 处理，不伪造 mock PR
+      return { ok: false, steps }
     }
 
-    // 无 Token 或 API 失败时降级为 Mock
+    // 仅「未配置 GitHub Token」才降级为 Mock（无真实 CI，直接触发审阅）
     this.state.prStatus = 'open'
     this.state.prNumber = Math.floor(Math.random() * 100) + 1
     this.state.prUrl = `${this.state.repoUrl.replace(/\.git$/, '')}/pull/${this.state.prNumber}`
@@ -568,7 +571,8 @@ export class Agent {
       if (Date.now() - startTime > this.CI_TIMEOUT_MS) {
         this.stopCiMonitor()
         this.state.ciStatus = 'unknown'
-        this.log('error', 'CI 监控超时（10分钟），请指挥官人工检查 CI 状态')
+        this.log('error', 'CI 监控超时（10分钟）：仍触发审阅，请指挥官人工核查 CI 状态')
+        this.notifyPrCreated()
         return
       }
 
@@ -596,10 +600,11 @@ export class Agent {
         return
       }
 
-      // 全部通过
+      // 全部通过 → 此时才触发审阅
       this.stopCiMonitor()
       this.state.ciStatus = 'success'
       this.log('system', 'GitHub Actions CI 全部通过 ✅')
+      this.notifyPrCreated()
     }, this.CI_POLL_INTERVAL_MS)
   }
 
@@ -767,7 +772,8 @@ export class Agent {
 
   rejectPr() {
     if (this.state.status !== 'reviewing') return
-    this.state.prStatus = 'none'
+    // 不清 prStatus：PR 在 GitHub 上仍是 open，重新提交应追加 commit 到原 PR，
+    // 而非重建（重建会撞「分支已有 PR」422 并降级 mock）
     this.state.reviews = []
     this.setStatus('working')
     this.log('system', 'PR 被打回，Agent 继续修改')
@@ -779,6 +785,11 @@ export class Agent {
         this.log('error', `PR 创建后通知 engine 失败: ${String(err)}`)
       })
     }
+  }
+
+  /** 暴露给引擎：延后审阅重试时取回 PR 操作所需的 GitHub Token */
+  getGithubToken(): string | undefined {
+    return this.githubToken
   }
 
   async submitReview(reviewerAgentId: string, approved: boolean, comment?: string) {
@@ -1102,13 +1113,15 @@ PR_BODY:
     targetAgentId: string,
     onComplete: (reviewerId: string, targetId: string, approved: boolean, comment: string) => void,
   ) {
-    // 完成任务(completed)或正在等待自身 PR 审阅(reviewing)的 Agent 仍应参与审阅；
-    // 仅 working（占用 kimi 进程）等状态才跳过
+    // 不可审状态（working 占用 kimi 进程 / cloning / stopped / pending）→ 延后：
+    // 不裁决、不评论，审阅条目保持 pending，由引擎定时器在本 Agent 空闲后重试。
+    // completed / reviewing 仍可参与审阅。
     if (this.state.status !== 'ready' && this.state.status !== 'completed' && this.state.status !== 'reviewing') {
-      this.log('system', `当前状态 ${this.state.status}，跳过自动审阅`)
-      onComplete(this.state.id, targetAgentId, false, `当前状态 ${this.state.status}，无法参与审阅`)
       return
     }
+    // 防重入：同一 target 的审阅已在进行（定时器可能重复触发）→ 跳过
+    if (this.activeReviews.has(targetAgentId)) return
+    this.activeReviews.add(targetAgentId)
 
     try {
       const result = await this.runReview(targetBranch)
@@ -1116,6 +1129,8 @@ PR_BODY:
     } catch (err) {
       this.log('error', `自动审阅执行异常: ${String(err)}`)
       onComplete(this.state.id, targetAgentId, false, `审阅异常: ${String(err)}`)
+    } finally {
+      this.activeReviews.delete(targetAgentId)
     }
   }
 

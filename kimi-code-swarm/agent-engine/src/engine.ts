@@ -8,9 +8,13 @@ export class AgentEngine {
   private emit: (event: EngineEvent) => void
   // 待审阅 PR 队列：PR 创建时没有 reviewer 的，放入此队列等待新 Agent 接单
   private pendingReviews = new Map<string, { branch: string; githubToken?: string }>()
+  // 延后审阅重试定时器：定期把因 reviewer 忙碌而搁置的 pending 审阅重新触发
+  private reviewRetryTimer?: NodeJS.Timeout
+  private readonly REVIEW_RETRY_INTERVAL_MS = 30000
 
   constructor(emit: (event: EngineEvent) => void) {
     this.emit = emit
+    this.reviewRetryTimer = setInterval(() => this.retryDeferredReviews(), this.REVIEW_RETRY_INTERVAL_MS)
   }
 
   private broadcast = (event: EngineEvent) => {
@@ -60,11 +64,7 @@ export class AgentEngine {
                   content: `新 Agent「${agent.state.name}」已加入，自动指派审阅 PR`,
                 },
               })
-              agent.performReview(target.state.branch, target.state.id, async (reviewerId, targetAgentId, approved, comment) => {
-                const targetAgent = this.agents.get(targetAgentId)
-                if (!targetAgent) return
-                await this.handleReviewVerdict(targetAgent, reviewerId, approved, comment, pending.githubToken)
-              }).catch((err) => {
+              agent.performReview(target.state.branch, target.state.id, this.reviewCompletionHandler(pending.githubToken)).catch((err) => {
                 this.broadcast({ type: 'error', message: `自动审阅失败: ${String(err)}` })
               })
             }
@@ -209,6 +209,7 @@ export class AgentEngine {
 
         case 'shutdown': {
           // Stop all agents gracefully
+          if (this.reviewRetryTimer) clearInterval(this.reviewRetryTimer)
           await Promise.all(Array.from(this.agents.values()).map((a) => a.stop()))
           this.agents.clear()
           this.broadcast({ type: 'pong', message: 'Engine shutting down' })
@@ -251,6 +252,36 @@ export class AgentEngine {
     }
   }
 
+  /** 审阅结论回调：命令路径 / 自动审阅 / 延后重试 三处共用 */
+  private reviewCompletionHandler(githubToken?: string) {
+    return async (reviewerId: string, targetId: string, approved: boolean, comment: string): Promise<void> => {
+      const t = this.agents.get(targetId)
+      if (!t) return
+      await this.handleReviewVerdict(t, reviewerId, approved, comment, githubToken)
+    }
+  }
+
+  /**
+   * 定期重试因 reviewer 忙碌而搁置的审阅：扫描所有 reviewing 的 Agent，
+   * 对其 pending 的审阅条目重新触发对应 reviewer 的 performReview。
+   * performReview 自身判断 reviewer 是否可审 + 防重入，不可审则直接返回。
+   */
+  private retryDeferredReviews(): void {
+    for (const target of this.agents.values()) {
+      if (target.state.status !== 'reviewing') continue
+      for (const review of target.state.reviews) {
+        if (review.status !== 'pending') continue
+        const reviewer = this.agents.get(review.reviewerAgentId)
+        if (!reviewer || reviewer.state.id === target.state.id) continue
+        reviewer
+          .performReview(target.state.branch, target.state.id, this.reviewCompletionHandler(target.getGithubToken()))
+          .catch((err) => {
+            this.broadcast({ type: 'error', message: `延后审阅失败: ${String(err)}` })
+          })
+      }
+    }
+  }
+
   private triggerReviews(agentId: string, branch: string, githubToken?: string) {
     const target = this.agents.get(agentId)
     if (!target || target.state.status !== 'reviewing') return
@@ -260,11 +291,7 @@ export class AgentEngine {
     for (const review of target.state.reviews) {
       const reviewer = this.agents.get(review.reviewerAgentId)
       if (reviewer && reviewer.state.id !== target.state.id) {
-        reviewer.performReview(branch, agentId, async (reviewerId, targetId, approved, comment) => {
-          const t = this.agents.get(targetId)
-          if (!t) return
-          await this.handleReviewVerdict(t, reviewerId, approved, comment, githubToken)
-        }).catch((err) => {
+        reviewer.performReview(branch, agentId, this.reviewCompletionHandler(githubToken)).catch((err) => {
           this.broadcast({ type: 'error', message: `自动审阅失败: ${String(err)}` })
         })
       }
