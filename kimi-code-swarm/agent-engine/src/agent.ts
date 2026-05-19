@@ -211,9 +211,11 @@ export class Agent {
     const inputTokens = Math.floor(instruction.length / 2)
     this.state.tokenUsed += inputTokens
     this.log('input', instruction, inputTokens)
+    this.syncState()
 
     if (this.state.tokenUsed >= this.state.tokenBudget) {
       this.log('error', 'Token 预算已耗尽，无法执行新指令')
+      this.syncState()
       return
     }
 
@@ -244,12 +246,24 @@ export class Agent {
     // stdout reader — parse stream-json and emit structured streaming chunks in real-time
     const outputLines: string[] = []
     let streamJsonOk = false
+    let linesSinceSync = 0
+    let tokensSinceSync = 0
+    const SYNC_EVERY_LINES = 10
+    const SYNC_EVERY_TOKENS = 500
     ;(async () => {
       try {
         for await (const line of this.process!.stdout) {
           if (!this.running) break
           const estimated = Math.max(1, Math.floor(line.length / 4))
           this.state.tokenUsed = Math.min(this.state.tokenUsed + estimated, this.state.tokenBudget)
+          linesSinceSync++
+          tokensSinceSync += estimated
+
+          if (linesSinceSync >= SYNC_EVERY_LINES || tokensSinceSync >= SYNC_EVERY_TOKENS) {
+            this.syncState()
+            linesSinceSync = 0
+            tokensSinceSync = 0
+          }
 
           // Try to parse as stream-json structured output
           let parsed = false
@@ -299,6 +313,7 @@ export class Agent {
           }
 
           if (this.state.tokenUsed >= this.state.tokenBudget) {
+            this.syncState()
             this.process!.kill()
             this.log('error', 'Token 预算已耗尽，Agent 执行被中断')
             break

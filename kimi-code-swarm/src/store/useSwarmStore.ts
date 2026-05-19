@@ -260,12 +260,14 @@ if (!isTauri) {
   setInterval(() => {
     state.agents.forEach((a) => {
       if (a.status === 'working') {
-        const increment = Math.floor(Math.random() * 50) + 10
+        // 基于当前 instruction 长度估算工作期间的 token 消耗，避免纯随机
+        const base = a.instruction ? Math.floor(a.instruction.length / 4) : 0
+        const increment = Math.max(5, Math.floor(base * 0.1) + Math.floor(Math.random() * 10))
         a.tokenUsed = Math.min(a.tokenUsed + increment, a.tokenBudget)
         a.lastActivity = new Date().toISOString()
       }
     })
-  }, 3000)
+  }, 5000)
 }
 
 export function useSwarmStore() {
@@ -440,7 +442,10 @@ export function useSwarmStore() {
       agent.lastActivity = new Date().toISOString()
       setTimeout(() => {
         agent.status = 'ready'
-        agent.logs.push({ id: generateId(), timestamp: new Date().toISOString(), type: 'output', content: '模拟执行完成。在 Tauri 桌面模式下将调用真实 Kimi CLI。', tokens: 42 })
+        const outputContent = '模拟执行完成。在 Tauri 桌面模式下将调用真实 Kimi CLI。'
+        const outputTokens = Math.floor(outputContent.length / 2)
+        agent.logs.push({ id: generateId(), timestamp: new Date().toISOString(), type: 'output', content: outputContent, tokens: outputTokens })
+        agent.tokenUsed += outputTokens
         persistAgents()
       }, 3000)
       persistAgents()

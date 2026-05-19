@@ -85,6 +85,11 @@ PR 创建时，Store 自动生成 `ReviewEntry[]`，包含所有其他 Agent 作
 - 覆盖字段：`status`、`workspace`、`branch`、`prStatus`、`prNumber`、`prUrl`、`pid`、`tokenUsed`、`lastActivity`、`reviews`、`changedFiles`
 - 更新完成后调用 `persistAgents()` 持久化到 `tauri-plugin-store`
 
+**Token 预算实时同步**:
+- Agent Engine 在 `agent.ts` 中通过 `syncState()` 将 `tokenUsed` 实时回推前端，避免前端硬编码或纯随机估算
+- 增量同步阈值：每处理 10 行 stdout 或每累计 500 tokens；预算耗尽时立即同步并中断进程
+- Browser 降级模式（非 Tauri）下，Store 以 5s 为周期模拟 token 增长，增量基于当前 `instruction` 长度估算，模拟执行完成的 output tokens 按实际内容长度计算，不再使用硬编码值
+
 ## 登录流程
 
 `login()` 执行验证链：
