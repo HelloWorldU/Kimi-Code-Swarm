@@ -49,11 +49,7 @@ export class AgentEngine {
                 reviewerName: agent.state.name,
                 status: 'pending',
               })
-              this.broadcast({
-                type: 'agent-state',
-                agentId: targetId,
-                state: target.state,
-              })
+              target.syncState()
               this.broadcast({
                 type: 'log',
                 agentId: targetId,

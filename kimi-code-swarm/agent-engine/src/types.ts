@@ -76,13 +76,29 @@ export type EngineCommand =
 
 // ── Events from Node.js → Rust ──
 
+/** agent-state 事件载荷：仅 Store 实际消费的字段，不含 logs 等大字段 */
+export type AgentStateSnapshot = Pick<
+  AgentState,
+  | 'status'
+  | 'workspace'
+  | 'branch'
+  | 'prStatus'
+  | 'prNumber'
+  | 'prUrl'
+  | 'pid'
+  | 'tokenUsed'
+  | 'lastActivity'
+  | 'reviews'
+  | 'changedFiles'
+>
+
 export type EngineEvent =
   | { type: 'agent-created'; agent: AgentState }
   | { type: 'agent-output'; agentId: string; line: string; isStderr: boolean }
   | { type: 'agent-stream'; agentId: string; chunk: StreamChunk }
   | { type: 'agent-exit'; agentId: string; code: number | null }
   | { type: 'agent-status'; agentId: string; status: TaskStatus }
-  | { type: 'agent-state'; agentId: string; state: AgentState }
+  | { type: 'agent-state'; agentId: string; state: AgentStateSnapshot }
   | { type: 'log'; agentId: string; entry: LogEntry }
   | { type: 'file-changed'; agentId: string; files: string[] }
   | { type: 'diff-result'; agentId: string; filePath: string; diff: string }

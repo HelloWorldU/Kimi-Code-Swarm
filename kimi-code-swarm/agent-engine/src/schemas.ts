@@ -1,59 +1,9 @@
 /**
  * Zod 运行时验证 Schema
- * 为 AgentState / EngineCommand / EngineEvent 提供运行时类型安全
+ * 校验 Rust → Node.js 的入站命令（EngineCommand）
  */
 
 import { z } from 'zod'
-
-// ── 基础枚举 ──
-export const TaskStatusSchema = z.enum([
-  'pending', 'cloning', 'ready', 'working', 'reviewing', 'completed', 'stopped',
-])
-
-export const PrStatusSchema = z.enum(['none', 'open', 'merged', 'closed'])
-export const CiStatusSchema = z.enum(['pending', 'success', 'failure', 'unknown'])
-
-// ── LogEntry ──
-export const LogEntrySchema = z.object({
-  id: z.string().min(1),
-  timestamp: z.string().datetime(),
-  type: z.enum(['system', 'input', 'output', 'error', 'think', 'tool_call', 'tool_result', 'mcp']),
-  content: z.string(),
-  tokens: z.number().int().nonnegative().optional(),
-})
-
-// ── ReviewEntry ──
-export const ReviewEntrySchema = z.object({
-  reviewerAgentId: z.string().min(1),
-  reviewerName: z.string().min(1),
-  status: z.enum(['pending', 'approved', 'rejected']),
-  comment: z.string().optional(),
-  reviewedAt: z.string().datetime().optional(),
-})
-
-// ── AgentState ──
-export const AgentStateSchema = z.object({
-  id: z.string().min(1),
-  name: z.string().min(1),
-  status: TaskStatusSchema,
-  repoUrl: z.string().url(),
-  workspace: z.string(),
-  branch: z.string().min(1),
-  instruction: z.string(),
-  prStatus: PrStatusSchema,
-  prNumber: z.number().int().positive().optional(),
-  prUrl: z.string().url().optional(),
-  prAuthor: z.string().optional(),
-  tokenUsed: z.number().int().nonnegative(),
-  tokenBudget: z.number().int().positive(),
-  pid: z.number().int().positive().optional(),
-  createdAt: z.string().datetime(),
-  lastActivity: z.string().datetime(),
-  logs: z.array(LogEntrySchema),
-  reviews: z.array(ReviewEntrySchema),
-  changedFiles: z.array(z.string()).optional(),
-  ciStatus: CiStatusSchema.optional(),
-})
 
 // ── EngineCommand (Discriminated Union) ──
 export const EngineCommandSchema = z.discriminatedUnion('type', [
@@ -112,64 +62,5 @@ export const EngineCommandSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal('delete-agent'),
     agentId: z.string().min(1),
-  }),
-])
-
-// ── EngineEvent (Discriminated Union) ──
-export const EngineEventSchema = z.discriminatedUnion('type', [
-  z.object({
-    type: z.literal('agent-created'),
-    agent: AgentStateSchema,
-  }),
-  z.object({
-    type: z.literal('agent-output'),
-    agentId: z.string().min(1),
-    line: z.string(),
-    isStderr: z.boolean(),
-  }),
-  z.object({
-    type: z.literal('agent-stream'),
-    agentId: z.string().min(1),
-    chunk: z.discriminatedUnion('type', [
-      z.object({ type: z.literal('text'), content: z.string() }),
-      z.object({ type: z.literal('think'), content: z.string() }),
-      z.object({ type: z.literal('tool_call'), name: z.string(), arguments: z.string(), id: z.string() }),
-      z.object({ type: z.literal('tool_result'), content: z.string(), toolCallId: z.string().optional() }),
-      z.object({ type: z.literal('mcp'), name: z.string(), arguments: z.string(), id: z.string() }),
-    ]),
-  }),
-  z.object({
-    type: z.literal('agent-exit'),
-    agentId: z.string().min(1),
-    code: z.number().int().nullable(),
-  }),
-  z.object({
-    type: z.literal('agent-status'),
-    agentId: z.string().min(1),
-    status: TaskStatusSchema,
-  }),
-  z.object({
-    type: z.literal('log'),
-    agentId: z.string().min(1),
-    entry: LogEntrySchema,
-  }),
-  z.object({
-    type: z.literal('file-changed'),
-    agentId: z.string().min(1),
-    files: z.array(z.string()),
-  }),
-  z.object({
-    type: z.literal('diff-result'),
-    agentId: z.string().min(1),
-    filePath: z.string(),
-    diff: z.string(),
-  }),
-  z.object({
-    type: z.literal('error'),
-    message: z.string(),
-  }),
-  z.object({
-    type: z.literal('pong'),
-    message: z.string().optional(),
   }),
 ])

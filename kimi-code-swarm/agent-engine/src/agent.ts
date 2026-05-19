@@ -146,9 +146,27 @@ export class Agent {
     this.syncState()
   }
 
-  private syncState() {
-    // 发送深拷贝：直接传 this.state 引用会让 Store 端的修改反向污染引擎内部状态
-    this.emit({ type: 'agent-state', agentId: this.state.id, state: structuredClone(this.state) })
+  syncState() {
+    // 只发送 Store 实际消费的字段；reviews/changedFiles 深拷贝，避免 Store 端
+    // 修改反向污染引擎状态；不带 logs 等大字段，避免长 run 反复全量深拷贝
+    const s = this.state
+    this.emit({
+      type: 'agent-state',
+      agentId: s.id,
+      state: {
+        status: s.status,
+        workspace: s.workspace,
+        branch: s.branch,
+        prStatus: s.prStatus,
+        prNumber: s.prNumber,
+        prUrl: s.prUrl,
+        pid: s.pid,
+        tokenUsed: s.tokenUsed,
+        lastActivity: s.lastActivity,
+        reviews: structuredClone(s.reviews),
+        changedFiles: structuredClone(s.changedFiles),
+      },
+    })
   }
 
   async start() {
