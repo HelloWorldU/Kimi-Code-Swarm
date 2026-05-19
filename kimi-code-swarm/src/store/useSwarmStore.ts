@@ -151,6 +151,34 @@ function handleEngineEvent(event: Record<string, unknown>) {
       }
       break
     }
+    case 'agent-state': {
+      const agent = state.agents.find((a) => a.id === event.agentId)
+      if (!agent) break
+      const incoming = event.state as Record<string, unknown>
+      if (incoming.status !== undefined) agent.status = incoming.status as AgentTask['status']
+      if (incoming.workspace !== undefined) agent.workspace = String(incoming.workspace)
+      if (incoming.branch !== undefined) agent.branch = String(incoming.branch)
+      if (incoming.prStatus !== undefined) agent.prStatus = incoming.prStatus as AgentTask['prStatus']
+      if (incoming.prNumber !== undefined) agent.prNumber = Number(incoming.prNumber)
+      if (incoming.prUrl !== undefined) agent.prUrl = String(incoming.prUrl)
+      if (incoming.pid !== undefined) agent.pid = Number(incoming.pid)
+      if (incoming.tokenUsed !== undefined) agent.tokenUsed = Number(incoming.tokenUsed)
+      if (incoming.lastActivity !== undefined) agent.lastActivity = String(incoming.lastActivity)
+      if (Array.isArray(incoming.reviews)) {
+        agent.reviews = incoming.reviews.map((r: Record<string, unknown>) => ({
+          reviewerTaskId: String(r.reviewerTaskId ?? r.reviewerAgentId),
+          reviewerName: String(r.reviewerName),
+          status: r.status as ReviewEntry['status'],
+          comment: r.comment ? String(r.comment) : undefined,
+          reviewedAt: r.reviewedAt ? String(r.reviewedAt) : undefined,
+        }))
+      }
+      if (Array.isArray(incoming.changedFiles)) {
+        agent.changedFiles = incoming.changedFiles.map(String)
+      }
+      persistAgents()
+      break
+    }
     case 'log': {
       const agent = state.agents.find((a) => a.id === event.agentId)
       if (agent) {
