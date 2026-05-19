@@ -35,6 +35,7 @@ export class Agent {
   private reviewRound = 0
   private githubToken?: string
   private githubUser?: string
+  private autoSubmitting = false
   private ciMonitorTimer?: NodeJS.Timeout
   private ciRetryCount = 0
   private readonly CI_MAX_RETRIES = 3
@@ -399,7 +400,8 @@ export class Agent {
     if (githubToken) {
       this.githubToken = githubToken
     }
-    if (this.state.status !== 'working' && this.state.status !== 'ready') {
+    // reviewing 也允许：CI 失败后需在审阅中追加 commit 重新提交
+    if (this.state.status !== 'working' && this.state.status !== 'ready' && this.state.status !== 'reviewing') {
       return { ok: false, steps: [] }
     }
 
@@ -585,38 +587,47 @@ export class Agent {
   }
 
   /**
-   * 自动提交审阅：失败时捕获错误并让 Agent 修复，最多重试 3 次
+   * 自动提交审阅：失败时让 Agent 流式修复并重试，最多 3 次。
+   * 防重入：修复步走 sendInstruction，其尾部会再次触发 autoSubmitForReview，
+   * 用 autoSubmitting 守卫避免无限递归——外层负责重试，尾部触发的内层直接跳过。
    */
   async autoSubmitForReview(maxRetries = 3): Promise<void> {
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      const { ok, steps } = await this.submitForReview(this.githubToken)
-      if (ok) return
+    if (this.autoSubmitting) return
+    this.autoSubmitting = true
+    try {
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        const { ok, steps } = await this.submitForReview(this.githubToken)
+        if (ok) return
 
-      // 构建完整执行日志
-      const fullLog = steps.map((s) => {
-        let out = `=== ${s.name} (exit: ${s.exitCode}) ===`
-        if (s.stdout) out += `\n[stdout]\n${s.stdout}`
-        if (s.stderr) out += `\n[stderr]\n${s.stderr}`
-        return out
-      }).join('\n\n')
+        // 构建完整执行日志
+        const fullLog = steps.map((s) => {
+          let out = `=== ${s.name} (exit: ${s.exitCode}) ===`
+          if (s.stdout) out += `\n[stdout]\n${s.stdout}`
+          if (s.stderr) out += `\n[stderr]\n${s.stderr}`
+          return out
+        }).join('\n\n')
 
-      this.log('error', `提交审阅失败 (${attempt}/${maxRetries})`)
-      if (attempt >= maxRetries) {
-        this.log('error', '多次尝试后仍无法提交审阅，请指挥官人工介入')
-        this.setStatus('ready')
-        return
-      }
-      this.log('system', '正在根据执行日志自动修复...')
-      const fixPrompt = `你刚才尝试提交代码，执行日志如下：\n\n${fullLog}\n\n请根据上述日志中的错误信息，修改相关文件，使其能够通过项目的 typecheck、lint 和 pre-commit 检查。直接修改相关文件，不需要额外说明。`
-      await this.runInstructionSilent(fixPrompt)
-      // 修复后重新检测变更
-      if (this.state.workspace) {
-        try {
-          this.state.changedFiles = await getChangedFiles(this.state.workspace)
-        } catch {
-          // 忽略检测失败
+        this.log('error', `提交审阅失败 (${attempt}/${maxRetries})`)
+        if (attempt >= maxRetries) {
+          this.log('error', '多次尝试后仍无法提交审阅，请指挥官人工介入')
+          this.setStatus('ready')
+          return
+        }
+        this.log('system', '正在根据执行日志自动修复...')
+        const fixPrompt = `你刚才尝试提交代码，执行日志如下：\n\n${fullLog}\n\n请根据上述日志中的错误信息，修改相关文件，使其能够通过项目的 typecheck、lint 和 pre-commit 检查。直接修改相关文件，不需要额外说明。`
+        // 走流式 sendInstruction：修复过程实时显示在对话框，且无 runInstructionSilent 的硬超时
+        await this.sendInstruction(fixPrompt)
+        // 修复后重新检测变更
+        if (this.state.workspace) {
+          try {
+            this.state.changedFiles = await getChangedFiles(this.state.workspace)
+          } catch {
+            // 忽略检测失败
+          }
         }
       }
+    } finally {
+      this.autoSubmitting = false
     }
   }
 
@@ -1034,9 +1045,11 @@ PR_BODY:
     targetAgentId: string,
     onComplete: (reviewerId: string, targetId: string, approved: boolean, comment: string) => void,
   ) {
-    if (this.state.status !== 'ready') {
+    // 完成任务(completed)或正在等待自身 PR 审阅(reviewing)的 Agent 仍应参与审阅；
+    // 仅 working（占用 kimi 进程）等状态才跳过
+    if (this.state.status !== 'ready' && this.state.status !== 'completed' && this.state.status !== 'reviewing') {
       this.log('system', `当前状态 ${this.state.status}，跳过自动审阅`)
-      onComplete(this.state.id, targetAgentId, false, '当前状态非 ready，跳过审阅')
+      onComplete(this.state.id, targetAgentId, false, `当前状态 ${this.state.status}，无法参与审阅`)
       return
     }
 

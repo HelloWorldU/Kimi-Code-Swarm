@@ -62,14 +62,7 @@ export class AgentEngine {
               agent.performReview(target.state.branch, target.state.id, async (reviewerId, targetAgentId, approved, comment) => {
                 const targetAgent = this.agents.get(targetAgentId)
                 if (!targetAgent) return
-                await targetAgent.submitReview(reviewerId, approved, comment)
-                const canMerge = await targetAgent.canMerge(pending.githubToken)
-                if (canMerge && targetAgent.state.status === 'reviewing') {
-                  this.pendingReviews.delete(targetAgentId)
-                  targetAgent.mergePr(pending.githubToken).catch((err) => {
-                    this.broadcast({ type: 'error', message: `自动合并失败: ${String(err)}` })
-                  })
-                }
+                await this.handleReviewVerdict(targetAgent, reviewerId, approved, comment, pending.githubToken)
               }).catch((err) => {
                 this.broadcast({ type: 'error', message: `自动审阅失败: ${String(err)}` })
               })
@@ -190,23 +183,7 @@ export class AgentEngine {
         case 'submit-review': {
           const agent = this.agents.get(cmd.agentId)
           if (!agent) break
-          await agent.submitReview(cmd.reviewerAgentId, cmd.approved, cmd.comment)
-
-          if (agent.state.status !== 'reviewing') break
-
-          // 全部 approved → 自动合并
-          const canMerge = await agent.canMerge(cmd.githubToken)
-          if (canMerge) {
-            this.pendingReviews.delete(agent.state.id)
-            await agent.mergePr(cmd.githubToken)
-            break
-          }
-
-          // 所有 reviewer 都审完了且有 reject → 触发自动修改
-          const hasPending = agent.state.reviews.some((r) => r.status === 'pending')
-          if (!hasPending) {
-            await agent.fixBasedOnReviews(cmd.githubToken)
-          }
+          await this.handleReviewVerdict(agent, cmd.reviewerAgentId, cmd.approved, cmd.comment, cmd.githubToken)
           break
         }
 
@@ -244,6 +221,35 @@ export class AgentEngine {
     }
   }
 
+  /**
+   * 记录一条审阅结论，并据此决定合并或触发自动修复。
+   * 命令路径与两条自动回调路径共用，避免「只合并、不修复」的不对称。
+   */
+  private async handleReviewVerdict(
+    agent: Agent,
+    reviewerId: string,
+    approved: boolean,
+    comment: string | undefined,
+    githubToken?: string,
+  ): Promise<void> {
+    await agent.submitReview(reviewerId, approved, comment)
+    if (agent.state.status !== 'reviewing') return
+
+    // 全部 approved → 自动合并
+    const canMerge = await agent.canMerge(githubToken)
+    if (canMerge) {
+      this.pendingReviews.delete(agent.state.id)
+      await agent.mergePr(githubToken)
+      return
+    }
+
+    // 所有 reviewer 都审完且存在 reject → 触发自动修复
+    const hasPending = agent.state.reviews.some((r) => r.status === 'pending')
+    if (!hasPending) {
+      await agent.fixBasedOnReviews(githubToken)
+    }
+  }
+
   private triggerReviews(agentId: string, branch: string, githubToken?: string) {
     const target = this.agents.get(agentId)
     if (!target || target.state.status !== 'reviewing') return
@@ -256,14 +262,7 @@ export class AgentEngine {
         reviewer.performReview(branch, agentId, async (reviewerId, targetId, approved, comment) => {
           const t = this.agents.get(targetId)
           if (!t) return
-          await t.submitReview(reviewerId, approved, comment)
-          const canMerge = await t.canMerge(githubToken)
-          if (canMerge && t.state.status === 'reviewing') {
-            this.pendingReviews.delete(targetId)
-            t.mergePr(githubToken).catch((err) => {
-              this.broadcast({ type: 'error', message: `自动合并失败: ${String(err)}` })
-            })
-          }
+          await this.handleReviewVerdict(t, reviewerId, approved, comment, githubToken)
         }).catch((err) => {
           this.broadcast({ type: 'error', message: `自动审阅失败: ${String(err)}` })
         })
