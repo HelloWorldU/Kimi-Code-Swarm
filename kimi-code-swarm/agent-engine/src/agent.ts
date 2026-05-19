@@ -279,7 +279,10 @@ export class Agent {
     this.state.pid = this.process.pid
     // Log the exact command line for observability / debugging
     this.log('system', `Kimi CLI 已启动 (PID: ${this.process.pid})`)
-    this.log('system', `命令: ${kimiPath} --work-dir ${this.state.workspace} --prompt "..." --print --output-format stream-json --thinking`)
+    const cmdParts = [kimiPath, '--work-dir', this.state.workspace, '--prompt', '"..."', '--print']
+    if (this.state.kimiSessionId) cmdParts.push('-r', this.state.kimiSessionId)
+    cmdParts.push('--output-format', 'stream-json', '--thinking')
+    this.log('system', `命令: ${cmdParts.join(' ')}`)
     this.running = true
 
     // stdout reader — parse stream-json and emit structured streaming chunks in real-time
