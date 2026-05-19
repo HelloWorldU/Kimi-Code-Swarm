@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import {
   ArrowLeft, Send, Terminal, AlertCircle, CheckCircle, Play,
   GitPullRequest, GitMerge, RotateCcw, Square, Clock, XCircle, FileCode,
@@ -85,17 +85,59 @@ function handleKeydown(e: KeyboardEvent) {
   // Shift+Enter 默认换行，不拦截
 }
 
+const NEAR_BOTTOM_THRESHOLD = 50
+
+function isNearBottom(): boolean {
+  if (!scrollRef.value) return true
+  const el = scrollRef.value
+  return el.scrollHeight - el.scrollTop - el.clientHeight <= NEAR_BOTTOM_THRESHOLD
+}
+
+function scrollToBottom(smooth = false) {
+  if (!scrollRef.value) return
+  const el = scrollRef.value
+  if (smooth) {
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+  } else {
+    el.scrollTop = el.scrollHeight
+  }
+}
+
+let resizeObserver: ResizeObserver | null = null
+
+onMounted(() => {
+  scrollToBottom(false)
+
+  if (scrollRef.value) {
+    resizeObserver = new ResizeObserver(() => {
+      if (isNearBottom()) {
+        scrollToBottom(false)
+      }
+    })
+    resizeObserver.observe(scrollRef.value)
+  }
+})
+
+onUnmounted(() => {
+  resizeObserver?.disconnect()
+})
+
+watch(() => props.agent.id, async () => {
+  await nextTick()
+  scrollToBottom(false)
+})
+
 watch(() => props.agent.logs.length, async () => {
   await nextTick()
-  if (scrollRef.value) {
-    scrollRef.value.scrollTop = scrollRef.value.scrollHeight
+  if (isNearBottom()) {
+    scrollToBottom(true)
   }
 })
 
 watch(() => props.agent.status, async () => {
   await nextTick()
-  if (scrollRef.value) {
-    scrollRef.value.scrollTop = scrollRef.value.scrollHeight
+  if (isNearBottom()) {
+    scrollToBottom(true)
   }
 })
 </script>
