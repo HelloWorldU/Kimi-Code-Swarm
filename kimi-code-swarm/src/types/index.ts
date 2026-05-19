@@ -35,6 +35,8 @@ export interface AgentTask {
   logs: LogEntry[]
   reviews: ReviewEntry[]
   changedFiles?: string[]
+  /** Kimi CLI 原生会话 ID，用于 resume */
+  kimiSessionId?: string
 }
 
 export interface LogEntry {

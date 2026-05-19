@@ -56,6 +56,8 @@ export interface AgentState {
   reviews: ReviewEntry[]
   changedFiles?: string[]
   ciStatus?: CiStatus
+  /** Kimi CLI 原生会话 ID，用于 resume */
+  kimiSessionId?: string
 }
 
 // ── Commands from Rust → Node.js ──
@@ -90,6 +92,7 @@ export type AgentStateSnapshot = Pick<
   | 'lastActivity'
   | 'reviews'
   | 'changedFiles'
+  | 'kimiSessionId'
 >
 
 export type EngineEvent =

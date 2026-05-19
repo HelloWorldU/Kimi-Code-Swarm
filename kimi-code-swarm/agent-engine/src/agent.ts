@@ -27,6 +27,9 @@ const termColors = {
   gray: '\x1b[90m',
 }
 
+/** Kimi CLI 每次 --print 运行结束会在 stderr 打印的会话恢复提示，用于捕获 session id */
+export const SESSION_RESUME_RE = /To resume this session: kimi -r ([a-f0-9-]+)/i
+
 export class Agent {
   state: AgentState
   private process?: KimiProcess
@@ -167,6 +170,7 @@ export class Agent {
         lastActivity: s.lastActivity,
         reviews: structuredClone(s.reviews),
         changedFiles: structuredClone(s.changedFiles),
+        kimiSessionId: s.kimiSessionId,
       },
     })
   }
@@ -250,12 +254,23 @@ export class Agent {
       return
     }
 
-    // 拼接历史上下文 + 当前指令
-    const history = this.buildContextPrompt(instruction)
-    const fullPrompt = history ? `${history}\n\nUser: ${instruction}` : instruction
+    // 如果有 Kimi 原生 session，只发增量指令；否则 fallback：平铺历史 + 当前指令
+    // （buildContextPrompt 只返回历史、不含当前指令，必须自己补回，否则这一轮丢失）
+    const hasSession = !!this.state.kimiSessionId
+    let prompt: string
+    if (hasSession) {
+      prompt = instruction
+    } else {
+      const history = this.buildContextPrompt(instruction)
+      prompt = history ? `${history}\n\nUser: ${instruction}` : instruction
+    }
 
     try {
-      this.process = runKimi(kimiPath, this.state.workspace, fullPrompt, { streamJson: true, thinking: true })
+      this.process = runKimi(kimiPath, this.state.workspace, prompt, {
+        streamJson: true,
+        thinking: true,
+        sessionId: this.state.kimiSessionId,
+      })
     } catch (err) {
       this.log('error', `启动 Kimi CLI 失败: ${String(err)}`)
       this.setStatus('ready')
@@ -369,6 +384,16 @@ export class Agent {
             continue
           }
           if (loguruBlockActive) continue
+
+          // Capture Kimi session id from resume hint (not an error)
+          const sessionMatch = SESSION_RESUME_RE.exec(line)
+          if (sessionMatch) {
+            this.state.kimiSessionId = sessionMatch[1]
+            this.syncState()
+            this.termLog('Kimi', 'info', `Session captured: ${this.state.kimiSessionId}`)
+            continue
+          }
+
           // Skip empty lines to avoid [Agent] ERROR spam in terminal
           if (!line.trim()) continue
           this.log('error', line)
@@ -867,53 +892,70 @@ export class Agent {
    * 运行 kimi CLI 执行一次"静默"指令，返回完整 stdout
    * 不修改 running 状态，不 emit agent-output 事件
    */
-  private async runInstructionSilent(instruction: string, timeoutMs = 120000): Promise<string> {
+  /**
+   * 后台静默运行一次 kimi（审阅 / CI 修复 / 生成 commit message 等）。
+   * 流式模式 + 空闲超时：有 stdout 活动就续命，仅在连续 idleMs 无任何输出时
+   * 判定卡死并 kill。返回 { ok, text }——ok 表示进程正常跑完（非卡死被 kill）。
+   */
+  private async runInstructionSilent(
+    instruction: string,
+    idleMs = 120000,
+  ): Promise<{ ok: boolean; text: string }> {
     const kimiPath = await detectKimiCli()
     if (!kimiPath) {
-      this.log('error', 'Kimi CLI 未找到，无法执行自动审阅')
-      return ''
+      this.log('error', 'Kimi CLI 未找到，无法执行')
+      return { ok: false, text: '' }
     }
 
     let proc: ReturnType<typeof runKimi>
     try {
-      proc = runKimi(kimiPath, this.state.workspace, instruction)
+      proc = runKimi(kimiPath, this.state.workspace, instruction, { streamJson: true, thinking: true })
     } catch (err) {
       this.log('error', `启动 Kimi CLI 失败: ${String(err)}`)
-      return ''
+      return { ok: false, text: '' }
     }
 
-    let output = ''
-    const timeoutPromise = new Promise<string>((_, reject) => {
-      const timer = setTimeout(() => {
-        clearTimeout(timer)
+    let text = ''
+    let timedOut = false
+    let idleTimer: NodeJS.Timeout | undefined
+    const armIdle = () => {
+      if (idleTimer) clearTimeout(idleTimer)
+      idleTimer = setTimeout(() => {
+        timedOut = true
         proc.kill()
-        reject(new Error(`Kimi CLI 执行超时（${timeoutMs}ms），已终止进程`))
-      }, timeoutMs)
-    })
+        this.log('error', `Kimi CLI 连续 ${idleMs}ms 无输出，判定卡死并终止`)
+      }, idleMs)
+    }
 
-    const runPromise = (async () => {
-      try {
-        for await (const line of proc.stdout) {
-          output += line + '\n'
+    armIdle()
+    try {
+      for await (const line of proc.stdout) {
+        armIdle()
+        // 解析 stream-json，累积 assistant 的 text 内容
+        try {
+          const json = JSON.parse(line)
+          if (json.role === 'assistant' && Array.isArray(json.content)) {
+            for (const chunk of json.content) {
+              if (chunk.type === 'text' && chunk.text) text += chunk.text
+            }
+          }
+        } catch {
+          // 非 stream-json 行（少见）：原样收集兜底
+          if (line.trim()) text += line + '\n'
         }
-      } catch (err) {
-        this.log('error', `读取 kimi stdout 失败: ${String(err)}`)
       }
-
-      try {
-        await proc.wait()
-      } catch (err) {
-        this.log('error', `等待 kimi 进程退出失败: ${String(err)}`)
-      }
-      return output
-    })()
+    } catch (err) {
+      this.log('error', `读取 kimi stdout 失败: ${String(err)}`)
+    }
+    if (idleTimer) clearTimeout(idleTimer)
 
     try {
-      return await Promise.race([runPromise, timeoutPromise])
+      await proc.wait()
     } catch (err) {
-      this.log('error', String(err))
-      return output
+      this.log('error', `等待 kimi 进程退出失败: ${String(err)}`)
     }
+
+    return { ok: !timedOut, text }
   }
 
   /**
@@ -960,7 +1002,7 @@ PR_BODY:
 `
 
     try {
-      const output = await this.runInstructionSilent(prompt, 60000)
+      const { text: output } = await this.runInstructionSilent(prompt, 60000)
       const commitMatch = output.match(/COMMIT:\s*([\s\S]+?)(?=\n---\nPR_BODY:)/)
       const bodyMatch = output.match(/PR_BODY:\s*([\s\S]+)/)
 
@@ -1074,9 +1116,9 @@ PR_BODY:
    * 自动审阅指定分支的代码变更
    * 返回 { approved, comment }
    */
-  async runReview(targetBranch: string): Promise<{ approved: boolean; comment: string }> {
+  async runReview(targetBranch: string): Promise<{ status: 'approved' | 'rejected' | 'failed'; comment: string }> {
     if (!this.state.workspace) {
-      return { approved: false, comment: '工作空间未就绪' }
+      return { status: 'failed', comment: '工作空间未就绪' }
     }
 
     try {
@@ -1087,22 +1129,27 @@ PR_BODY:
 
     const diff = await getBranchDiff(this.state.workspace, targetBranch)
     if (!diff.trim()) {
-      return { approved: true, comment: '无代码变更需要审阅' }
+      return { status: 'approved', comment: '无代码变更需要审阅' }
     }
 
-    const truncatedDiff = diff.slice(0, 4000)
-    const prompt = `请审阅以下代码变更（分支 ${targetBranch}）。\n\n\`\`\`diff\n${truncatedDiff}\n\`\`\`\n\n请检查是否有 bug、安全隐患或规范问题。如果有问题请详细说明；如果没有问题请回复 "LGTM"。`
+    // 发全量 diff（不截断）——截断会让审阅基于半截改动、结论不可靠
+    const prompt = `请审阅以下代码变更（分支 ${targetBranch}）。\n\n\`\`\`diff\n${diff}\n\`\`\`\n\n请检查是否有 bug、安全隐患或规范问题。如果有问题请详细说明；如果没有问题请回复 "LGTM"。`
 
     this.log('system', `开始对分支 ${targetBranch} 执行自动审阅...`)
-    const output = await this.runInstructionSilent(prompt)
+    const { ok, text } = await this.runInstructionSilent(prompt)
 
-    const approved = /LGTM|lgtm|approve|通过|无问题|没问题/i.test(output)
+    // 区分「审阅没跑完」和「跑完有结论」：卡死/超时/空输出 → failed，不当成裁决
+    if (!ok || !text.trim()) {
+      this.log('error', '审阅未完成：kimi 卡死/超时或无有效输出')
+      return { status: 'failed', comment: '审阅未完成（kimi 卡死/超时或无有效输出）' }
+    }
+
+    const approved = /LGTM|lgtm|approve|通过|无问题|没问题/i.test(text)
     const comment = approved
       ? '自动审阅通过（LGTM）'
-      : `审阅发现潜在问题，kimi 输出如下：\n${output}`
-
+      : `审阅发现潜在问题，kimi 输出如下：\n${text}`
     this.log('system', comment)
-    return { approved, comment }
+    return { status: approved ? 'approved' : 'rejected', comment }
   }
 
   /**
@@ -1125,10 +1172,15 @@ PR_BODY:
 
     try {
       const result = await this.runReview(targetBranch)
-      onComplete(this.state.id, targetAgentId, result.approved, result.comment)
+      if (result.status === 'failed') {
+        // 审阅没跑完 → 不出裁决，审阅条目保持 pending，由引擎定时器稍后重试
+        this.log('system', `${result.comment}，将稍后重试`)
+        return
+      }
+      onComplete(this.state.id, targetAgentId, result.status === 'approved', result.comment)
     } catch (err) {
-      this.log('error', `自动审阅执行异常: ${String(err)}`)
-      onComplete(this.state.id, targetAgentId, false, `审阅异常: ${String(err)}`)
+      // 审阅异常同样按「未完成」处理：不出假裁决，留 pending 等重试
+      this.log('error', `自动审阅执行异常：${String(err)}，将稍后重试`)
     } finally {
       this.activeReviews.delete(targetAgentId)
     }

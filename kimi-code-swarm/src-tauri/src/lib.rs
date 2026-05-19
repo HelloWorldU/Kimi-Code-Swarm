@@ -460,7 +460,7 @@ fn verify_api_key(key: String) -> Result<bool, String> {
 /// 3. 在 cmd 中运行 `..\target\debug\kimi-code-swarm.exe`，复现 bug，看日志
 /// 4. 修完后改回 `false`，再跑 `cargo tauri build` 出正式包
 /// ===================================================================
-const DEBUG_CONSOLE: bool = false;
+const DEBUG_CONSOLE: bool = true;
 
 #[cfg(windows)]
 fn open_debug_console() {

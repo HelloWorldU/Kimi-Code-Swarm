@@ -176,6 +176,9 @@ function handleEngineEvent(event: Record<string, unknown>) {
       if (Array.isArray(incoming.changedFiles)) {
         agent.changedFiles = incoming.changedFiles.map(String)
       }
+      if (incoming.kimiSessionId !== undefined) {
+        agent.kimiSessionId = String(incoming.kimiSessionId)
+      }
       persistAgents()
       break
     }

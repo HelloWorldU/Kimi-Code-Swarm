@@ -70,6 +70,8 @@ export interface RunKimiOptions {
   streamJson?: boolean
   /** 启用 --thinking 让模型输出思考过程 */
   thinking?: boolean
+  /** 传入已有的 session id，用 -r <id> 恢复 Kimi CLI 原生会话 */
+  sessionId?: string
 }
 
 export function runKimi(
@@ -83,6 +85,9 @@ export function runKimi(
   // --output-format stream-json: structured streaming output (thinking / tool_calls / text)
   // --final-message-only: only output the final assistant message (fallback for silent mode)
   const baseArgs = ['--work-dir', workspace, '--prompt', instruction, '--print']
+  if (options.sessionId) {
+    baseArgs.push('-r', options.sessionId)
+  }
   if (options.streamJson) {
     baseArgs.push('--output-format', 'stream-json')
   }
