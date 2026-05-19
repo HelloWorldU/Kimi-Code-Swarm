@@ -97,6 +97,8 @@ export class Agent {
       'Agent 执行完毕',
       'Agent 执行失败',
       'Agent 已停止',
+      '文件变更',
+      '检测到代码变更',
       '代码已推送',
       '推送失败',
       'PR #',
@@ -449,7 +451,15 @@ export class Agent {
       const commitRes = await gitCommit(this.state.workspace, generated.commitMessage)
       steps.push({ name: 'git commit', stdout: commitRes.stdout, stderr: commitRes.stderr, exitCode: commitRes.exitCode })
       if (commitRes.exitCode !== 0) {
-        return { ok: false, steps }
+        // 「nothing to commit」不是失败：改动已被提交（agent 修复时自行 commit 过 /
+        // 上一轮已提交）。应继续 push + 建 PR，而非回头让 agent 重复"修复"
+        const alreadyCommitted = /nothing to commit|working tree clean/i.test(
+          `${commitRes.stdout}\n${commitRes.stderr}`,
+        )
+        if (!alreadyCommitted) {
+          return { ok: false, steps }
+        }
+        this.log('system', '工作区无新变更，改动已提交，继续推送')
       }
 
       // git push
