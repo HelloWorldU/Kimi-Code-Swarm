@@ -3,7 +3,8 @@ import { ref, computed, watch, nextTick } from 'vue'
 import {
   ArrowLeft, Send, Terminal, AlertCircle, CheckCircle, Play,
   GitPullRequest, GitMerge, RotateCcw, Square, Clock, XCircle, FileCode,
-  User, Bot, Loader2, Brain, Wrench, Server
+  User, Bot, Loader2, Brain, Wrench, Server,
+  ChevronDown, ChevronRight
 } from 'lucide-vue-next'
 import type { AgentTask } from '../types'
 
@@ -25,6 +26,23 @@ const emit = defineEmits<{
 
 const instruction = ref('')
 const scrollRef = ref<HTMLDivElement>()
+
+// Collapsible logs: expanded by default for none; stored as Set of log ids
+const expandedLogIds = ref<Set<string>>(new Set())
+
+function toggleLogExpand(logId: string) {
+  const set = expandedLogIds.value
+  if (set.has(logId)) {
+    set.delete(logId)
+  } else {
+    set.add(logId)
+  }
+  expandedLogIds.value = new Set(set)
+}
+
+function isLogExpanded(logId: string) {
+  return expandedLogIds.value.has(logId)
+}
 
 const tokenPercent = computed(() => (props.agent.tokenUsed / props.agent.tokenBudget) * 100)
 const approvedCount = computed(() => props.agent.reviews.filter((r) => r.status === 'approved').length)
@@ -289,11 +307,20 @@ watch(() => props.agent.status, async () => {
             <div class="w-7 h-7 rounded-full bg-amber-100 flex items-center justify-center shrink-0 mb-1">
               <Brain class="w-3.5 h-3.5 text-amber-600" />
             </div>
-            <div class="bg-amber-50 text-amber-800 rounded-2xl rounded-tl-sm px-4 py-2.5 shadow-sm border border-amber-100">
-              <p class="text-xs font-medium text-amber-600 mb-1">Thinking</p>
-              <p class="text-sm whitespace-pre-wrap break-words leading-relaxed">{{ log.content }}</p>
-              <div class="flex items-center gap-2 mt-1">
-                <span class="text-[10px] text-amber-400">{{ new Date(log.timestamp).toLocaleTimeString() }}</span>
+            <div class="bg-amber-50 text-amber-800 rounded-2xl rounded-tl-sm shadow-sm border border-amber-100 min-w-0">
+              <button
+                class="w-full flex items-center justify-between px-4 py-2 cursor-pointer hover:bg-amber-100/50 transition-colors rounded-2xl rounded-bl-sm"
+                @click="toggleLogExpand(log.id)"
+              >
+                <span class="text-xs font-medium text-amber-600">Thinking</span>
+                <ChevronRight v-if="!isLogExpanded(log.id)" class="w-3.5 h-3.5 text-amber-600 shrink-0 ml-2" />
+                <ChevronDown v-else class="w-3.5 h-3.5 text-amber-600 shrink-0 ml-2" />
+              </button>
+              <div v-if="isLogExpanded(log.id)" class="px-4 pb-2.5">
+                <p class="text-sm whitespace-pre-wrap break-words leading-relaxed">{{ log.content }}</p>
+                <div class="flex items-center gap-2 mt-1">
+                  <span class="text-[10px] text-amber-400">{{ new Date(log.timestamp).toLocaleTimeString() }}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -306,11 +333,20 @@ watch(() => props.agent.status, async () => {
               <Wrench v-if="log.type === 'tool_call'" class="w-3.5 h-3.5 text-purple-600" />
               <Server v-else class="w-3.5 h-3.5 text-purple-600" />
             </div>
-            <div class="bg-purple-50 text-purple-800 rounded-2xl rounded-tl-sm px-4 py-2.5 shadow-sm border border-purple-100">
-              <p class="text-xs font-medium text-purple-600 mb-1">{{ log.type === 'mcp' ? 'MCP' : 'Tool Call' }}</p>
-              <p class="text-sm whitespace-pre-wrap break-words leading-relaxed font-mono text-xs">{{ log.content }}</p>
-              <div class="flex items-center gap-2 mt-1">
-                <span class="text-[10px] text-purple-400">{{ new Date(log.timestamp).toLocaleTimeString() }}</span>
+            <div class="bg-purple-50 text-purple-800 rounded-2xl rounded-tl-sm shadow-sm border border-purple-100 min-w-0">
+              <button
+                class="w-full flex items-center justify-between px-4 py-2 cursor-pointer hover:bg-purple-100/50 transition-colors rounded-2xl rounded-bl-sm"
+                @click="toggleLogExpand(log.id)"
+              >
+                <span class="text-xs font-medium text-purple-600">{{ log.type === 'mcp' ? 'MCP' : 'Tool Call' }}</span>
+                <ChevronRight v-if="!isLogExpanded(log.id)" class="w-3.5 h-3.5 text-purple-600 shrink-0 ml-2" />
+                <ChevronDown v-else class="w-3.5 h-3.5 text-purple-600 shrink-0 ml-2" />
+              </button>
+              <div v-if="isLogExpanded(log.id)" class="px-4 pb-2.5">
+                <p class="text-sm whitespace-pre-wrap break-words leading-relaxed font-mono text-xs">{{ log.content }}</p>
+                <div class="flex items-center gap-2 mt-1">
+                  <span class="text-[10px] text-purple-400">{{ new Date(log.timestamp).toLocaleTimeString() }}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -322,11 +358,20 @@ watch(() => props.agent.status, async () => {
             <div class="w-7 h-7 rounded-full bg-green-100 flex items-center justify-center shrink-0 mb-1">
               <CheckCircle class="w-3.5 h-3.5 text-green-600" />
             </div>
-            <div class="bg-green-50 text-green-800 rounded-2xl rounded-tl-sm px-4 py-2.5 shadow-sm border border-green-100">
-              <p class="text-xs font-medium text-green-600 mb-1">Tool Result</p>
-              <p class="text-sm whitespace-pre-wrap break-words leading-relaxed font-mono text-xs">{{ log.content }}</p>
-              <div class="flex items-center gap-2 mt-1">
-                <span class="text-[10px] text-green-400">{{ new Date(log.timestamp).toLocaleTimeString() }}</span>
+            <div class="bg-green-50 text-green-800 rounded-2xl rounded-tl-sm shadow-sm border border-green-100 min-w-0">
+              <button
+                class="w-full flex items-center justify-between px-4 py-2 cursor-pointer hover:bg-green-100/50 transition-colors rounded-2xl rounded-bl-sm"
+                @click="toggleLogExpand(log.id)"
+              >
+                <span class="text-xs font-medium text-green-600">Tool Result</span>
+                <ChevronRight v-if="!isLogExpanded(log.id)" class="w-3.5 h-3.5 text-green-600 shrink-0 ml-2" />
+                <ChevronDown v-else class="w-3.5 h-3.5 text-green-600 shrink-0 ml-2" />
+              </button>
+              <div v-if="isLogExpanded(log.id)" class="px-4 pb-2.5">
+                <p class="text-sm whitespace-pre-wrap break-words leading-relaxed font-mono text-xs">{{ log.content }}</p>
+                <div class="flex items-center gap-2 mt-1">
+                  <span class="text-[10px] text-green-400">{{ new Date(log.timestamp).toLocaleTimeString() }}</span>
+                </div>
               </div>
             </div>
           </div>
