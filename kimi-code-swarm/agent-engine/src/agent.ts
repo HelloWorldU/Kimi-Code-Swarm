@@ -225,7 +225,9 @@ export class Agent {
     }
     if (this.state.status !== 'ready') return
 
-    this.githubToken = githubToken
+    // 有条件赋值：没传 token 不应擦掉已知的（token 是 agent 持久凭据，
+    // 并非每条指令都携带；autoSubmitForReview 的修复步就以无 token 调用本方法）
+    if (githubToken) this.githubToken = githubToken
     this.setStatus('working')
     this.state.instruction = instruction
     const inputTokens = Math.floor(instruction.length / 2)
