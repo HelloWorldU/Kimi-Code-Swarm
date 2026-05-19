@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import {
   ArrowLeft, Send, Terminal, AlertCircle, CheckCircle, Play,
   GitPullRequest, GitMerge, RotateCcw, Square, Clock, XCircle, FileCode,
@@ -44,6 +44,17 @@ function isLogExpanded(logId: string) {
   return expandedLogIds.value.has(logId)
 }
 
+// ── Smart scroll: only auto-scroll if user is already near bottom ──
+const SCROLL_THRESHOLD = 80
+
+function isNearBottom(el: HTMLDivElement): boolean {
+  return el.scrollHeight - el.scrollTop - el.clientHeight < SCROLL_THRESHOLD
+}
+
+function scrollToBottom(el: HTMLDivElement) {
+  el.scrollTop = el.scrollHeight
+}
+
 const tokenPercent = computed(() => (props.agent.tokenUsed / props.agent.tokenBudget) * 100)
 const approvedCount = computed(() => props.agent.reviews.filter((r) => r.status === 'approved').length)
 const canMerge = computed(() => props.agent.reviews.length === 0 || props.agent.reviews.every((r) => r.status === 'approved'))
@@ -85,17 +96,29 @@ function handleKeydown(e: KeyboardEvent) {
   // Shift+Enter 默认换行，不拦截
 }
 
+onMounted(() => {
+  // When entering the chat, always scroll to the bottom
+  if (scrollRef.value) {
+    scrollToBottom(scrollRef.value)
+  }
+})
+
 watch(() => props.agent.logs.length, async () => {
   await nextTick()
-  if (scrollRef.value) {
-    scrollRef.value.scrollTop = scrollRef.value.scrollHeight
+  const el = scrollRef.value
+  if (!el) return
+  // Only auto-scroll if the user is already near the bottom
+  if (isNearBottom(el)) {
+    scrollToBottom(el)
   }
 })
 
 watch(() => props.agent.status, async () => {
   await nextTick()
-  if (scrollRef.value) {
-    scrollRef.value.scrollTop = scrollRef.value.scrollHeight
+  const el = scrollRef.value
+  if (!el) return
+  if (isNearBottom(el)) {
+    scrollToBottom(el)
   }
 })
 </script>
