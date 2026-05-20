@@ -31,6 +31,16 @@ const termColors = {
 /** Kimi CLI 每次 --print 运行结束会在 stderr 打印的会话恢复提示，用于捕获 session id */
 export const SESSION_RESUME_RE = /To resume this session: kimi -r ([a-f0-9-]+)/i
 
+/**
+ * 所有 fix prompt（pre-commit / CI / review 三处）共用的硬约束：
+ * 禁止 agent 自己跑 git——commit / push / PR 由引擎统一编排，
+ * agent 自跑会绕开 generateCommitAndPrBody 的规范 commit message、
+ * 也会让 submitForReview 重试时命中 "nothing to commit" 兼容分支，
+ * 流程双轨混乱。
+ */
+const FIX_PROMPT_GIT_GUARD =
+  '\n\n**重要约束：只修改文件，不要运行 git add / git commit / git push 等任何 git 命令。提交、推送、PR 等流程将由引擎在你修改完成后自动重试。**'
+
 export class Agent {
   state: AgentState
   private process?: KimiProcess
@@ -719,7 +729,7 @@ export class Agent {
     }
 
     this.log('system', `CI 失败，第 ${this.ciRetryCount}/${this.CI_MAX_RETRIES} 轮自动修复...`)
-    const fixPrompt = `GitHub Actions CI 检查失败了，日志如下：\n\n${ciLogs}\n\n请根据上述日志修改代码文件，使其能够通过 CI 检查。直接修改相关文件，不需要额外说明。`
+    const fixPrompt = `GitHub Actions CI 检查失败了，日志如下：\n\n${ciLogs}\n\n请根据上述日志修改代码文件，使其能够通过 CI 检查。直接修改相关文件，不需要额外说明。${FIX_PROMPT_GIT_GUARD}`
     await this.runInstructionSilent(fixPrompt)
 
     // 修复后重新检测变更
@@ -763,7 +773,7 @@ export class Agent {
           return
         }
         this.log('system', '正在根据执行日志自动修复...')
-        const fixPrompt = `你刚才尝试提交代码，执行日志如下：\n\n${fullLog}\n\n请根据上述日志中的错误信息，修改相关文件，使其能够通过项目的 typecheck、lint 和 pre-commit 检查。直接修改相关文件，不需要额外说明。`
+        const fixPrompt = `你刚才尝试提交代码，执行日志如下：\n\n${fullLog}\n\n请根据上述日志中的错误信息，修改相关文件，使其能够通过项目的 typecheck、lint 和 pre-commit 检查。直接修改相关文件，不需要额外说明。${FIX_PROMPT_GIT_GUARD}`
         // 走流式 sendInstruction：修复过程实时显示在对话框，且无 runInstructionSilent 的硬超时
         await this.sendInstruction(fixPrompt)
         // 修复后重新检测变更
@@ -1268,7 +1278,7 @@ PR_BODY:
       .map((r) => `-${r.reviewerName}: ${r.comment || '审阅未通过'}`)
       .join('\n')
 
-    const prompt = `你的 PR 被以下审阅意见拒绝了，请根据意见修改代码：\n\n${comments}\n\n请直接修改相关代码文件。修改完成后不需要额外说明。`
+    const prompt = `你的 PR 被以下审阅意见拒绝了，请根据意见修改代码：\n\n${comments}\n\n请直接修改相关代码文件。修改完成后不需要额外说明。${FIX_PROMPT_GIT_GUARD}`
 
     this.rejectPr()
     this.log('system', `第 ${this.reviewRound} 轮自动修改开始，基于 ${rejectedReviews.length} 条审阅意见`)
