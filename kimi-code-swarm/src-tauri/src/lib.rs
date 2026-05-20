@@ -295,6 +295,12 @@ fn spawn_agent_engine(app: tauri::AppHandle) -> Result<u32, String> {
         cmd_builder.env("KIMI_API_KEY", key);
     }
 
+    // 告诉引擎数据目录：跨平台正确路径由 Rust 解析，引擎不猜
+    if let Ok(data_dir) = app.path().app_local_data_dir() {
+        let _ = std::fs::create_dir_all(&data_dir);
+        cmd_builder.env("KIMI_SWARM_DATA_DIR", data_dir.to_string_lossy().as_ref());
+    }
+
     let mut child = cmd_builder
         .spawn()
         .map_err(|e| format!(

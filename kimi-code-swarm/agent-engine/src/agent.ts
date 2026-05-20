@@ -1,4 +1,5 @@
-import type { AgentState, LogEntry, ReviewEntry, TaskStatus, EngineEvent } from './types.js'
+import type { AgentState, LogEntry, ReviewEntry, TaskStatus, PrStatus, CiStatus, EngineEvent } from './types.js'
+import type { PersistedAgent } from './persist.js'
 import { runKimi, detectKimiCli, type KimiProcess } from './kimi.js'
 import { getChangedFiles, getStagedFiles, getFileDiff, gitAdd, gitCommit, gitPush, createBranch, cloneRepo, gitFetch, getBranchDiff, gitDeleteRemoteBranch } from './git.js'
 import { createPullRequest, mergePullRequest, getPullRequest, getPullRequestReviews, getCheckRuns, getCheckRunLogs, submitPullRequestReview, getAuthenticatedUser } from './github-api.js'
@@ -54,6 +55,7 @@ export class Agent {
     tokenBudget: number,
     emit: (event: EngineEvent) => void,
     private onPrCreated?: (agentId: string, branch: string, githubToken?: string) => Promise<void> | void,
+    private onPersist?: () => void,
   ) {
     this.emit = emit
     this.state = {
@@ -72,6 +74,36 @@ export class Agent {
       logs: [this.makeLog('system', 'Agent 已创建，等待启动...')],
       reviews: [],
     }
+  }
+
+  /**
+   * 从持久化状态恢复一个 Agent —— 用于引擎重启后的 restore。
+   * Logs 不恢复（由前端缓存）；status / kimiSessionId / PR 等业务字段还原。
+   */
+  static fromPersisted(
+    p: PersistedAgent,
+    emit: (event: EngineEvent) => void,
+    onPrCreated?: (agentId: string, branch: string, githubToken?: string) => Promise<void> | void,
+    onPersist?: () => void,
+  ): Agent {
+    const a = new Agent(p.name, p.repoUrl, p.instruction, p.tokenBudget, emit, onPrCreated, onPersist)
+    a.state.id = p.id
+    a.state.status = p.status as TaskStatus
+    a.state.workspace = p.workspace
+    a.state.branch = p.branch
+    a.state.prStatus = p.prStatus as PrStatus
+    a.state.prNumber = p.prNumber
+    a.state.prUrl = p.prUrl
+    a.state.prAuthor = p.prAuthor
+    a.state.tokenUsed = p.tokenUsed
+    a.state.kimiSessionId = p.kimiSessionId
+    a.state.reviews = (p.reviews as ReviewEntry[]) ?? []
+    a.state.changedFiles = p.changedFiles
+    a.state.ciStatus = p.ciStatus as CiStatus | undefined
+    a.state.createdAt = p.createdAt
+    a.state.lastActivity = p.lastActivity
+    a.state.logs = []   // logs 来自前端缓存
+    return a
   }
 
   private makeLog(type: LogEntry['type'], content: string, tokens?: number): LogEntry {
@@ -173,6 +205,7 @@ export class Agent {
         kimiSessionId: s.kimiSessionId,
       },
     })
+    this.onPersist?.()
   }
 
   async start() {

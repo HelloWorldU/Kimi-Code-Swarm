@@ -113,6 +113,6 @@ PR CI 中额外运行 `check-test-sync`：若 `src/` 新增代码文件，`tests
 | SettingsPanel（Token 配置） | ✅ 真实 | localStorage 持久化；白色简约 UI |
 | 监控分析页 | ✅ 真实 | 状态分布、Token 排行、活跃/审阅任务；白色简约 UI |
 | 删除 Agent 确认 | ✅ 真实 | `confirm()` 弹窗提示，明确告知工作目录将被一并删除；未启动的 Agent 根据命名规则推断路径显示 |
-| Agent 状态持久化 | ✅ 真实 | tauri-plugin-store 自动保存/恢复 |
+| Agent 状态持久化 | ✅ 真实 | 引擎自持久化 `engine-state.json`（事实源）+ `tauri-plugin-store` 缓存 logs/UI；启动后 `engine-restored` 事件 diff 出本地多余项标 `orphan` |
 
 文档同步检测被阻断时，不直接告知需要更新哪个文档——Agent 需回顾本次会话已读文档，或查阅 AGENTS.md 地图自行定位关联文档。

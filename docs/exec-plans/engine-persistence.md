@@ -1,55 +1,144 @@
-# 方案：引擎自持久化 + 前端缓存 Logs
+# 方案：引擎自持久化（实施版）
 
-> 解决重启后旧 Agent 变"植物人"的问题：引擎进程重启后无状态，前端有 localStorage 但引擎不认识这些 Agent。
-
----
-
-## 1. 现状问题
-
-| 层级 | 持久化？ | 重启后状态 |
-|------|---------|-----------|
-| 前端 Vue + useSwarmStore | ✅ localStorage（tauri-plugin-store） | 能恢复 Agent 列表和 Logs |
-| 引擎 AgentEngine（Node.js） | ❌ 纯内存 | 全新空进程，没有任何 Agent 对象 |
-
-**结果**：
-- 用户能看到旧 Agent 和历史消息，但发指令时引擎 `this.agents.get(id)` 返回 `undefined`，指令被静默丢弃。
-- 删除 Agent 时引擎同样找不到对象，`delete-agent` 里的目录清理逻辑完全没执行，`E:/workspace/agent-xxx` 残留在磁盘上，前端 UI 却显示"已删除"。
+> **一句话**：Rust 通过 `KIMI_SWARM_DATA_DIR` 环境变量告诉引擎数据目录；引擎启动时从 `engine-state.json` 重建 Agent、emit `engine-restored` 事件；前端等这个事件再去填 `state.agents`，对不在恢复列表里的 localStorage 旧 Agent 标「孤儿」。重启不再变植物人，且每一项跟 kimi 原生 session resume 完全协作。
 
 ---
 
-## 2. 目标架构：各司其职
+## 1. 现状（已读代码确认）
 
+| 事实 | 出处 |
+|------|------|
+| 引擎入口 `index.ts` 只做：`new AgentEngine` + 收 stdin 命令 + emit boot `pong`，**没有任何 restore** | [agent-engine/src/index.ts](../../kimi-code-swarm/agent-engine/src/index.ts) |
+| 引擎进程内存里只有空 `this.agents = new Map()` | [agent-engine/src/engine.ts:7](../../kimi-code-swarm/agent-engine/src/engine.ts#L7) |
+| Rust `spawn_agent_engine` 已经在用 `cmd_builder.env("KIMI_API_KEY", key)` 注入环境变量 —— **再加一个 env 即可** | [src-tauri/src/lib.rs:295](../../kimi-code-swarm/src-tauri/src/lib.rs#L295) |
+| Rust 已持有 `app.path().app_local_data_dir()` | [src-tauri/src/lib.rs:94](../../kimi-code-swarm/src-tauri/src/lib.rs#L94) |
+| 前端 `STORE_KEY = 'agents'`、走 **`tauri-plugin-store`**（不是浏览器 localStorage）持久化完整 `AgentTask[]`；`persistAgents()` 在 store 里被 20+ 处调用 | [src/store/useSwarmStore.ts:26, 232](../../kimi-code-swarm/src/store/useSwarmStore.ts#L26) |
+| `bootstrap()` 把 localStorage 里的 agents 直接塞回 `state.agents` —— 这就是「前端有、引擎没有」错配的源头 | [src/store/useSwarmStore.ts:30-51](../../kimi-code-swarm/src/store/useSwarmStore.ts#L30) |
+| `agent-created` handler 现在是 `state.agents.push(agent)` —— 一旦引擎在 restore 时 emit，会跟前端已有的 agents **重复** | [src/store/useSwarmStore.ts:88-92](../../kimi-code-swarm/src/store/useSwarmStore.ts#L88) |
+
+**症状**：用户能看到旧 Agent 和历史消息，但发指令时引擎 `this.agents.get(id)` 返回 `undefined`，指令静默丢弃；删除时引擎找不到对象，`E:/workspace/agent-xxx` 残留在磁盘上。
+
+---
+
+## 2. 架构分工
+
+| 角色 | 职责 | 实现 |
+|------|------|------|
+| **引擎 = 事实源** | Agent 身份、运行状态、`kimiSessionId`、PR / review / token 等 | `<dataDir>/engine-state.json` |
+| **前端 = 视图缓存** | 历史 `logs`、`selectedAgentId` 等 UI 状态 | `tauri-plugin-store`（沿用） |
+
+引擎结构化字段（business state）→ 引擎写盘；前端只缓存看的东西。
+
+---
+
+## 3. 改动清单（按文件，可直接动手）
+
+### Rust ([src-tauri/src/lib.rs](../../kimi-code-swarm/src-tauri/src/lib.rs))
+
+`spawn_agent_engine` 在 `KIMI_API_KEY` 注入处（295 行附近）再加：
+
+```rust
+let data_dir = app.path().app_local_data_dir()
+    .map_err(|e| format!("Failed to resolve data dir: {}", e))?;
+std::fs::create_dir_all(&data_dir).ok();
+cmd_builder.env("KIMI_SWARM_DATA_DIR", data_dir.to_string_lossy().as_ref());
 ```
-┌─────────────────────────────────────────────┐
-│  引擎 JSON (~/.config/kimi-code-swarm/)     │  ← 核心状态事实源
-│  • Agent 身份、运行状态、kimiSessionId       │
-│  • 审阅状态、PR 信息、Token 预算             │
-└──────────────┬──────────────────────────────┘
-               │
-┌──────────────▼──────────────────────────────┐
-│       AgentEngine (Node.js)                 │
-│  • 启动时自加载 JSON，重建 Agent 对象       │
-│  • 状态变更时异步写回 JSON                  │
-│  • emit agent-created / agent-state 给前端  │
-└──────────────┬──────────────────────────────┘
-               │ JSON-RPC 事件
-┌──────────────▼──────────────────────────────┐
-│          Vue Frontend                       │
-│  • 接收引擎事件，渲染 UI                     │
-│  • localStorage 缓存 Logs（视图层）         │
-│  • 重启后等引擎恢复，再拼上本地 Logs         │
-└─────────────────────────────────────────────┘
+
+跨平台路径由 Rust 解决；引擎只读 env，不猜路径。
+
+### 引擎新增 `agent-engine/src/persist.ts`
+
+| 导出 | 行为 |
+|------|------|
+| `getDataDir(): string` | 读 `process.env.KIMI_SWARM_DATA_DIR`；缺失时 throw（不允许默默落到错误位置） |
+| `acquireLock(dir): void` | 写 `engine.lock`（自己 pid）；若已存在且 pid 活 → throw 退出；pid 已死 → 抢占 |
+| `loadEngineState(dir): Promise<PersistedState \| null>` | 读 `engine-state.json`；parse 失败 → `rename` 成 `engine-state.json.corrupt.<ts>` 留底 + 返回 null |
+| `schedulePersist(state): void` | **debounced 500ms**；写时**原子化**：`engine-state.json.tmp` → `rename` |
+
+### 引擎 `agent-engine/src/agent.ts`
+
+- 加静态 `Agent.fromPersisted(p, emit, onPrCreated): Agent`，把持久化字段塞回 `this.state`（含 `kimiSessionId`）。
+- `syncState()` 末尾加：**当 business 字段变化才** `schedulePersist`。
+  - business 字段集合：`kimiSessionId / prStatus / prNumber / prUrl / status / reviews / changedFiles / workspace / branch / prAuthor / ciStatus`
+  - **`tokenUsed` 不算**（高频，不值得刷盘；丢了无所谓）
+  - 实现：在 `Agent` 上维护 `lastPersistedFingerprint = JSON.stringify(businessSubset)`，变了才 schedule
+
+### 引擎 `agent-engine/src/types.ts`
+
+`EngineEvent` 加一项：
+
+```ts
+| { type: 'engine-restored'; restoredAgentIds: string[] }
 ```
 
-**分工原则**：
-- **引擎 = 唯一事实来源**：谁活着、在哪工作、kimi session 是什么
-- **前端 = 视图缓存**：历史消息（Logs）存在本地是为了 UI 渲染快，丢了不影响业务
+### 引擎 `agent-engine/src/index.ts` 启动顺序改为
+
+```ts
+const dataDir = getDataDir()
+acquireLock(dataDir)
+
+const persisted = await loadEngineState(dataDir)
+const engine = new AgentEngine(emit, dataDir)
+const restoredIds: string[] = []
+if (persisted) {
+  for (const p of persisted.agents) {
+    engine.restoreAgent(p)              // 内部 new Agent + 进 Map + emit agent-created
+    restoredIds.push(p.id)
+  }
+}
+emit({ type: 'engine-restored', restoredAgentIds: restoredIds })   // 必须在 agent-created 之后
+emit({ type: 'pong', message: 'Agent Engine started' })
+// 然后 readline 接 stdin
+```
+
+### 前端 [src/store/useSwarmStore.ts](../../kimi-code-swarm/src/store/useSwarmStore.ts) —— 渐进式
+
+`bootstrap()`：仍 `loadPersistedAgents()`，但**只拿 logs 作缓存**，不直接塞 `state.agents`；标记 `state.engineReady = false`。
+
+`handleEngineEvent` 改/加：
+
+```ts
+case 'agent-created': {
+  const agent = event.agent as AgentTask
+  agent.logs = logsCache.get(agent.id) ?? agent.logs ?? []
+  const i = state.agents.findIndex(a => a.id === agent.id)
+  if (i >= 0) state.agents[i] = agent     // 去重：替换，不重复 push
+  else state.agents.push(agent)
+  break
+}
+case 'engine-restored': {
+  state.engineReady = true
+  const restored = new Set(event.restoredAgentIds as string[])
+  for (const a of state.agents) {
+    if (!restored.has(a.id)) a.status = 'orphan'   // localStorage 多出来的 → 孤儿
+  }
+  break
+}
+```
+
+`AgentTask.status` 加 `'orphan'`；UI 在 `engineReady=false` 时禁「发送/创建/删除」按钮。
+
+> **不要一次拆掉** `persistAgents()`。Phase 1 让引擎 JSON 接管核心状态，前端 store 继续全量持久化作 fallback；Phase 3 再砍。
 
 ---
 
-## 3. 持久化格式
+## 4. 关键机制
 
-文件：`~/.config/kimi-code-swarm/engine-state.json`（Tauri 的 `app_local_data_dir()`）
+| 机制 | 实现 |
+|------|------|
+| 跨平台路径 | Rust `app_local_data_dir()` → env `KIMI_SWARM_DATA_DIR` → 引擎读 |
+| 多实例隔离 | `engine.lock`(写 pid)，已存在且活着 → 退出 |
+| 写盘抗 crash | 原子写：`.tmp` → `rename` |
+| 损坏不删数据 | parse 失败 → `rename .corrupt.<ts>` 留底，空启动 |
+| 不刷盘 | 500ms debounce + 仅 business 字段变才 schedule |
+| 孤儿可见 | `engine-restored` 含 ID 列表；前端 diff 后给 localStorage 多出的标 `orphan` |
+| 启动窗口期 | `state.engineReady` + UI 禁交互直到收到 `engine-restored` |
+
+---
+
+## 5. 持久化 JSON 格式
+
+文件：`<KIMI_SWARM_DATA_DIR>/engine-state.json`
 
 ```json
 {
@@ -61,111 +150,72 @@
       "status": "ready",
       "repoUrl": "https://github.com/...",
       "workspace": "E:/workspace/agent-abc123",
-      "branch": "agent/test-abc123",
+      "branch": "agent/test-abc",
       "instruction": "实现登录功能",
       "prStatus": "none",
       "prNumber": null,
       "prUrl": null,
+      "prAuthor": null,
       "tokenUsed": 1234,
       "tokenBudget": 50000,
       "kimiSessionId": "1ec1a250-9e90-4fd0-8ba3-722e71e6440d",
       "reviews": [],
       "changedFiles": [],
+      "ciStatus": null,
+      "createdAt": "2026-05-19T10:00:00Z",
       "lastActivity": "2026-05-19T12:00:00Z"
     }
   ]
 }
 ```
 
-**不存什么**：
-- `logs`：前端自己缓存，引擎不存（避免文件膨胀）
-- `pid`：进程 ID 重启后无效
-- `createdAt`：可选，不影响续接能力
+**不存**：`logs`（前端缓存）、`pid`（进程死了就无效）。
+**保留 `createdAt`**：UI 排序/显示用。
 
 ---
 
-## 4. 重启恢复流程
+## 6. 重启流程
 
 ```
 1. 用户打开 App
-   ↓
-2. 前端启动 → 启动引擎进程
-   ↓
-3. 【引擎】读取 engine-state.json
-   → 遍历 agents 数组
-   → new Agent(...) 重建每个 Agent 对象
-   → 把 kimiSessionId 塞回 this.state.kimiSessionId
-   → emit { type: 'agent-created', agent: state }
-   ↓
-4. 【前端】接收 agent-created 事件
-   → state.agents 填充核心状态
-   → 从 localStorage 加载对应 agent 的 Logs 缓存
-   → 拼接后渲染聊天界面
-   ↓
-5. 用户点击旧 Agent 发消息
-   → 引擎 sendInstruction 直接用内存中的 kimiSessionId
-   → kimi --print -r <id> 续接上一次的会话
+2. 前端 bootstrap → 启 Rust → spawn engine（带 KIMI_SWARM_DATA_DIR 等 env）
+3. 引擎：acquireLock → loadEngineState → for each agent: new Agent + emit agent-created
+4. 引擎 emit { engine-restored, restoredAgentIds }
+5. 引擎 emit { pong, "Agent Engine started" }
+6. 前端：收到 agent-created（按 id 去重填 / 替换 state.agents，logs 从缓存拼回）
+7. 前端：收到 engine-restored → state.engineReady = true，给 localStorage 多出的标 orphan
+8. 用户发指令 → sendInstruction → 引擎用内存里的 kimiSessionId → kimi --print -r <id> 续接
 ```
 
 ---
 
-## 5. 改动范围
-
-### 引擎侧（agent-engine）
-
-| 文件 | 改动 |
-|------|------|
-| `agent-engine/src/persist.ts`（新增） | `loadEngineState()` / `saveEngineState()` 读写 JSON |
-| `agent-engine/src/engine.ts` | 构造函数启动时调用 `loadEngineState()` 恢复；Agent 状态变更时触发 `saveEngineState()` |
-| `agent-engine/src/agent.ts` | `syncState()` 或状态变更钩子中触发保存；确保 `kimiSessionId` 被序列化 |
-
-### 前端侧（kimi-code-swarm）
-
-| 文件 | 改动 |
-|------|------|
-| `src/store/useSwarmStore.ts` | `bootstrap()` 不再把 `persisted` 当业务状态直接塞给 `state.agents`；改为等引擎 `agent-created` 事件；localStorage 继续存 Logs 缓存 |
-
-### 关键决策
-
-**Q: 前端 localStorage 里的 agents 还存吗？**
-
-存，但**只存 Logs**，不存核心状态。结构调整：
-
-```ts
-// 改造前：localStorage 存完整 agents（含核心状态+Logs）
-{ agents: AgentTask[] }
-
-// 改造后：localStorage 只存 Logs 映射
-{ 
-  agentLogs: { [agentId]: LogEntry[] },
-  uiState: { selectedAgentId: string | null }
-}
-```
-
-或者更简单：继续用现有格式，但 `bootstrap()` 恢复时**只取 logs**，核心状态等引擎事件。渐进式改造，不一次拆完。
-
----
-
-## 6. 边界与风险
+## 7. 边界处理
 
 | 场景 | 策略 |
 |------|------|
-| **engine-state.json 损坏** | 启动时 `try/catch`，损坏则清空重建（等价于全新启动） |
-| **引擎 crash 时丢数据** | 每次 `syncState()` 都触发异步保存，crash 最多丢最近几秒 |
-| **用户手动删了 engine-state.json** | 引擎空启动，前端 Logs 缓存还在但"孤儿"——UI 显示历史消息，发指令时引擎会 `this.agents.get(id) === undefined`。需要前端检测并提示"Agent 已失效" |
-| **多开 App 实例** | 各实例独立进程 + 独立 JSON 文件，互不影响（桌面应用常规行为） |
-| **Logs 缓存过期** | 前端 Logs 可以设 TTL（如 7 天），超期自动清理 |
+| `engine-state.json` 损坏 | `rename .corrupt.<ts>` + 空启动 + emit error 提示用户 |
+| 引擎 crash 时丢数据 | 仅丢最近 ≤500ms（debounce 窗口） |
+| 用户手删 JSON | 空启动 → 前端 localStorage 里的全部变 `orphan`（可视化提示） |
+| 多开 App | `engine.lock` 拒绝第二实例（推荐配合 [`tauri-plugin-single-instance`](https://crates.io/crates/tauri-plugin-single-instance) 在 Rust 侧也挡一道） |
+| 启动窗口期用户操作 | `state.engineReady=false` 禁交互 |
 
 ---
 
-## 7. 一句话
+## 8. 实施分阶段（降风险）
 
-**引擎自己记住 Agent 是谁、session 在哪；前端只管记住聊过什么。** 重启后两边各恢复各的，拼起来就是一个完整的 Agent。
+| Phase | 内容 | 可独立合并 |
+|-------|------|-----------|
+| **1** | Rust 注入 env + `persist.ts`（load/lock/原子写）+ 启动 restore + emit `engine-restored` + 前端识别孤儿 + `engineReady` 门控 | ✅ 单独可发 —— 解决「重启变植物人」核心痛点 |
+| **2** | `syncState` 接 `schedulePersist`，含 business-字段哈希判定 | ✅ |
+| **3** | 砍掉前端 `persistAgents` 对核心字段的持久化，只留 logs | 观察一两个版本稳定后做 |
 
 ---
 
-## Review 请确认
+## 9. 不在本方案范围（遗留）
 
-1. 持久化文件路径和格式是否 OK？
-2. 前端 localStorage 的改造方式（渐进式 vs 一次性拆分）倾向哪个？
-3. 是否有我没覆盖到的场景？
+- **kimi session 过期检测与 fallback**：`-r <过期 id>` 时 kimi 的实际报错串**未知**，需真机确认才能写检测。属于 session-resume migration 文档的遗留 TODO，单独跟进。
+- **多开实例的进阶 UX**：本方案靠 lock 拒绝第二实例；若要更友好（focus 已有窗口），用 `tauri-plugin-single-instance`。
+
+---
+
+*Plan version: 2026-05-19（基于代码现状重写；上一版概念稿已合并入此）*

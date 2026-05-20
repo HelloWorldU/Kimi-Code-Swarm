@@ -102,6 +102,7 @@ export type EngineEvent =
   | { type: 'agent-exit'; agentId: string; code: number | null }
   | { type: 'agent-status'; agentId: string; status: TaskStatus }
   | { type: 'agent-state'; agentId: string; state: AgentStateSnapshot }
+  | { type: 'engine-restored'; restoredAgentIds: string[] }
   | { type: 'log'; agentId: string; entry: LogEntry }
   | { type: 'file-changed'; agentId: string; files: string[] }
   | { type: 'diff-result'; agentId: string; filePath: string; diff: string }

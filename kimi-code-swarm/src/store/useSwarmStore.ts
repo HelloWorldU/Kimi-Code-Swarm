@@ -25,6 +25,10 @@ const toast = useToast()
 const MAX_AGENTS = 5
 const STORE_KEY = 'agents'
 
+// ── 持久化缓存：保存上次 localStorage 里的 agents，等 engine-restored 后
+// 给「孤儿」补 entry、给 agent-created 拼回 logs（引擎不持久化 logs） ──
+const persistedAgentsCache = new Map<string, AgentTask>()
+
 // ── Bootstrap: check auth on load ──
 let bootstrapped = false
 async function bootstrap() {
@@ -33,10 +37,12 @@ async function bootstrap() {
   const key = await getApiKey()
   if (key) {
     state.isLoggedIn = true
+    // Phase 1：不再把 persisted 直接塞 state.agents；引擎是事实源。
+    // 缓存起来，等 engine-restored 后给「孤儿」补 entry、给 agent-created 拼回 logs。
     const persisted = await loadPersistedAgents()
-    if (persisted.length > 0) {
-      state.agents = persisted
-    }
+    persistedAgentsCache.clear()
+    for (const a of persisted) persistedAgentsCache.set(a.id, a)
+    state.engineReady = false
     // Auto-start agent engine if logged in
     startAgentEngine()
   }
@@ -87,7 +93,26 @@ function handleEngineEvent(event: Record<string, unknown>) {
   switch (type) {
     case 'agent-created': {
       const agent = event.agent as AgentTask
-      state.agents.push(agent)
+      // 引擎不持久化 logs；如果 localStorage 有缓存就拼回
+      if ((!agent.logs || agent.logs.length === 0) && persistedAgentsCache.has(agent.id)) {
+        agent.logs = persistedAgentsCache.get(agent.id)!.logs ?? []
+      }
+      // 去重：已存在则替换（restore 时引擎对每个恢复的 agent 都 emit 一次，避免重复 push）
+      const i = state.agents.findIndex((a) => a.id === agent.id)
+      if (i >= 0) state.agents[i] = agent
+      else state.agents.push(agent)
+      persistAgents()
+      break
+    }
+    case 'engine-restored': {
+      state.engineReady = true
+      const restored = new Set((event.restoredAgentIds as string[]) ?? [])
+      // localStorage 里有、引擎没恢复 → 孤儿（用户手删了 engine-state.json，或别的什么）
+      for (const cached of persistedAgentsCache.values()) {
+        if (restored.has(cached.id)) continue
+        if (state.agents.find((a) => a.id === cached.id)) continue
+        state.agents.push({ ...cached, status: 'orphan' })
+      }
       persistAgents()
       break
     }
@@ -254,6 +279,9 @@ const state = reactive({
   isAuthLoading: false,
   authError: '',
   engineConnected: false,
+  // 引擎是否已 restore 完毕：bootstrap/login 后置 false，
+  // 收到 engine-restored 事件后置 true；UI 可据此禁掉「发送/创建/删除」按钮
+  engineReady: false,
 })
 
 bootstrap()
@@ -301,10 +329,11 @@ export function useSwarmStore() {
       }
       await saveApiKey(apiKey)
       state.isLoggedIn = true
+      // 同 bootstrap：不直接塞 state.agents；引擎是事实源
       const persisted = await loadPersistedAgents()
-      if (persisted.length > 0) {
-        state.agents = persisted
-      }
+      persistedAgentsCache.clear()
+      for (const a of persisted) persistedAgentsCache.set(a.id, a)
+      state.engineReady = false
       await startAgentEngine()
       state.isAuthLoading = false
       return true

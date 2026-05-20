@@ -1,4 +1,5 @@
 import { Agent } from './agent.js'
+import { schedulePersist, type PersistedAgent, type PersistedState } from './persist.js'
 import type { AgentState, EngineCommand, EngineEvent } from './types.js'
 import { EngineCommandSchema } from './schemas.js'
 import { rm } from 'fs/promises'
@@ -11,9 +12,14 @@ export class AgentEngine {
   // 延后审阅重试定时器：定期把因 reviewer 忙碌而搁置的 pending 审阅重新触发
   private reviewRetryTimer?: NodeJS.Timeout
   private readonly REVIEW_RETRY_INTERVAL_MS = 30000
+  // 引擎持久化数据目录；不设则不做持久化（适用开发 / 单元测试模式）
+  private dataDir?: string
+  // 给 Agent 用的统一持久化回调：state 变更 → debounced 保存
+  private agentPersistCallback = () => this.persist()
 
-  constructor(emit: (event: EngineEvent) => void) {
+  constructor(emit: (event: EngineEvent) => void, dataDir?: string) {
     this.emit = emit
+    this.dataDir = dataDir
     this.reviewRetryTimer = setInterval(() => this.retryDeferredReviews(), this.REVIEW_RETRY_INTERVAL_MS)
   }
 
@@ -40,9 +46,11 @@ export class AgentEngine {
             cmd.payload.tokenBudget,
             this.broadcast,
             (agentId, branch, token) => this.triggerReviews(agentId, branch, token),
+            this.agentPersistCallback,
           )
           this.agents.set(agent.state.id, agent)
           this.broadcast({ type: 'agent-created', agent: agent.state })
+          this.persist()
 
           // 检查是否有待审阅的 PR，自动分配新 Agent 为 reviewer 并触发审阅
           for (const [targetId, pending] of this.pendingReviews) {
@@ -158,6 +166,7 @@ export class AgentEngine {
           }
           this.pendingReviews.delete(cmd.agentId)
           this.agents.delete(cmd.agentId)
+          this.persist()
           break
         }
 
@@ -309,6 +318,59 @@ export class AgentEngine {
           content: 'PR 已创建，当前无可用审阅者，进入待审队列等待新 Agent 加入',
         },
       })
+    }
+  }
+
+  /**
+   * 启动时由 index.ts 用持久化状态重建一个 Agent。
+   * emit agent-created，前端按 id 去重处理（已存在则替换，否则 push）。
+   */
+  restoreAgent(p: PersistedAgent): void {
+    const agent = Agent.fromPersisted(
+      p,
+      this.broadcast,
+      (agentId, branch, token) => this.triggerReviews(agentId, branch, token),
+      this.agentPersistCallback,
+    )
+    this.agents.set(agent.state.id, agent)
+    this.broadcast({ type: 'agent-created', agent: agent.state })
+  }
+
+  /** 没设 dataDir（测试/开发模式）时是 no-op；否则把当前所有 agent 持久化（debounced） */
+  private persist(): void {
+    if (!this.dataDir) return
+    schedulePersist(this.dataDir, this.toPersistedState())
+  }
+
+  private toPersistedState(): PersistedState {
+    return {
+      version: 1,
+      agents: Array.from(this.agents.values()).map((a) => this.agentToPersisted(a)),
+    }
+  }
+
+  private agentToPersisted(a: Agent): PersistedAgent {
+    const s = a.state
+    return {
+      id: s.id,
+      name: s.name,
+      status: s.status,
+      repoUrl: s.repoUrl,
+      workspace: s.workspace,
+      branch: s.branch,
+      instruction: s.instruction,
+      prStatus: s.prStatus,
+      prNumber: s.prNumber,
+      prUrl: s.prUrl,
+      prAuthor: s.prAuthor,
+      tokenUsed: s.tokenUsed,
+      tokenBudget: s.tokenBudget,
+      kimiSessionId: s.kimiSessionId,
+      reviews: s.reviews,
+      changedFiles: s.changedFiles,
+      ciStatus: s.ciStatus,
+      createdAt: s.createdAt,
+      lastActivity: s.lastActivity,
     }
   }
 

@@ -37,7 +37,8 @@ UI (Vue) ←→ useSwarmStore (UI state only)
       ←→ Git operations (clone/commit/push)
       ←→ Token budget monitoring
   ←→ Tauri IPC ←→ OS Keyring (Kimi API Key)
-  ←→ tauri-plugin-store (Agent 列表持久化)
+  ←→ Agent Engine ←→ <app_local_data_dir>/engine-state.json (引擎自持久化：身份/状态/PR/session)
+  ←→ tauri-plugin-store (UI 缓存：logs + selectedAgentId，restore 完成后做 diff)
   ←→ localStorage (GitHub Token, browser fallback)
 
 ## 审阅门控
@@ -56,7 +57,8 @@ PR 创建时，Store 自动生成 `ReviewEntry[]`，包含所有其他 Agent 作
 | Runtime | Main Process | 应用关闭丢失 |
 | Persistent | localStorage | 跨会话保留（浏览器 fallback） |
 | Secure | OS Keyring | 跨会话保留，系统级加密 |
-| App State | tauri-plugin-store (JSON) | 跨会话保留（Agent 列表等） |
+| App State | tauri-plugin-store (JSON) | 跨会话保留（logs / UI 选中等视图缓存） |
+| Engine State | `<app_local_data_dir>/engine-state.json`（debounced 500ms / 原子写 .tmp→rename / 多实例 lock） | 跨会话保留（**事实源**：身份、运行状态、PR、`kimiSessionId`、token、reviews） |
 | Agent Engine | Node.js process (JSON Lines over stdio) | 常驻进程，管理所有 Agent 生命周期 |
 
 ## 模块边界
@@ -110,7 +112,7 @@ PR 创建时，Store 自动生成 `ReviewEntry[]`，包含所有其他 Agent 作
 **状态同步事件 (`agent-state`)**:
 - Engine 通过 `agent-state` 推送 Agent 完整状态快照，Store 增量更新对应字段
 - 覆盖字段：`status`、`workspace`、`branch`、`prStatus`、`prNumber`、`prUrl`、`pid`、`tokenUsed`、`lastActivity`、`reviews`、`changedFiles`
-- 更新完成后调用 `persistAgents()` 持久化到 `tauri-plugin-store`
+- 引擎在 `syncState()` 中触发 `schedulePersist()`，500ms debounce 后写 `engine-state.json`；前端 `persistAgents()` 同步写 `tauri-plugin-store` 作 logs 缓存与 fallback（核心字段以引擎 JSON 为准）
 
 **Token 预算实时同步**:
 - Agent Engine 在 `agent.ts` 中通过 `syncState()` 将 `tokenUsed` 实时回推前端，避免前端硬编码或纯随机估算
@@ -123,9 +125,10 @@ PR 创建时，Store 自动生成 `ReviewEntry[]`，包含所有其他 Agent 作
 1. `verifyKimiApiKey(key)` — 通过 Rust 后端验证 API Key 有效性
 2. `saveApiKey(key)` — 存入 OS Keyring
 3. `state.isLoggedIn = true` — 切换 UI 状态
-4. `loadPersistedAgents()` — 恢复持久化 Agent 列表
+4. `loadPersistedAgents()` — 将 `tauri-plugin-store` 中的 agents 读入 `persistedAgentsCache`（**不直接塞入 `state.agents`**），`engineReady=false`
 5. `startAgentEngine()` — 启动 Agent 引擎（失败时 Toast 提示用户具体错误）
-6. `state.isAuthLoading = false` — 结束加载态
+6. Engine 启动后 emit `agent-created`（基于 `engine-state.json` restore）→ Store 从 cache 取回 logs 合并到运行态；emit `engine-restored` 携带 `restoredAgentIds` → Store 把 cache 里多出来的 agent 标 `orphan` 后加入列表、置 `engineReady=true`
+7. `state.isAuthLoading = false` — 结束加载态
 
 > **Debug 原则**：问题暴露但代码层面不明显时，优先通过 `src/utils/logger.ts` 增加运行时日志定位根因，而非盲猜。
 

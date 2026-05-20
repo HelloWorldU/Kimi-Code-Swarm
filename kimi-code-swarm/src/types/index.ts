@@ -6,6 +6,7 @@ export type TaskStatus =
   | 'reviewing'
   | 'completed'
   | 'stopped'
+  | 'orphan'
 
 export type PrStatus = 'none' | 'open' | 'merged' | 'closed'
 

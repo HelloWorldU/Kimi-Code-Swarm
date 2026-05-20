@@ -26,6 +26,7 @@ const statusConfig = {
   reviewing: { label: '待审阅', color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-200', dot: 'bg-purple-500' },
   completed: { label: '已完成', color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', dot: 'bg-emerald-500' },
   stopped: { label: '已停止', color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-200', dot: 'bg-red-500' },
+  orphan: { label: '已失效', color: 'text-gray-500', bg: 'bg-gray-100', border: 'border-gray-300', dot: 'bg-gray-400' },
 }
 
 const prConfig = {
