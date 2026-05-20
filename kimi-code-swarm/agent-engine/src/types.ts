@@ -63,7 +63,7 @@ export interface AgentState {
 // ── Commands from Rust → Node.js ──
 
 export type EngineCommand =
-  | { type: 'create-agent'; payload: { name: string; repoUrl: string; instruction: string; tokenBudget: number } }
+  | { type: 'create-agent'; payload: { name: string; repoUrl: string; tokenBudget: number } }
   | { type: 'start-agent'; agentId: string }
   | { type: 'send-instruction'; agentId: string; instruction: string; githubToken?: string }
   | { type: 'stop-agent'; agentId: string }

@@ -32,7 +32,7 @@ const emit = defineEmits<{...}>()
 
 - `LoginView.vue` — 独立页面组件：登录表单 + API Key 验证 + Kimi Code 控制台外链
 - `AgentDashboard.vue` — 列表容器组件：渐变背景统计卡片（含底部进度条）+ Agent 网格 + 空状态
-- `CreateTaskModal.vue` — 表单弹窗组件：新建 Agent 的信息收集与提交，Vue `<Transition>` 原生过渡动画
+- `CreateTaskModal.vue` — 表单弹窗组件：收集 name / repoUrl / tokenBudget 创建 Agent，Vue `<Transition>` 原生过渡动画
 - `SwarmConfirmModal.vue` — 确认弹窗组件：类型化图标 + 双按钮确认/取消，配合 useConfirm composable
 - `SwarmToast.vue` — Toast 通知组件：类型化图标 + 进度条 + 自动消失，配合 useToast composable
 - `AgentDetail.vue` — 聊天式多轮对话组件：Header + Info + PR 审阅 + 文件变更 + 聊天消息区（input/output/system/error 直接渲染；think/tool_call/mcp/tool_result 为可折叠气泡，默认收起，点击展开查看完整内容）+ `<textarea>` 输入框（Enter 发送 / Shift+Enter 换行，自动增高）。日期字段通过 new Date(string).toLocaleTimeString() 显示。滚动行为：进入对话/新消息时若用户已在底部 50px 范围内则平滑滚至底部，否则保持当前浏览位置

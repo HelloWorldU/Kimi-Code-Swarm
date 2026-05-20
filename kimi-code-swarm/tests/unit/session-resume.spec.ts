@@ -72,7 +72,6 @@ describe('Agent.sendInstruction —— session 续接与 fallback prompt', async
     agent = new Agent(
       'TestAgent',
       'https://github.com/test/repo.git',
-      'initial instruction',
       10000,
       () => {},
     )

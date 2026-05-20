@@ -12,7 +12,6 @@ export const EngineCommandSchema = z.discriminatedUnion('type', [
     payload: z.object({
       name: z.string().min(1),
       repoUrl: z.string().url(),
-      instruction: z.string(),
       tokenBudget: z.number().int().positive(),
     }),
   }),

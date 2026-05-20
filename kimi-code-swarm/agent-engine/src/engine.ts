@@ -42,7 +42,6 @@ export class AgentEngine {
           const agent = new Agent(
             cmd.payload.name,
             cmd.payload.repoUrl,
-            cmd.payload.instruction,
             cmd.payload.tokenBudget,
             this.broadcast,
             (agentId, branch, token) => this.triggerReviews(agentId, branch, token),

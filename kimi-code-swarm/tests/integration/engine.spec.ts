@@ -35,7 +35,7 @@ describe('AgentEngine integration', () => {
     const engine = createEngine()
     await engine.handleCommand(
       createCmd('create-agent', {
-        payload: { name: 'TestAgent', repoUrl: 'https://github.com/test/repo.git', instruction: 'test', tokenBudget: 10000 },
+        payload: { name: 'TestAgent', repoUrl: 'https://github.com/test/repo.git', tokenBudget: 10000 }
       }),
     )
 
@@ -56,7 +56,7 @@ describe('AgentEngine integration', () => {
     // 1. Create
     await engine.handleCommand(
       createCmd('create-agent', {
-        payload: { name: 'LifecycleAgent', repoUrl: 'https://github.com/test/repo.git', instruction: 'test', tokenBudget: 10000 },
+        payload: { name: 'LifecycleAgent', repoUrl: 'https://github.com/test/repo.git', tokenBudget: 10000 },
       }),
     )
     const agentId = engine.getAllStates()[0].id
@@ -106,7 +106,7 @@ describe('AgentEngine integration', () => {
     const engine = createEngine()
     await engine.handleCommand(
       createCmd('create-agent', {
-        payload: { name: 'TokenAgent', repoUrl: 'https://github.com/test/repo.git', instruction: 'test', tokenBudget: 10000 },
+        payload: { name: 'TokenAgent', repoUrl: 'https://github.com/test/repo.git', tokenBudget: 10000 },
       }),
     )
     const agentId = engine.getAllStates()[0].id
@@ -131,7 +131,7 @@ describe('AgentEngine integration', () => {
     const engine = createEngine()
     await engine.handleCommand(
       createCmd('create-agent', {
-        payload: { name: 'RejectAgent', repoUrl: 'https://github.com/test/repo.git', instruction: 'test', tokenBudget: 10000 },
+        payload: { name: 'RejectAgent', repoUrl: 'https://github.com/test/repo.git', tokenBudget: 10000 },
       }),
     )
     const agentId = engine.getAllStates()[0].id
@@ -144,7 +144,7 @@ describe('AgentEngine integration', () => {
     agent.prStatus = 'open'
     agent.reviews = [{ reviewerAgentId: 'r1', reviewerName: 'Reviewer', status: 'rejected' }]
 
-    // Try to merge — should fail because review is rejected
+    // Try to merge → should fail because review is rejected
     await engine.handleCommand(createCmd('merge-pr', { agentId }))
     expect(engine.getState(agentId)!.status).toBe('reviewing')
   })
@@ -153,7 +153,7 @@ describe('AgentEngine integration', () => {
     const engine = createEngine()
     await engine.handleCommand(
       createCmd('create-agent', {
-        payload: { name: 'StopAgent', repoUrl: 'https://github.com/test/repo.git', instruction: 'test', tokenBudget: 10000 },
+        payload: { name: 'StopAgent', repoUrl: 'https://github.com/test/repo.git', tokenBudget: 10000 },
       }),
     )
     const agentId = engine.getAllStates()[0].id
@@ -165,7 +165,7 @@ describe('AgentEngine integration', () => {
     const engine = createEngine()
     await engine.handleCommand(
       createCmd('create-agent', {
-        payload: { name: 'DeleteAgent', repoUrl: 'https://github.com/test/repo.git', instruction: 'test', tokenBudget: 10000 },
+        payload: { name: 'DeleteAgent', repoUrl: 'https://github.com/test/repo.git', tokenBudget: 10000 },
       }),
     )
     const agentId = engine.getAllStates()[0].id
@@ -185,7 +185,7 @@ describe('AgentEngine integration', () => {
     const engine = createEngine()
     await engine.handleCommand(
       createCmd('create-agent', {
-        payload: { name: 'DiffAgent', repoUrl: 'https://github.com/test/repo.git', instruction: 'test', tokenBudget: 10000 },
+        payload: { name: 'DiffAgent', repoUrl: 'https://github.com/test/repo.git', tokenBudget: 10000 },
       }),
     )
     const agentId = engine.getAllStates()[0].id

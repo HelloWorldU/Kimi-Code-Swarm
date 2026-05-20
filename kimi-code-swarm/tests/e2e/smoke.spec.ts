@@ -39,7 +39,6 @@ test('login and create agent flow', async () => {
     '[data-testid="agent-repo-url-input"]',
     'https://github.com/HelloWorldU/Kimi-Code-Swarm',
   )
-  await page.fill('[data-testid="agent-instruction-input"]', '运行 E2E 冒烟测试')
 
   // 6. 提交创建
   await page.click('[data-testid="agent-create-submit"]')

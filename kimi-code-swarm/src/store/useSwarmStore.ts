@@ -427,7 +427,7 @@ export function useSwarmStore() {
   }
 
   // ── Agent CRUD (delegated to Node.js engine) ──
-  function createAgent(name: string, repoUrl: string, instruction: string, tokenBudget: number) {
+  function createAgent(name: string, repoUrl: string, tokenBudget: number) {
     if (state.agents.length >= MAX_AGENTS) return
     if (!isTauri) {
       // Browser mock mode: create directly
@@ -438,7 +438,7 @@ export function useSwarmStore() {
         repoUrl,
         workspace: '',
         branch: `agent/${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}-${generateId().slice(0, 4)}`,
-        instruction,
+        instruction: '',
         prStatus: 'none',
         tokenUsed: 0,
         tokenBudget,
@@ -453,7 +453,7 @@ export function useSwarmStore() {
     }
     sendToEngine({
       type: 'create-agent',
-      payload: { name, repoUrl, instruction, tokenBudget },
+      payload: { name, repoUrl, tokenBudget },
     }).catch((e) => {
       log.error('createAgent failed:', e)
       toast.add({

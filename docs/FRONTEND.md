@@ -25,7 +25,7 @@ Vue 3 + TypeScript + Vite + Tailwind CSS + lucide-vue-next + Tauri v2 + @tauri-a
 - `api/ipc.ts` — Tauri IPC 适配层
 - `components/LoginView.vue` — API Key 登录页（验证 + keyring 存储）
 - `components/AgentDashboard.vue` — Agent 卡片网格（最多 5 个，点击进入详情）；统计卡片带渐变背景 + 进度条
-- `components/CreateTaskModal.vue` — 新建 Agent 弹窗：收集 name / repoUrl / instruction / tokenBudget，Vue `<Transition>` 淡入淡出动画
+- `components/CreateTaskModal.vue` — 新建 Agent 弹窗：收集 name / repoUrl / tokenBudget，Vue `<Transition>` 淡入淡出动画
 - `components/SwarmConfirmModal.vue` — 确认弹窗组件：支持 danger/warning/info 类型，配合 useConfirm 使用
 - `components/SwarmToast.vue` — Toast 通知组件：支持 error/success/info/warning，自动消失
 - `App.vue` — 主入口：布局框架 + 视图路由（dashboard/agent-detail/analytics）+ 全局事件处理（如文件 diff 查看）

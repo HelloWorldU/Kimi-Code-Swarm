@@ -91,7 +91,7 @@ PR 创建时，Store 自动生成 `ReviewEntry[]`，包含所有其他 Agent 作
 - Review Agent 拥有最终合入权，但自身代码也需其他 Agent 交叉审阅
 
 **Agent 创建时序（Tauri 生产模式）**：
-1. 前端弹窗收集信息 → 调用 `createAgent()`
+1. 前端弹窗收集信息（name / repoUrl / tokenBudget）→ 调用 `createAgent()`
 2. `createAgent()` 发送 `create-agent` 命令给 Agent Engine（Rust → Node.js）
 3. Engine 创建成功后推送 `agent-created` 事件 → 前端列表更新
 4. 用户点击"启动"→ `startAgent()` 发送 `start-agent` 命令 → Engine 执行 clone/branch → 推送 `agent-status` 事件
@@ -120,7 +120,7 @@ PR 创建时，Store 自动生成 `ReviewEntry[]`，包含所有其他 Agent 作
 **Token 预算实时同步**:
 - Agent Engine 在 `agent.ts` 中通过 `syncState()` 将 `tokenUsed` 实时回推前端，避免前端硬编码或纯随机估算
 - 增量同步阈值：每处理 10 行 stdout 或每累计 500 tokens；预算耗尽时立即同步并中断进程
-- Browser 降级模式（非 Tauri）下，Store 以 5s 为周期模拟 token 增长，增量基于当前 `instruction` 长度估算，模拟执行完成的 output tokens 按实际内容长度计算，不再使用硬编码值
+- Browser 降级模式（非 Tauri）下，Store 以 5s 为周期模拟 token 增长，增量基于当前 `instruction`（最后发送的指令）长度估算，模拟执行完成的 output tokens 按实际内容长度计算，不再使用硬编码值
 
 ## 登录流程
 

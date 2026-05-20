@@ -54,7 +54,6 @@ export class Agent {
   constructor(
     name: string,
     repoUrl: string,
-    instruction: string,
     tokenBudget: number,
     emit: (event: EngineEvent) => void,
     private onPrCreated?: (agentId: string, branch: string, githubToken?: string) => Promise<void> | void,
@@ -68,7 +67,7 @@ export class Agent {
       repoUrl,
       workspace: '',
       branch: branchName(name),
-      instruction,
+      instruction: '',
       prStatus: 'none',
       tokenUsed: 0,
       tokenBudget,
@@ -89,11 +88,12 @@ export class Agent {
     onPrCreated?: (agentId: string, branch: string, githubToken?: string) => Promise<void> | void,
     onPersist?: () => void,
   ): Agent {
-    const a = new Agent(p.name, p.repoUrl, p.instruction, p.tokenBudget, emit, onPrCreated, onPersist)
+    const a = new Agent(p.name, p.repoUrl, p.tokenBudget, emit, onPrCreated, onPersist)
     a.state.id = p.id
     a.state.status = p.status as TaskStatus
     a.state.workspace = p.workspace
     a.state.branch = p.branch
+    a.state.instruction = p.instruction
     a.state.prStatus = p.prStatus as PrStatus
     a.state.prNumber = p.prNumber
     a.state.prUrl = p.prUrl
