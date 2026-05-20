@@ -129,7 +129,7 @@ PR 创建时，Store 自动生成 `ReviewEntry[]`，包含所有其他 Agent 作
 2. `saveApiKey(key)` — 存入 OS Keyring
 3. `state.isLoggedIn = true` — 切换 UI 状态
 4. `loadPersistedAgents()` — 将 `tauri-plugin-store` 中的 agents 读入 `persistedAgentsCache`（**不直接塞入 `state.agents`**），`engineReady=false`
-5. `startAgentEngine()` — 启动 Agent 引擎（失败时 Toast 提示用户具体错误）
+5. `startAgentEngine()` — **先 await 注册** `agent-engine-event` / `agent-engine-exit` 监听器（Tauri `listen()` 是 Promise，fire-and-forget 会丢启动期事件），再 spawn 引擎（失败时 Toast 提示用户具体错误）
 6. Engine 启动后 emit `agent-created`（基于 `engine-state.json` restore）→ Store 从 cache 取回 logs 合并到运行态；emit `engine-restored` 携带 `restoredAgentIds` → Store 把 cache 里多出来的 agent 标 `orphan` 后加入列表、置 `engineReady=true`
 7. `state.isAuthLoading = false` — 结束加载态
 

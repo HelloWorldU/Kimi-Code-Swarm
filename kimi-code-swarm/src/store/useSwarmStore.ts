@@ -52,9 +52,16 @@ async function startAgentEngine() {
   if (!isTauri) return
   try {
     const running = await isEngineRunning()
-    if (running) return
+    if (running) {
+      // 引擎已存在（HMR / 多次 bootstrap）：仍需保证监听器注册，
+      // 否则 engine-restored 已发出会被错过
+      await initEngineListeners()
+      return
+    }
+    // 必须先注册监听器再 spawn：引擎启动后立刻 emit engine-restored / pong，
+    // 如果监听器晚于 spawn 注册，会错过 engine-restored，engineReady 永远 false
+    await initEngineListeners()
     await spawnAgentEngine()
-    initEngineListeners()
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     log.error('Failed to start agent engine:', e)
@@ -67,12 +74,14 @@ async function startAgentEngine() {
 }
 
 // ── Engine event listener ──
+// 必须 async：listen() 是 Promise，没等它 resolve 就 spawn 引擎会丢启动期事件
+// （engine-restored / pong 在 Node 进程起来后 ~100ms 内就 emit 到 stdout）
 let engineListenersInitialized = false
-function initEngineListeners() {
+async function initEngineListeners() {
   if (engineListenersInitialized) return
   engineListenersInitialized = true
 
-  listenAgentEngineEvent((payload) => {
+  await listenAgentEngineEvent((payload) => {
     try {
       const event = JSON.parse(payload.line)
       handleEngineEvent(event)
@@ -81,9 +90,11 @@ function initEngineListeners() {
     }
   })
 
-  listenAgentEngineExit(() => {
+  await listenAgentEngineExit(() => {
     engineListenersInitialized = false
     state.engineConnected = false
+    // 引擎崩了 → 必须把 engineReady 也置 false，否则按钮门控会失效
+    state.engineReady = false
   })
 }
 
