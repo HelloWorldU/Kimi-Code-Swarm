@@ -203,11 +203,11 @@ case 'engine-restored': {
 
 ## 8. 实施分阶段（降风险）
 
-| Phase | 内容 | 可独立合并 |
-|-------|------|-----------|
-| **1** | Rust 注入 env + `persist.ts`（load/lock/原子写）+ 启动 restore + emit `engine-restored` + 前端识别孤儿 + `engineReady` 门控 | ✅ 单独可发 —— 解决「重启变植物人」核心痛点 |
-| **2** | `syncState` 接 `schedulePersist`，含 business-字段哈希判定 | ✅ |
-| **3** | 砍掉前端 `persistAgents` 对核心字段的持久化，只留 logs | 观察一两个版本稳定后做 |
+| Phase | 内容 | 状态 |
+|-------|------|------|
+| **1** | Rust 注入 env + `persist.ts`（load/lock/原子写）+ 启动 restore + emit `engine-restored` + 前端识别孤儿 + `engineReady` 门控 | ✅ 已落地（commit `5d6ac8b`） |
+| **2** | `syncState` 接 `schedulePersist`，含 business-字段哈希判定 | ✅ 已落地（commit `2a03133`） |
+| **3** | 砍掉前端 `persistAgents` 对核心字段的持久化，只留 slim 切片（id/name/repoUrl/branch/createdAt/lastActivity/tokenBudget/logs）；纯业务字段事件不再触发落盘 | ✅ 已落地（本次提交） |
 
 ---
 

@@ -113,7 +113,9 @@ PR 创建时，Store 自动生成 `ReviewEntry[]`，包含所有其他 Agent 作
 - Engine 通过 `agent-state` 推送 Agent 完整状态快照，Store 增量更新对应字段
 - 覆盖字段：`status`、`workspace`、`branch`、`prStatus`、`prNumber`、`prUrl`、`pid`、`tokenUsed`、`lastActivity`、`reviews`、`changedFiles`
 - 引擎在 `syncState()` 中按**业务字段指纹**判定（只取 status / workspace / branch / pr* / kimiSessionId / reviews / changedFiles / ciStatus；剔除 tokenUsed / lastActivity 等高频抖动字段）；指纹未变则跳过持久化，避免 stdout 流式回推每 10 行就触发一次写盘
-- 指纹变化时触发 `schedulePersist()`，500ms debounce 后写 `engine-state.json`；前端 `persistAgents()` 同步写 `tauri-plugin-store` 作 logs 缓存与 fallback（核心字段以引擎 JSON 为准）
+- 指纹变化时触发 `schedulePersist()`，500ms debounce 后写 `engine-state.json`
+- 前端 `persistAgents()` 仅写 slim 切片到 `tauri-plugin-store`：`id / name / repoUrl / branch / createdAt / lastActivity / tokenBudget / logs`；业务字段（status / pr* / kimiSessionId / reviews / changedFiles / tokenUsed）一律不写，由引擎 restore 推回，避免双源
+- `handleEngineEvent` 中纯业务字段事件（`agent-status` / `agent-state` / `file-changed`）不再触发 `persistAgents()`，仅 logs 类事件（`log` / `agent-created` / `agent-exit` 带新日志时 / `diff-result`）才落盘
 
 **Token 预算实时同步**:
 - Agent Engine 在 `agent.ts` 中通过 `syncState()` 将 `tokenUsed` 实时回推前端，避免前端硬编码或纯随机估算

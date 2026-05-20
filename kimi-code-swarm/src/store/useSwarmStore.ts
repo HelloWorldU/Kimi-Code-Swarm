@@ -151,6 +151,8 @@ function handleEngineEvent(event: Record<string, unknown>) {
       break
     }
     case 'agent-exit': {
+      // Phase 3：业务字段（status/pid）以引擎事实源为准；本 case 仍补一条用户可见
+      // 的「执行完毕/进程退出」日志，所以需要 persist 把 logs 落盘。
       const agent = state.agents.find((a) => a.id === event.agentId)
       if (!agent) return
       agent.pid = undefined
@@ -164,19 +166,18 @@ function handleEngineEvent(event: Record<string, unknown>) {
             ? 'Agent 执行完毕，可以继续发送指令或提交审阅'
             : `Agent 进程退出 (code: ${event.code ?? 'unknown'})`,
         })
-      }
-      persistAgents()
-      break
-    }
-    case 'agent-status': {
-      const agent = state.agents.find((a) => a.id === event.agentId)
-      if (agent) {
-        agent.status = event.status as AgentTask['status']
         persistAgents()
       }
       break
     }
+    case 'agent-status': {
+      // Phase 3：纯业务字段事件 → 不落盘（引擎已写 engine-state.json）
+      const agent = state.agents.find((a) => a.id === event.agentId)
+      if (agent) agent.status = event.status as AgentTask['status']
+      break
+    }
     case 'agent-state': {
+      // Phase 3：纯业务字段事件 → 不落盘（引擎已写 engine-state.json）
       const agent = state.agents.find((a) => a.id === event.agentId)
       if (!agent) break
       const incoming = event.state as Record<string, unknown>
@@ -204,7 +205,6 @@ function handleEngineEvent(event: Record<string, unknown>) {
       if (incoming.kimiSessionId !== undefined) {
         agent.kimiSessionId = String(incoming.kimiSessionId)
       }
-      persistAgents()
       break
     }
     case 'log': {
@@ -217,11 +217,9 @@ function handleEngineEvent(event: Record<string, unknown>) {
       break
     }
     case 'file-changed': {
+      // Phase 3：changedFiles 是业务字段 → 不落盘
       const agent = state.agents.find((a) => a.id === event.agentId)
-      if (agent) {
-        agent.changedFiles = event.files as string[]
-        persistAgents()
-      }
+      if (agent) agent.changedFiles = event.files as string[]
       break
     }
     case 'diff-result': {
@@ -254,17 +252,56 @@ function handleEngineEvent(event: Record<string, unknown>) {
 }
 
 // ── Persistence ──
+// Phase 3：前端只持久化 logs + 身份/UI 必要的最小元数据（id/name/repoUrl/branch
+// /createdAt/lastActivity/tokenBudget）。业务字段（status / pr* / kimiSessionId /
+// reviews / changedFiles / tokenUsed 等）一律由引擎 `engine-state.json` 推回，
+// 前端不再做双源。orphan 卡片复用这份 slim 数据展示标识/分支/时间。
+interface PersistedAgentSlim {
+  id: string
+  name: string
+  repoUrl: string
+  branch: string
+  createdAt: string
+  lastActivity: string
+  tokenBudget: number
+  logs: LogEntry[]
+}
+
 async function persistAgents() {
-  await saveStoreValue(STORE_KEY, { agents: state.agents })
+  const slim: PersistedAgentSlim[] = state.agents.map((a) => ({
+    id: a.id,
+    name: a.name,
+    repoUrl: a.repoUrl,
+    branch: a.branch,
+    createdAt: a.createdAt,
+    lastActivity: a.lastActivity,
+    tokenBudget: a.tokenBudget,
+    logs: a.logs,
+  }))
+  await saveStoreValue(STORE_KEY, { agents: slim })
 }
 
 async function loadPersistedAgents(): Promise<AgentTask[]> {
-  const data = await loadStoreValue<{ agents: AgentTask[] }>(STORE_KEY)
+  // 兼容旧数据：旧版存的是完整 AgentTask，新版是 slim；只读 slim 字段，多余字段忽略。
+  const data = await loadStoreValue<{ agents: Partial<AgentTask>[] }>(STORE_KEY)
   if (!data || !data.agents) return []
   return data.agents.map((a) => ({
-    ...a,
-    createdAt: typeof a.createdAt === 'string' ? a.createdAt : new Date(a.createdAt).toISOString(),
-    lastActivity: typeof a.lastActivity === 'string' ? a.lastActivity : new Date(a.lastActivity).toISOString(),
+    id: String(a.id),
+    name: String(a.name ?? ''),
+    repoUrl: String(a.repoUrl ?? ''),
+    branch: String(a.branch ?? ''),
+    createdAt: typeof a.createdAt === 'string' ? a.createdAt : new Date().toISOString(),
+    lastActivity: typeof a.lastActivity === 'string' ? a.lastActivity : new Date().toISOString(),
+    tokenBudget: typeof a.tokenBudget === 'number' && a.tokenBudget > 0 ? a.tokenBudget : 1,
+    logs: a.logs ?? [],
+    // 业务字段默认值——以引擎 restore 推送的 agent-state / agent-created 为准；
+    // orphan 卡（引擎没认领）也用这份默认值，TaskCard 按 status='orphan' 灰显
+    status: 'pending' as const,
+    workspace: '',
+    instruction: '',
+    prStatus: 'none' as const,
+    tokenUsed: 0,
+    reviews: [],
   }))
 }
 
