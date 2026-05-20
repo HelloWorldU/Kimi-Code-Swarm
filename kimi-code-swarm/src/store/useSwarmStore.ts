@@ -406,12 +406,9 @@ export function useSwarmStore() {
     } catch (e) {
       log.error('Failed to delete API key during logout:', e)
     }
-    // 3. Clear persisted store data
-    try {
-      await saveStoreValue(STORE_KEY, { agents: [] })
-    } catch (e) {
-      log.error('Failed to clear store during logout:', e)
-    }
+    // 3. Phase 3 后不再清空 store：引擎 engine-state.json 是业务字段事实源，
+    //    store 只缓存 slim+logs（logs 引擎不存）。退登清掉 = 重登看不到历史对话。
+    //    退登只需停引擎 + 删 API Key + reset 内存态 + reload，store 留着供下次登录续看。
     // 4. Reset all reactive state
     state.isLoggedIn = false
     state.agents = []
