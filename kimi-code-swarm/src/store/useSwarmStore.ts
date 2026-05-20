@@ -370,6 +370,8 @@ export function useSwarmStore() {
     state.selectedAgentId = null
     state.authError = ''
     state.engineConnected = false
+    state.engineReady = false
+    persistedAgentsCache.clear()
     // 5. Reset bootstrap flags so next login re-initializes
     bootstrapped = false
     engineListenersInitialized = false
@@ -615,6 +617,7 @@ export function useSwarmStore() {
     isAuthLoading: computed(() => state.isAuthLoading),
     authError: computed(() => state.authError),
     engineConnected: computed(() => state.engineConnected),
+    engineReady: computed(() => state.engineReady),
     canCreateAgent,
     maxAgents: MAX_AGENTS,
 

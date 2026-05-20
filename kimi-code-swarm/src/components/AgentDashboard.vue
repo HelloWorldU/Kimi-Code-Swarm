@@ -4,11 +4,13 @@ import { Activity, Users, Coins, CheckCircle, Bot } from 'lucide-vue-next'
 import type { AgentTask } from '../types'
 import TaskCard from './TaskCard.vue'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   agents: AgentTask[]
   canCreate: boolean
   maxAgents: number
-}>()
+  /** 引擎是否已 restore 完毕；透传给 TaskCard 控制启动/停止/重启/删除按钮 */
+  engineReady?: boolean
+}>(), { engineReady: true })
 
 const emit = defineEmits<{
   (e: 'select', id: string): void
@@ -135,6 +137,7 @@ const statCards = computed(() => [
           :key="agent.id"
           :task="agent"
           :is-selected="false"
+          :engine-ready="engineReady"
           @select="emit('select', $event)"
           @start="emit('start', $event)"
           @stop="emit('stop', $event)"

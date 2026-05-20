@@ -47,6 +47,9 @@ export class Agent {
   private readonly CI_MAX_RETRIES = 3
   private readonly CI_POLL_INTERVAL_MS = 30000
   private readonly CI_TIMEOUT_MS = 600000
+  // 上次持久化时的业务字段指纹；高频字段（tokenUsed/lastActivity）不参与，
+  // 避免 stdout 流式回推每 10 行就触发一次写盘。
+  private lastPersistFingerprint?: string
 
   constructor(
     name: string,
@@ -205,7 +208,32 @@ export class Agent {
         kimiSessionId: s.kimiSessionId,
       },
     })
-    this.onPersist?.()
+
+    // 仅当业务字段（status/workspace/branch/pr*/kimiSessionId/reviews/changedFiles/ciStatus）
+    // 发生变化时才触发持久化；tokenUsed/lastActivity 高频抖动不参与，避免流式回推每 10 行写一次盘。
+    const fp = this.businessFingerprint()
+    if (fp !== this.lastPersistFingerprint) {
+      this.lastPersistFingerprint = fp
+      this.onPersist?.()
+    }
+  }
+
+  /** 业务字段指纹：只取重启 restore 真正需要的字段，剔除高频抖动字段 */
+  private businessFingerprint(): string {
+    const s = this.state
+    return JSON.stringify({
+      status: s.status,
+      workspace: s.workspace,
+      branch: s.branch,
+      prStatus: s.prStatus,
+      prNumber: s.prNumber,
+      prUrl: s.prUrl,
+      prAuthor: s.prAuthor,
+      kimiSessionId: s.kimiSessionId,
+      reviews: s.reviews,
+      changedFiles: s.changedFiles,
+      ciStatus: s.ciStatus,
+    })
   }
 
   async start() {

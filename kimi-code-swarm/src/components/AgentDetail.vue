@@ -8,9 +8,11 @@ import {
 } from 'lucide-vue-next'
 import type { AgentTask } from '../types'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   agent: AgentTask
-}>()
+  /** 引擎是否已 restore 完毕；false 时禁用「启动/发送/停止」等向引擎发命令的按钮 */
+  engineReady?: boolean
+}>(), { engineReady: true })
 
 const emit = defineEmits<{
   (e: 'back'): void
@@ -72,6 +74,7 @@ const isWorking = computed(() => props.agent.status === 'working')
 
 function handleSendInstruction() {
   if (!instruction.value.trim()) return
+  if (!props.engineReady) return
   if (!canSendMessage.value && !isWorking.value) return
   emit('sendInstruction', props.agent.id, instruction.value.trim())
   instruction.value = ''
@@ -457,7 +460,9 @@ watch(() => props.agent.status, async () => {
       <!-- Pending: Start Button -->
       <div v-if="agent.status === 'pending'">
         <button
-          class="w-full px-4 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-medium transition-colors flex items-center justify-center gap-2"
+          :disabled="!engineReady"
+          :title="!engineReady ? '引擎启动中…' : ''"
+          class="w-full px-4 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium transition-colors flex items-center justify-center gap-2"
           @click="emit('start', agent.id)"
         >
           <Play class="w-4 h-4" /> 启动 Agent（自动 clone + 启动 CLI）
@@ -487,7 +492,8 @@ watch(() => props.agent.status, async () => {
           />
           <button
             type="submit"
-            :disabled="!instruction.trim()"
+            :disabled="!instruction.trim() || !engineReady"
+            :title="!engineReady ? '引擎启动中…' : ''"
             class="px-5 py-2.5 bg-swarm-600 text-white rounded-xl hover:bg-swarm-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-2 font-medium shrink-0"
           >
             <Send class="w-4 h-4" /> 发送
@@ -515,7 +521,9 @@ watch(() => props.agent.status, async () => {
           />
           <button
             type="button"
-            class="px-4 py-2.5 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 transition-colors font-medium flex items-center gap-2 shrink-0"
+            :disabled="!engineReady"
+            :title="!engineReady ? '引擎启动中…' : ''"
+            class="px-4 py-2.5 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium flex items-center gap-2 shrink-0"
             @click="emit('stop', agent.id)"
           >
             <Square class="w-4 h-4" /> 停止

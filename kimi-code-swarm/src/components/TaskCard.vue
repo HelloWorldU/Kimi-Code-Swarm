@@ -4,10 +4,12 @@ import { Play, Square, GitPullRequest, Trash2, Clock, FolderGit, GitBranch } fro
 import type { AgentTask } from '../types'
 import { useConfirm } from '../composables/useConfirm'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   task: AgentTask
   isSelected: boolean
-}>()
+  /** 引擎是否已 restore 完毕；false 时禁用「启动/停止/重启/删除」 */
+  engineReady?: boolean
+}>(), { engineReady: true })
 
 const emit = defineEmits<{
   (e: 'select', id: string): void
@@ -125,21 +127,27 @@ async function handleDelete() {
     <div class="flex items-center gap-1" @click.stop>
       <button
         v-if="task.status === 'pending'"
-        class="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors text-xs font-medium"
+        :disabled="!engineReady"
+        :title="!engineReady ? '引擎启动中…' : ''"
+        class="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-xs font-medium"
         @click="emit('start', task.id)"
       >
         <Play class="w-3 h-3" /> 启动
       </button>
       <button
         v-else-if="task.status === 'working'"
-        class="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors text-xs font-medium"
+        :disabled="!engineReady"
+        :title="!engineReady ? '引擎启动中…' : ''"
+        class="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-xs font-medium"
         @click="emit('stop', task.id)"
       >
         <Square class="w-3 h-3" /> 停止
       </button>
       <button
         v-else-if="task.status === 'stopped'"
-        class="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-swarm-50 text-swarm-600 hover:bg-swarm-100 transition-colors text-xs font-medium"
+        :disabled="!engineReady"
+        :title="!engineReady ? '引擎启动中…' : ''"
+        class="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-swarm-50 text-swarm-600 hover:bg-swarm-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors text-xs font-medium"
         @click="emit('start', task.id)"
       >
         <Play class="w-3 h-3" /> 重启
@@ -151,7 +159,9 @@ async function handleDelete() {
         <Clock class="w-3 h-3" /> {{ status.label }}
       </div>
       <button
-        class="px-2 py-1.5 rounded-lg bg-gray-50 text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+        :disabled="!engineReady"
+        :title="!engineReady ? '引擎启动中…' : ''"
+        class="px-2 py-1.5 rounded-lg bg-gray-50 text-gray-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         @click="handleDelete"
       >
         <Trash2 class="w-3 h-3" />

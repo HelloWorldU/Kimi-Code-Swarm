@@ -112,7 +112,8 @@ PR 创建时，Store 自动生成 `ReviewEntry[]`，包含所有其他 Agent 作
 **状态同步事件 (`agent-state`)**:
 - Engine 通过 `agent-state` 推送 Agent 完整状态快照，Store 增量更新对应字段
 - 覆盖字段：`status`、`workspace`、`branch`、`prStatus`、`prNumber`、`prUrl`、`pid`、`tokenUsed`、`lastActivity`、`reviews`、`changedFiles`
-- 引擎在 `syncState()` 中触发 `schedulePersist()`，500ms debounce 后写 `engine-state.json`；前端 `persistAgents()` 同步写 `tauri-plugin-store` 作 logs 缓存与 fallback（核心字段以引擎 JSON 为准）
+- 引擎在 `syncState()` 中按**业务字段指纹**判定（只取 status / workspace / branch / pr* / kimiSessionId / reviews / changedFiles / ciStatus；剔除 tokenUsed / lastActivity 等高频抖动字段）；指纹未变则跳过持久化，避免 stdout 流式回推每 10 行就触发一次写盘
+- 指纹变化时触发 `schedulePersist()`，500ms debounce 后写 `engine-state.json`；前端 `persistAgents()` 同步写 `tauri-plugin-store` 作 logs 缓存与 fallback（核心字段以引擎 JSON 为准）
 
 **Token 预算实时同步**:
 - Agent Engine 在 `agent.ts` 中通过 `syncState()` 将 `tokenUsed` 实时回推前端，避免前端硬编码或纯随机估算
@@ -129,6 +130,8 @@ PR 创建时，Store 自动生成 `ReviewEntry[]`，包含所有其他 Agent 作
 5. `startAgentEngine()` — 启动 Agent 引擎（失败时 Toast 提示用户具体错误）
 6. Engine 启动后 emit `agent-created`（基于 `engine-state.json` restore）→ Store 从 cache 取回 logs 合并到运行态；emit `engine-restored` 携带 `restoredAgentIds` → Store 把 cache 里多出来的 agent 标 `orphan` 后加入列表、置 `engineReady=true`
 7. `state.isAuthLoading = false` — 结束加载态
+
+**UI 门控（`engineReady=false` 窗口期）**：从登录/bootstrap 到收到 `engine-restored` 之间，前端禁用所有「向引擎发命令」的按钮 —— 新建 Agent（`App.vue` 顶部）、TaskCard 的启动/停止/重启/删除、AgentDetail 的启动/发送/停止。按钮 tooltip 提示「引擎启动中…」，避免命令被打到一个未装载完的引擎上引发不一致。
 
 > **Debug 原则**：问题暴露但代码层面不明显时，优先通过 `src/utils/logger.ts` 增加运行时日志定位根因，而非盲猜。
 
