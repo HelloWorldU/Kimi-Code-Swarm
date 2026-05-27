@@ -1,3 +1,5 @@
+@import 'highlight.js/styles/github.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -7,6 +9,136 @@
     @apply bg-white text-gray-800 antialiased;
     font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
   }
+}
+
+/* Markdown rendering styles for chat bubbles */
+.markdown-content {
+  @apply text-sm leading-relaxed break-words;
+}
+
+.markdown-content > *:first-child {
+  @apply mt-0;
+}
+
+.markdown-content > *:last-child {
+  @apply mb-0;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+  @apply font-semibold mt-3 mb-2 text-gray-900;
+}
+
+.markdown-content h1 { @apply text-lg; }
+.markdown-content h2 { @apply text-base; }
+.markdown-content h3 { @apply text-sm; }
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 { @apply text-sm; }
+
+.markdown-content p {
+  @apply mb-2;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  @apply pl-5 mb-2;
+}
+
+.markdown-content ul {
+  @apply list-disc;
+}
+
+.markdown-content ol {
+  @apply list-decimal;
+}
+
+.markdown-content blockquote {
+  @apply border-l-4 border-gray-300 pl-3 italic text-gray-600 my-2;
+}
+
+.markdown-content a {
+  @apply text-swarm-600 underline;
+}
+
+.markdown-content code {
+  @apply bg-gray-100 text-pink-600 px-1 py-0.5 rounded text-xs font-mono;
+}
+
+.markdown-content pre {
+  @apply bg-gray-100 rounded-lg p-3 overflow-x-auto my-2;
+}
+
+.markdown-content pre code {
+  @apply bg-transparent text-inherit p-0 rounded-none text-xs;
+}
+
+.markdown-content table {
+  @apply w-full border-collapse text-xs my-2;
+}
+
+.markdown-content th,
+.markdown-content td {
+  @apply border border-gray-200 px-2 py-1;
+}
+
+.markdown-content th {
+  @apply bg-gray-50 font-medium;
+}
+
+.markdown-content hr {
+  @apply border-gray-200 my-3;
+}
+
+.markdown-content img {
+  @apply max-w-full rounded-lg my-2;
+}
+
+/* Inverted styles for user message bubble (green bg, white text) */
+.markdown-content-inverted h1,
+.markdown-content-inverted h2,
+.markdown-content-inverted h3,
+.markdown-content-inverted h4,
+.markdown-content-inverted h5,
+.markdown-content-inverted h6 {
+  @apply text-white;
+}
+
+.markdown-content-inverted blockquote {
+  @apply border-white/30 text-white/80;
+}
+
+.markdown-content-inverted a {
+  @apply text-green-200;
+}
+
+.markdown-content-inverted code {
+  @apply bg-white/20 text-white;
+}
+
+.markdown-content-inverted pre {
+  @apply bg-white/15;
+}
+
+.markdown-content-inverted pre code {
+  @apply text-white;
+}
+
+.markdown-content-inverted th,
+.markdown-content-inverted td {
+  @apply border-white/20;
+}
+
+.markdown-content-inverted th {
+  @apply bg-white/10;
+}
+
+.markdown-content-inverted hr {
+  @apply border-white/20;
 }
 
 @layer utilities {
