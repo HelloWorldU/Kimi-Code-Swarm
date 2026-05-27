@@ -1,7 +1,7 @@
 import type { AgentState, LogEntry, ReviewEntry, TaskStatus, PrStatus, CiStatus, EngineEvent } from './types.js'
 import type { PersistedAgent } from './persist.js'
 import { runKimi, detectKimiCli, type KimiProcess } from './kimi.js'
-import { getChangedFiles, getStagedFiles, getFileDiff, gitAdd, gitCommit, gitPush, createBranch, cloneRepo, gitFetch, getBranchDiff, gitDeleteRemoteBranch } from './git.js'
+import { getChangedFiles, getStagedFiles, getFileDiff, gitAdd, gitCommit, gitPush, createBranch, cloneRepo, gitFetch, getBranchDiff } from './git.js'
 import { createPullRequest, mergePullRequest, getPullRequest, getPullRequestReviews, getCheckRuns, getCheckRunLogs, submitPullRequestReview, getAuthenticatedUser } from './github-api.js'
 import { readFile } from 'fs/promises'
 
@@ -833,15 +833,7 @@ export class Agent {
           this.state.reviews = []
           this.setStatus('completed')
           this.log('system', `PR #${this.state.prNumber} 已合并到 main（GitHub）`)
-          // 合并成功后清理远程分支，避免仓库堆积垃圾分支
-          if (this.state.workspace) {
-            try {
-              await gitDeleteRemoteBranch(this.state.workspace, this.state.branch)
-              this.log('system', `远程分支已清理: ${this.state.branch}`)
-            } catch (err) {
-              this.log('error', `删除远程分支失败: ${String(err)}`)
-            }
-          }
+          // 保留远程分支，便于后续 Agent 在同一分支上继续推送工作
           return
         }
         this.log('error', `GitHub API 合并 PR 失败，可能 PR 尚未就绪`)
@@ -855,15 +847,7 @@ export class Agent {
     this.state.reviews = []
     this.setStatus('completed')
     this.log('system', `PR #${this.state.prNumber} 已合并到 main（模拟）`)
-    // Mock 模式下同样清理远程分支
-    if (this.state.workspace) {
-      try {
-        await gitDeleteRemoteBranch(this.state.workspace, this.state.branch)
-        this.log('system', `远程分支已清理: ${this.state.branch}`)
-      } catch (err) {
-        this.log('error', `删除远程分支失败: ${String(err)}`)
-      }
-    }
+    // 保留远程分支，便于后续 Agent 在同一分支上继续推送工作
   }
 
   rejectPr() {
