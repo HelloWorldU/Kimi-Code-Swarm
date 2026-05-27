@@ -7,6 +7,7 @@ import {
   ChevronDown, ChevronRight
 } from 'lucide-vue-next'
 import type { AgentTask } from '../types'
+import { getLastInput } from '../utils/getLastInput'
 
 const props = withDefaults(defineProps<{
   agent: AgentTask
@@ -48,13 +49,7 @@ function isLogExpanded(logId: string) {
 
 const tokenPercent = computed(() => (props.agent.tokenUsed / props.agent.tokenBudget) * 100)
 const approvedCount = computed(() => props.agent.reviews.filter((r) => r.status === 'approved').length)
-const lastInput = computed(() => {
-  const logs = props.agent.logs
-  for (let i = logs.length - 1; i >= 0; i--) {
-    if (logs[i].type === 'input') return logs[i].content
-  }
-  return ''
-})
+const lastInput = computed(() => getLastInput(props.agent.logs))
 const canMerge = computed(() => props.agent.reviews.length === 0 || props.agent.reviews.every((r) => r.status === 'approved'))
 
 const statusText = computed(() => {
