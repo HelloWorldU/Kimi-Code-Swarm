@@ -35,9 +35,9 @@ const emit = defineEmits<{...}>()
 - `CreateTaskModal.vue` — 表单弹窗组件：收集 name / repoUrl / tokenBudget 创建 Agent，Vue `<Transition>` 原生过渡动画
 - `SwarmConfirmModal.vue` — 确认弹窗组件：类型化图标 + 双按钮确认/取消，配合 useConfirm composable
 - `SwarmToast.vue` — Toast 通知组件：类型化图标 + 进度条 + 自动消失，配合 useToast composable
-- `AgentDetail.vue` — 聊天式多轮对话组件：Header + Info + PR 审阅 + 文件变更 + 聊天消息区（input/output/system/error 直接渲染；think/tool_call/mcp/tool_result 为可折叠气泡，默认收起，点击展开查看完整内容）+ `<textarea>` 输入框（Enter 发送 / Shift+Enter 换行，自动增高）。日期字段通过 new Date(string).toLocaleTimeString() 显示。滚动行为：进入对话/新消息时若用户已在底部 50px 范围内则平滑滚至底部，否则保持当前浏览位置
+- `AgentDetail.vue` — 聊天式多轮对话组件：Header + Info + PR 审阅 + 文件变更 + 聊天消息区（input/output/system/error 直接渲染；think/tool_call/mcp/tool_result 为可折叠气泡，默认收起，点击展开查看完整内容）+ `<textarea>` 输入框（Enter 发送 / Shift+Enter 换行，自动增高）。Info 区任务指令从 `logs` 倒序查找最近 `input` 类型条目渲染，不再依赖 `agent.instruction`。日期字段通过 new Date(string).toLocaleTimeString() 显示。滚动行为：进入对话/新消息时若用户已在底部 50px 范围内则平滑滚至底部，否则保持当前浏览位置
 - `TaskCard.vue` — 卡片组件：Agent 状态 + Token 进度 + 审阅徽章；状态枚举含 `orphan`（已失效，表示本地缓存中存在但引擎 restore 列表中无对应 ID 的 agent）；启动/停止/重启/删除按钮均按 `engineReady` prop 禁用，引擎 restore 完成前置灰；删除操作通过 `useConfirm()` 调用自定义确认弹窗
-- `AnalyticsPanel.vue` — 数据展示型组件：状态分布、Token 排行、任务列表
+- `AnalyticsPanel.vue` — 数据展示型组件：状态分布、Token 排行、任务列表；列表项展示 `task.branch` 以替代已移除的 `task.instruction`
 - `SettingsPanel.vue` — 纯信息展示型设置面板，使用 lucide 图标 + code 标签展示命令指引
 
 ## Composables

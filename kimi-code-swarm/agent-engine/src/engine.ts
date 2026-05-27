@@ -357,7 +357,6 @@ export class AgentEngine {
       repoUrl: s.repoUrl,
       workspace: s.workspace,
       branch: s.branch,
-      instruction: s.instruction,
       prStatus: s.prStatus,
       prNumber: s.prNumber,
       prUrl: s.prUrl,
