@@ -1,57 +1,37 @@
 # Kimi-Code-Swarm
 
 > **本地 Agent 指挥中心 App**。指挥官通过 UI 派任务、监进度、审 PR。
-> 本文档是**索引**，规则去 `.kimi/skills/`（kimi CLI 启动时自动加载此目录），细节去 `docs/` 按需加载。
+> 本文档是**索引**，规则在 `.kimi/skills/`（kimi CLI 启动自动加载），细节去 `docs/` 按需读。
 
 ---
 
-## 快速决策树
+## 接到任务
 
-| 场景 | 加载文档 | 检查清单 |
-|------|---------|---------|
-| 接到任何新任务 | `.kimi/skills/task-intake/SKILL.md` | 对齐批准后才动手 |
-| 新建/修改代码 | `docs/FRONTEND.md` | build → lint → analyze → test |
-| 修复 Bug | `.kimi/skills/debug/SKILL.md` | 日志定位 → 修复 → 留痕 → 验证 |
-| 提交代码 | `.kimi/skills/commit/SKILL.md` | typecheck → lint → analyze → check-docs |
-| 推 PR | `.kimi/skills/push/SKILL.md` | CI 通过 → 审阅 → 合并 |
-| 查看功能状态 | `docs/STATUS.md` | 状态同步 |
-| 架构决策 | `docs/DESIGN.md` + `docs/ARCHITECTURE.md` | Plan Mode |
+**先走 `.kimi/skills/task-intake/SKILL.md`**（必走，对齐批准后才动手）。
+
+需要读哪些文档由 task-intake 阶段 1 引导。下面是常用关键文档清单，按需查：
+
+| 想了解… | 去这里 |
+|---------|--------|
+| 系统设计 | `docs/DESIGN.md` |
+| 架构 / 数据流 / 状态分层 | `docs/ARCHITECTURE.md` |
+| 前端代码规范 | `docs/FRONTEND.md` |
+| 前端组件规范 | `docs/COMPONENT_PATTERNS.md` |
+| 功能实现状态 | `docs/STATUS.md` |
+| 完整目录结构 | `docs/DIRECTORY.md` |
+| 已知待办 | `docs/exec-plans/backlog.md` |
 
 ---
 
 ## 黄金原则
 
-1. **地图即边界** — 只读 `AGENTS.md`，细节去 `docs/` 按需加载；口头约定等于不存在
+1. **地图即边界** — 只读本文件 + task-intake，细节按需；口头约定等于不存在
 2. **代码变，文档必须同步变** — 被 check-docs 阻断时回顾本次已读文档
 3. **约束即代码** — 不能自动检查的约定等于不存在
-4. **改完必须验证** — build → test → lint/analyze 全部通过才允许合入
-5. **debug 必加日志** — 看不出根因时禁止盲猜，加日志定位；修复后留痕
 
 ---
 
-## 技能索引
-
-| 技能 | 文件 |
-|------|------|
-| 任务接入门控 | `.kimi/skills/task-intake/SKILL.md` |
-| Commit 规范 | `.kimi/skills/commit/SKILL.md` |
-| PR 推送 | `.kimi/skills/push/SKILL.md` |
-| Debug 规范 | `.kimi/skills/debug/SKILL.md` |
-
-## 文档索引
-
-| 我想… | 去这里 |
-|-------|--------|
-| 理解系统设计 | `docs/DESIGN.md` |
-| 了解架构 | `docs/ARCHITECTURE.md` |
-| 写前端代码 | `docs/FRONTEND.md` |
-| 组件规范 | `docs/COMPONENT_PATTERNS.md` |
-| 查看功能状态 | `docs/STATUS.md` |
-| 完整目录结构 | `docs/DIRECTORY.md` |
-
----
-
-## 快速启动
+## 快速启动（人类开发者）
 
 ```bash
 cd kimi-code-swarm
@@ -64,4 +44,4 @@ npx tauri dev        # Tauri 桌面模式
 
 ---
 
-*Map version: 2026-05-18*
+*Map version: 2026-05-27*
