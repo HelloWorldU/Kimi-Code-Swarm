@@ -5,9 +5,12 @@
 
 ---
 
-## 接到任务
+## 入口 skill
 
-**先走 `.kimi/skills/task-intake/SKILL.md`**（必走，对齐批准后才动手）。
+| 场景 | 加载 |
+|------|------|
+| 接到任何新任务 | `.kimi/skills/task-intake/SKILL.md`（必走，对齐批准后才动手） |
+| 反复未解 / 卡死 | `.kimi/skills/debug/SKILL.md`（停止猜测式修改，加日志 + 与人类协作） |
 
 需要读哪些文档由 task-intake 阶段 1 引导。下面是常用关键文档清单，按需查：
 
