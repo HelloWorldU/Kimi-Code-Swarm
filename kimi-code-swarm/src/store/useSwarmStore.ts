@@ -639,7 +639,7 @@ export function useSwarmStore() {
       persistAgents()
       return
     }
-    sendToEngine({ type: 'submit-review', agentId, reviewerAgentId, approved })
+    sendToEngine({ type: 'submit-review', agentId, reviewerAgentId, approved, githubToken: getGitHubToken() || undefined })
   }
 
   async function getFileDiff(agentId: string, filePath: string): Promise<string> {
