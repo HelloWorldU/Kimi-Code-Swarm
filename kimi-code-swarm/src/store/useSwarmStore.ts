@@ -329,6 +329,8 @@ const state = reactive({
   // 引擎是否已 restore 完毕：bootstrap/login 后置 false，
   // 收到 engine-restored 事件后置 true；UI 可据此禁掉「发送/创建/删除」按钮
   engineReady: false,
+  // Agent 聊天输入框草稿缓存（内存级，切视图不丢失）
+  draftInputs: {} as Record<string, string>,
 })
 
 bootstrap()
@@ -666,6 +668,8 @@ export function useSwarmStore() {
 
     // Actions
     setSelectedAgentId: (id: string | null) => { state.selectedAgentId = id },
+    setDraftInput: (id: string, text: string) => { state.draftInputs[id] = text },
+    getDraftInput: (id: string) => state.draftInputs[id] || '',
     setIsCreateModalOpen: (v: boolean) => {
       log.debug('setIsCreateModalOpen called:', v, 'current:', state.isCreateModalOpen)
       state.isCreateModalOpen = v
