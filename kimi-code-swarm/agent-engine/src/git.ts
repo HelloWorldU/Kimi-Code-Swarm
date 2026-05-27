@@ -90,7 +90,11 @@ export async function gitFetch(dir: string): Promise<void> {
 }
 
 export async function getBranchDiff(dir: string, branch: string): Promise<string> {
-  return await execGit(dir, ['diff', `main...origin/${branch}`])
+  // 用 origin/main 不是本地 main：reviewer workspace 的本地 main 永远停在
+  // clone 时的版本（gitFetch 只更新 remote-tracking ref 不动本地分支），
+  // merge-base 会算成 reviewer 几天前的 main，diff 被虚假放大到包含所有
+  // main 推进的 commit，触发 ENAMETOOLONG（Bug E-1）。
+  return await execGit(dir, ['diff', `origin/main...origin/${branch}`])
 }
 
 export async function gitDeleteRemoteBranch(dir: string, branch: string): Promise<void> {

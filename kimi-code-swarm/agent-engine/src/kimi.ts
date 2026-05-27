@@ -72,6 +72,13 @@ export interface RunKimiOptions {
   thinking?: boolean
   /** 传入已有的 session id，用 -r <id> 恢复 Kimi CLI 原生会话 */
   sessionId?: string
+  /**
+   * prompt 通过 stdin 传给 kimi（不再用 --prompt 命令行参数）。
+   * 适用于可变长内容（review diff / CI 日志），避免 Windows CreateProcessW
+   * 命令行 32767 字符上限引发 ENAMETOOLONG（Bug E-2）。
+   * 实测 kimi CLI 支持 `echo "..." | kimi --print` 写法。
+   */
+  promptViaStdin?: boolean
 }
 
 export function runKimi(
@@ -84,7 +91,10 @@ export function runKimi(
   // --print: run in print mode (non-interactive)
   // --output-format stream-json: structured streaming output (thinking / tool_calls / text)
   // --final-message-only: only output the final assistant message (fallback for silent mode)
-  const baseArgs = ['--work-dir', workspace, '--prompt', instruction, '--print']
+  const useStdin = options.promptViaStdin === true
+  const baseArgs = useStdin
+    ? ['--work-dir', workspace, '--print']
+    : ['--work-dir', workspace, '--prompt', instruction, '--print']
   if (options.sessionId) {
     baseArgs.push('-r', options.sessionId)
   }
@@ -121,9 +131,14 @@ export function runKimi(
 
   const child = spawn(spawnCmd, spawnArgs, {
     cwd: workspace,
-    stdio: ['ignore', 'pipe', 'pipe'],
+    stdio: useStdin ? ['pipe', 'pipe', 'pipe'] : ['ignore', 'pipe', 'pipe'],
     env,
   })
+
+  if (useStdin && child.stdin) {
+    child.stdin.write(instruction)
+    child.stdin.end()
+  }
 
   const pid = child.pid!
 

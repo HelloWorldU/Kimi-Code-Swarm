@@ -965,7 +965,10 @@ export class Agent {
 
     let proc: ReturnType<typeof runKimi>
     try {
-      proc = runKimi(kimiPath, this.state.workspace, instruction, { streamJson: true, thinking: true })
+      // runInstructionSilent 服务 review / commit message 生成 / 其他可能带大 diff
+      // 的场景，prompt 通过 stdin 传以避开 Windows --prompt 命令行 32767 字符上限
+      // (Bug E-2)。用户聊天的 sendInstruction 路径走 --prompt 保持不变（短指令）。
+      proc = runKimi(kimiPath, this.state.workspace, instruction, { streamJson: true, thinking: true, promptViaStdin: true })
     } catch (err) {
       this.log('error', `启动 Kimi CLI 失败: ${String(err)}`)
       return { ok: false, text: '' }
