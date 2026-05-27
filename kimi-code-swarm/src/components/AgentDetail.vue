@@ -32,6 +32,15 @@ const store = useSwarmStore()
 const instruction = ref('')
 const scrollRef = ref<HTMLDivElement>()
 
+// Track whether user was near bottom *before* new content arrives.
+// This fixes the race where scrollHeight grows but scrollTop stays stale,
+// causing isNearBottom() to falsely return false after DOM update.
+const userWasNearBottom = ref(true)
+
+function onScroll() {
+  userWasNearBottom.value = isNearBottom()
+}
+
 // Collapsible logs: expanded by default for none; stored as Set of log ids
 const expandedLogIds = ref<Set<string>>(new Set())
 
@@ -43,6 +52,12 @@ function toggleLogExpand(logId: string) {
     set.add(logId)
   }
   expandedLogIds.value = new Set(set)
+  // If user was at bottom, follow up after expand/collapse animation
+  nextTick(() => {
+    if (userWasNearBottom.value) {
+      scrollToBottom(false)
+    }
+  })
 }
 
 function isLogExpanded(logId: string) {
@@ -112,23 +127,28 @@ function scrollToBottom(smooth = false) {
 }
 
 let resizeObserver: ResizeObserver | null = null
+let scrollEl: HTMLDivElement | undefined
 
 onMounted(() => {
   instruction.value = store.getDraftInput(props.agent.id)
+  scrollEl = scrollRef.value
   scrollToBottom(false)
 
-  if (scrollRef.value) {
+  scrollEl?.addEventListener('scroll', onScroll)
+
+  if (scrollEl) {
     resizeObserver = new ResizeObserver(() => {
-      if (isNearBottom()) {
+      if (userWasNearBottom.value) {
         scrollToBottom(false)
       }
     })
-    resizeObserver.observe(scrollRef.value)
+    resizeObserver.observe(scrollEl)
   }
 })
 
 onUnmounted(() => {
   resizeObserver?.disconnect()
+  scrollEl?.removeEventListener('scroll', onScroll)
   store.setDraftInput(props.agent.id, instruction.value)
 })
 
@@ -137,21 +157,31 @@ watch(() => props.agent.id, async (newId, oldId) => {
     store.setDraftInput(oldId, instruction.value)
   }
   instruction.value = store.getDraftInput(newId)
+  userWasNearBottom.value = true
   await nextTick()
   scrollToBottom(false)
 })
 
 watch(() => props.agent.logs.length, async () => {
   await nextTick()
-  if (isNearBottom()) {
-    scrollToBottom(true)
+  if (userWasNearBottom.value) {
+    scrollToBottom(false)
+  }
+})
+
+// Also watch the last log's content for streaming append scenarios
+// where logs.length does not change but content grows.
+watch(() => props.agent.logs[props.agent.logs.length - 1]?.content, async () => {
+  await nextTick()
+  if (userWasNearBottom.value) {
+    scrollToBottom(false)
   }
 })
 
 watch(() => props.agent.status, async () => {
   await nextTick()
-  if (isNearBottom()) {
-    scrollToBottom(true)
+  if (userWasNearBottom.value) {
+    scrollToBottom(false)
   }
 })
 </script>
@@ -327,7 +357,7 @@ watch(() => props.agent.status, async () => {
 
       <template v-for="log in agent.logs" :key="log.id">
         <!-- User Message -->
-        <div v-if="log.type === 'input'" class="flex justify-end">
+        <div v-if="log.type === 'input'" class="flex justify-end animate-message-enter">
           <div class="flex items-end gap-2 max-w-[85%] min-w-0">
             <div class="bg-swarm-600 text-white rounded-2xl rounded-tr-sm px-4 py-2.5 shadow-sm">
               <p class="text-sm whitespace-pre-wrap break-words leading-relaxed">{{ log.content }}</p>
@@ -343,7 +373,7 @@ watch(() => props.agent.status, async () => {
         </div>
 
         <!-- Agent Message -->
-        <div v-else-if="log.type === 'output'" class="flex justify-start">
+        <div v-else-if="log.type === 'output'" class="flex justify-start animate-message-enter">
           <div class="flex items-end gap-2 max-w-[85%] min-w-0">
             <div class="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center shrink-0 mb-1">
               <Bot class="w-3.5 h-3.5 text-blue-600" />
@@ -358,7 +388,7 @@ watch(() => props.agent.status, async () => {
         </div>
 
         <!-- Thinking Message -->
-        <div v-else-if="log.type === 'think'" class="flex justify-start">
+        <div v-else-if="log.type === 'think'" class="flex justify-start animate-message-enter">
           <div class="flex items-end gap-2 max-w-[85%] min-w-0">
             <div class="w-7 h-7 rounded-full bg-amber-100 flex items-center justify-center shrink-0 mb-1">
               <Brain class="w-3.5 h-3.5 text-amber-600" />
@@ -383,7 +413,7 @@ watch(() => props.agent.status, async () => {
         </div>
 
         <!-- Tool Call / MCP Message -->
-        <div v-else-if="log.type === 'tool_call' || log.type === 'mcp'" class="flex justify-start">
+        <div v-else-if="log.type === 'tool_call' || log.type === 'mcp'" class="flex justify-start animate-message-enter">
           <div class="flex items-end gap-2 max-w-[85%] min-w-0">
             <div class="w-7 h-7 rounded-full bg-purple-100 flex items-center justify-center shrink-0 mb-1">
               <Wrench v-if="log.type === 'tool_call'" class="w-3.5 h-3.5 text-purple-600" />
@@ -409,7 +439,7 @@ watch(() => props.agent.status, async () => {
         </div>
 
         <!-- Tool Result Message -->
-        <div v-else-if="log.type === 'tool_result'" class="flex justify-start">
+        <div v-else-if="log.type === 'tool_result'" class="flex justify-start animate-message-enter">
           <div class="flex items-end gap-2 max-w-[85%] min-w-0">
             <div class="w-7 h-7 rounded-full bg-green-100 flex items-center justify-center shrink-0 mb-1">
               <CheckCircle class="w-3.5 h-3.5 text-green-600" />
@@ -434,7 +464,7 @@ watch(() => props.agent.status, async () => {
         </div>
 
         <!-- System / Error Message -->
-        <div v-else class="flex justify-center">
+        <div v-else class="flex justify-center animate-message-enter">
           <div
             :class="[
               'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs max-w-[90%]',
