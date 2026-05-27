@@ -44,7 +44,3 @@
 ## 例外
 
 纯问答、纯解释、用户明确说「直接改」的小改动 → 可跳过阶段 1–3 GATE；**阶段 4 的不变量永远生效**。
-
-## 相关 skill
-
-`commit/` · `push/` · `debug/` —— 具体场景的子规范，本 skill 决策后按需加载。`commit/SKILL.md` 被 `agent.ts.generateCommitAndPrBody` 运行时读取。
