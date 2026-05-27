@@ -258,6 +258,7 @@ watch(() => props.agent.status, async () => {
             <GitMerge class="w-3 h-3" /> 合并
           </button>
           <button
+            title="打回 PR：清空审阅状态、切回就绪态等待你发送新指令；不会自动让 Agent 修改"
             class="px-3 py-1.5 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors text-xs font-medium flex items-center gap-1"
             @click="emit('rejectPr', agent.id)"
           >

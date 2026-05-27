@@ -855,8 +855,11 @@ export class Agent {
     // 不清 prStatus：PR 在 GitHub 上仍是 open，重新提交应追加 commit 到原 PR，
     // 而非重建（重建会撞「分支已有 PR」422 并降级 mock）
     this.state.reviews = []
-    this.setStatus('working')
-    this.log('system', 'PR 被打回，Agent 继续修改')
+    // 切 ready（不是 working）：本方法只切状态、不触发任何 agent 动作，
+    // 需要用户主动发新指令。ready 让 AgentDetail.canSendMessage 通过，输入框可用；
+    // working 会让输入框消失，跟「请发送新指令继续」的提示矛盾。
+    this.setStatus('ready')
+    this.log('system', 'PR 已打回，请发送新指令继续')
   }
 
   private notifyPrCreated() {
