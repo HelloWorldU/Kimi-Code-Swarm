@@ -1,22 +1,22 @@
 # Kimi-Code-Swarm
 
-> **本地 Agent 指挥中心 App**。指挥官通过桌面 UI 派任务、监进度、审 PR，指挥多个 Kimi Code CLI 工人在独立目录并发开发。
+> **Local Agent Command Center App**. The commander dispatches tasks, monitors progress, and reviews PRs through a desktop UI, directing multiple Kimi Code CLI workers to develop concurrently in isolated directories.
 
-单 Kimi 账号 → 本地 N 个独立目录 → N 个 CLI 工人并发开发 → 各自提 PR → 指挥官审阅合并。
+One Kimi account → N local isolated directories → N CLI workers developing concurrently → each submits a PR → the commander reviews and merges.
 
-> ⚠️ **这不是一个商业产品，而是 Harness Engineering 方法论的实践场。**
-> 核心价值不在功能本身，而在**"实践发现问题 → 抽象定义 → 解决问题"**的高价值回路。
+> ⚠️ **This is not a commercial product, but a proving ground for Harness Engineering methodology.**
+> The core value lies not in the features themselves, but in the high-value loop of **"practice → discover problems → abstract definitions → solve problems"**.
 
 ```
-指挥官（你）
+Commander (You)
     │
     ▼
 ┌─────────────────────────────┐
 │  Kimi-Code-Swarm App        │
-│  ├── 新建任务（自动 clone）   │
-│  ├── 输入指令               │
-│  ├── 实时监控进度           │
-│  └── 审阅 PR → 合并         │
+│  ├── New Task (auto clone)  │
+│  ├── Enter Instructions     │
+│  ├── Real-time Monitoring   │
+│  └── Review PR → Merge      │
 └─────────────────────────────┘
     │
     ├─► Agent-01 @ ~/workspace/agent-01  ──► PR #42
@@ -24,42 +24,46 @@
     └─► Agent-03 @ ~/workspace/agent-03  ──► PR #44
 ```
 
-## 核心功能
+<p align="right">
+  <a href="README.zh-CN.md">简体中文</a>
+</p>
 
-- 🎯 **任务派发**：点击新建任务，App 自动 clone 仓库、切分支、启动 CLI
-- 📝 **指令交互**：指挥官给 Agent 下达自然语言指令，多轮对话
-- 🤖 **自动提交审阅**：Agent 完成后自动 `git commit/push` 并创建 PR；pre-commit 失败时自动修复（最多 3 轮）
-- 🔍 **PR 审阅**：App 内查看 diff、合并或打回；全员审阅门控（其余 Agent 需全部通过）
-- 📊 **实时监控**：Token 消耗、Git 分支、PR 状态、进程存活
+## Core Features
 
-> ⚠️ **Windows 为主**。Rust 进程管理含 Windows-only 逻辑，macOS/Linux 需适配。浏览器开发模式不受影响。
+- 🎯 **Task Dispatch**: Click "New Task", the App automatically clones the repo, switches branches, and launches the CLI
+- 📝 **Instruction Interaction**: The commander gives natural language instructions to the Agent for multi-round dialogue
+- 🤖 **Auto Submit & Review**: When the Agent finishes, it automatically runs `git commit/push` and creates a PR; auto-fixes pre-commit failures (up to 3 rounds)
+- 🔍 **PR Review**: View diffs, merge or reject within the App; all-hands review gate (all other Agents must pass)
+- 📊 **Real-time Monitoring**: Token consumption, Git branches, PR status, process liveness
+
+> ⚠️ **Windows-first**. Rust process management contains Windows-only logic; macOS/Linux requires adaptation. Browser dev mode is unaffected.
 
 ---
 
-## 🚀 快速启动
+## 🚀 Quick Start
 
-**需要**：Node.js 22+、Git、[Kimi CLI](https://www.kimi.com/code/console)、Kimi API Key。Tauri 桌面模式额外需要 Rust。
+**Requirements**: Node.js 22+, Git, [Kimi CLI](https://www.kimi.com/code/console), Kimi API Key. Tauri desktop mode additionally requires Rust.
 
 ```bash
 git clone <repo-url>
 cd Kimi-Code-Swarm/kimi-code-swarm
-npm install          # 自动配置 Git hooks
-npm run dev          # 浏览器模式，localhost:5173
-npm run tauri dev    # 桌面模式（需 Rust）
+npm install          # auto-configures Git hooks
+npm run dev          # browser mode, localhost:5173
+npm run tauri dev    # desktop mode (requires Rust)
 ```
 
-**首次使用**：打开 App → 输入 Kimi API Key → 验证 → 新建 Agent → 输入仓库地址和指令 → 启动。
+**First time use**: Open the App → Enter Kimi API Key → Verify → Create Agent → Enter repo URL and instructions → Launch.
 
-核心功能（真实 CLI 调用、Git 自动化）仅在 **Tauri 桌面模式** 下生效。
+Core features (real CLI invocation, Git automation) only work in **Tauri desktop mode**.
 
 ---
 
-## 文档
+## Documentation
 
-- [`AGENTS.md`](AGENTS.md) — Agent 启动地图（规则 + 索引）
-- [`docs/`](docs/) — 完整知识库：架构、设计、规范、产品规格、功能状态
-- [`docs/STATUS.md`](docs/STATUS.md) — 功能实现状态单一事实源
+- [`AGENTS.md`](AGENTS.md) — Agent startup map (rules + index)
+- [`docs/`](docs/) — Full knowledge base: architecture, design, conventions, product specs, feature status
+- [`docs/STATUS.md`](docs/STATUS.md) — Single source of truth for feature implementation status
 
-## 许可证
+## License
 
 MIT
