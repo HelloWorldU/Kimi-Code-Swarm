@@ -289,12 +289,16 @@ watch(() => props.agent.status, async () => {
             :key="review.reviewerTaskId"
             class="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-white text-xs"
           >
-            <div class="flex items-center gap-2">
-              <Clock v-if="review.status === 'pending'" class="w-3.5 h-3.5 text-gray-400" />
-              <CheckCircle v-else-if="review.status === 'approved'" class="w-3.5 h-3.5 text-emerald-600" />
-              <XCircle v-else class="w-3.5 h-3.5 text-red-600" />
-              <span class="text-gray-700">{{ review.reviewerName }}</span>
-              <span v-if="review.reviewedAt" class="text-gray-400">{{ new Date(review.reviewedAt).toLocaleTimeString() }}</span>
+            <div class="flex items-center gap-2 min-w-0">
+              <Clock v-if="review.status === 'pending'" class="w-3.5 h-3.5 text-gray-400 shrink-0" />
+              <CheckCircle v-else-if="review.status === 'approved'" class="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <AlertCircle v-else-if="review.status === 'failed'" class="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <XCircle v-else class="w-3.5 h-3.5 text-red-600 shrink-0" />
+              <span class="text-gray-700 shrink-0">{{ review.reviewerName }}</span>
+              <span v-if="review.status === 'failed' && review.failureReason" class="text-amber-600 truncate" :title="review.failureReason">
+                — {{ review.failureReason }}
+              </span>
+              <span v-if="review.reviewedAt" class="text-gray-400 shrink-0">{{ new Date(review.reviewedAt).toLocaleTimeString() }}</span>
             </div>
             <div v-if="review.status === 'pending'" class="flex items-center gap-1">
               <button
@@ -312,11 +316,16 @@ watch(() => props.agent.status, async () => {
             </div>
             <span
               v-else :class="[
-                'text-xs px-2 py-0.5 rounded-full',
-                review.status === 'approved' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'
+                'text-xs px-2 py-0.5 rounded-full shrink-0',
+                review.status === 'approved' ? 'bg-emerald-50 text-emerald-600'
+                : review.status === 'failed' ? 'bg-amber-50 text-amber-600'
+                  : 'bg-red-50 text-red-600'
               ]"
+              :title="review.status === 'failed' ? '自动审阅多次失败，需要人工处置（重试 / 改派 / 强制合并 / 打回）' : ''"
             >
-              {{ review.status === 'approved' ? '已通过' : '已拒绝' }}
+              {{ review.status === 'approved' ? '已通过'
+                : review.status === 'failed' ? `失败 (×${review.attempts ?? '?'})`
+                  : '已拒绝' }}
             </span>
           </div>
         </div>

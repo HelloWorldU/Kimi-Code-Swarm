@@ -1210,11 +1210,15 @@ PR_BODY:
 
   /**
    * 执行自动审阅并回调结果
+   *
+   * @param onFailed - 单次跑不出裁决时的回调（kimi 卡死 / 启动失败 / 异常），
+   *   engine 用它累加 review entry 的 attempts，达上限标 status='failed'（Bug F）
    */
   async performReview(
     targetBranch: string,
     targetAgentId: string,
     onComplete: (reviewerId: string, targetId: string, approved: boolean, comment: string) => void,
+    onFailed?: (reviewerId: string, targetId: string, reason: string) => void,
   ) {
     // 不可审状态（working 占用 kimi 进程 / cloning / stopped / pending）→ 延后：
     // 不裁决、不评论，审阅条目保持 pending，由引擎定时器在本 Agent 空闲后重试。
@@ -1231,12 +1235,14 @@ PR_BODY:
       if (result.status === 'failed') {
         // 审阅没跑完 → 不出裁决，审阅条目保持 pending，由引擎定时器稍后重试
         this.log('system', `${result.comment}，将稍后重试`)
+        onFailed?.(this.state.id, targetAgentId, result.comment)
         return
       }
       onComplete(this.state.id, targetAgentId, result.status === 'approved', result.comment)
     } catch (err) {
       // 审阅异常同样按「未完成」处理：不出假裁决，留 pending 等重试
       this.log('error', `自动审阅执行异常：${String(err)}，将稍后重试`)
+      onFailed?.(this.state.id, targetAgentId, `异常: ${String(err)}`)
     } finally {
       this.activeReviews.delete(targetAgentId)
     }

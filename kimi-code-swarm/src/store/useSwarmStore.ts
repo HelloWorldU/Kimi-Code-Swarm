@@ -208,6 +208,8 @@ function handleEngineEvent(event: Record<string, unknown>) {
           status: r.status as ReviewEntry['status'],
           comment: r.comment ? String(r.comment) : undefined,
           reviewedAt: r.reviewedAt ? String(r.reviewedAt) : undefined,
+          attempts: typeof r.attempts === 'number' ? r.attempts : undefined,
+          failureReason: r.failureReason ? String(r.failureReason) : undefined,
         }))
       }
       if (Array.isArray(incoming.changedFiles)) {

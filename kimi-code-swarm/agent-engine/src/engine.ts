@@ -1,8 +1,11 @@
 import { Agent } from './agent.js'
 import { schedulePersist, type PersistedAgent, type PersistedState } from './persist.js'
-import type { AgentState, EngineCommand, EngineEvent } from './types.js'
+import type { AgentState, EngineCommand, EngineEvent, ReviewEntry } from './types.js'
 import { EngineCommandSchema } from './schemas.js'
 import { rm } from 'fs/promises'
+
+/** 单个 reviewer 自动审阅失败的最大尝试次数；达上限后 status='failed' 等人工 */
+const MAX_REVIEW_ATTEMPTS = 3
 
 export class AgentEngine {
   private agents = new Map<string, Agent>()
@@ -249,14 +252,56 @@ export class AgentEngine {
     const canMerge = await agent.canMerge(githubToken)
     if (canMerge) {
       this.pendingReviews.delete(agent.state.id)
+      // Bug C-2: mock 模式（无 GitHub Token）不主动调 mergePr，让用户手动点
+      //「合并」按钮。canMerge 仍返回 true → UI 按钮可点。理由：mock merge
+      // 跟 GitHub 现实状态脱钩，用户应该在自己决定的时机点合并。
+      if (!githubToken) {
+        this.broadcast({
+          type: 'log',
+          agentId: agent.state.id,
+          entry: {
+            id: 'review-all-approved-mock',
+            timestamp: new Date().toISOString(),
+            type: 'system',
+            content: '所有 reviewer 已通过 — 未配置 GitHub Token（mock 模式），请在 UI 上手动点「合并」按钮',
+          },
+        })
+        return
+      }
       await agent.mergePr(githubToken)
       return
     }
 
-    // 所有 reviewer 都审完且存在 reject → 触发自动修复
+    // Bug F：存在 failed（reviewer 重试用尽）→ 不自动修复，等用户手动处置
+    // Bug C/F：全审完且存在 reject + 没有 failed → 触发自动修复
     const hasPending = agent.state.reviews.some((r) => r.status === 'pending')
-    if (!hasPending) {
+    const hasFailed = agent.state.reviews.some((r) => r.status === 'failed')
+    if (!hasPending && !hasFailed) {
       await agent.fixBasedOnReviews(githubToken)
+    }
+  }
+
+  /**
+   * 构造单个 reviewer 失败时的回调：累加 attempts，达上限标 failed 等人工
+   */
+  private makeReviewFailureHandler(target: Agent, review: ReviewEntry) {
+    return (_reviewerId: string, _targetId: string, reason: string) => {
+      review.attempts = (review.attempts ?? 0) + 1
+      review.failureReason = reason
+      if (review.attempts >= MAX_REVIEW_ATTEMPTS) {
+        review.status = 'failed'
+        this.broadcast({
+          type: 'log',
+          agentId: target.state.id,
+          entry: {
+            id: `review-failed-${review.reviewerAgentId}`,
+            timestamp: new Date().toISOString(),
+            type: 'error',
+            content: `Reviewer「${review.reviewerName}」自动审阅 ${MAX_REVIEW_ATTEMPTS} 次仍未跑通，已标记 failed 等待人工处置。原因：${reason}`,
+          },
+        })
+      }
+      target.syncState()
     }
   }
 
@@ -273,6 +318,8 @@ export class AgentEngine {
    * 定期重试因 reviewer 忙碌而搁置的审阅：扫描所有 reviewing 的 Agent，
    * 对其 pending 的审阅条目重新触发对应 reviewer 的 performReview。
    * performReview 自身判断 reviewer 是否可审 + 防重入，不可审则直接返回。
+   * Bug F：已达 MAX_REVIEW_ATTEMPTS 的 review 跳过（status 已经是 'failed'，
+   * 上面 `review.status !== 'pending'` 的判断自然滤掉，这里只是 defensive 注释）。
    */
   private retryDeferredReviews(): void {
     for (const target of this.agents.values()) {
@@ -282,7 +329,12 @@ export class AgentEngine {
         const reviewer = this.agents.get(review.reviewerAgentId)
         if (!reviewer || reviewer.state.id === target.state.id) continue
         reviewer
-          .performReview(target.state.branch, target.state.id, this.reviewCompletionHandler(target.getGithubToken()))
+          .performReview(
+            target.state.branch,
+            target.state.id,
+            this.reviewCompletionHandler(target.getGithubToken()),
+            this.makeReviewFailureHandler(target, review),
+          )
           .catch((err) => {
             this.broadcast({ type: 'error', message: `延后审阅失败: ${String(err)}` })
           })
@@ -299,9 +351,16 @@ export class AgentEngine {
     for (const review of target.state.reviews) {
       const reviewer = this.agents.get(review.reviewerAgentId)
       if (reviewer && reviewer.state.id !== target.state.id) {
-        reviewer.performReview(branch, agentId, this.reviewCompletionHandler(githubToken)).catch((err) => {
-          this.broadcast({ type: 'error', message: `自动审阅失败: ${String(err)}` })
-        })
+        reviewer
+          .performReview(
+            branch,
+            agentId,
+            this.reviewCompletionHandler(githubToken),
+            this.makeReviewFailureHandler(target, review),
+          )
+          .catch((err) => {
+            this.broadcast({ type: 'error', message: `自动审阅失败: ${String(err)}` })
+          })
       }
     }
 

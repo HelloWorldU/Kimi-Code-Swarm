@@ -13,8 +13,12 @@ export type PrStatus = 'none' | 'open' | 'merged' | 'closed'
 export interface ReviewEntry {
   reviewerTaskId: string
   reviewerName: string
-  status: 'pending' | 'approved' | 'rejected'
+  /** failed = reviewer 多次尝试都跑不起来（非"内容拒绝"），等用户手动处置 */
+  status: 'pending' | 'approved' | 'rejected' | 'failed'
+  comment?: string
   reviewedAt?: string
+  attempts?: number
+  failureReason?: string
 }
 
 export interface AgentTask {
