@@ -19,7 +19,7 @@
 ## 阶段 1 — 需求澄清 + 文档清单
 
 1. 用自己的话**复述需求**，列出你的**假设**。有歧义立即提问，不替用户做决定。
-2. 列出**文档 / 文件清单**：本任务要读什么 —— 先看 `AGENTS.md` 快速决策树按图索骥，列出相关 `docs/`、`skills/`、以及会被改动的源文件。
+2. 列出**文档 / 文件清单**：本任务要读什么 —— 先看 `AGENTS.md` 快速决策树按图索骥，列出相关 `docs/`、`.kimi/skills/`、以及会被改动的源文件。
 3. 实际读完清单里的内容，再进入阶段 2。
 
 ## 阶段 2 — 场景与预期结果
@@ -62,6 +62,6 @@
 
 ## 相关 Skill
 
-- `skills/commit/SKILL.md` — commit message 规范
-- `skills/push/SKILL.md` — PR 推送规范
-- `skills/debug/SKILL.md` — Bug 修复规范
+- `.kimi/skills/commit/SKILL.md` — commit message 规范
+- `.kimi/skills/push/SKILL.md` — PR 推送规范
+- `.kimi/skills/debug/SKILL.md` — Bug 修复规范

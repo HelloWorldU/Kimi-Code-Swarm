@@ -1045,11 +1045,11 @@ export class Agent {
   /**
    * 基于变更文件列表生成 commit message 和 PR 描述
    * 优先调用 Kimi CLI 生成高质量内容，失败时 fallback 到规则生成
-   * Skill 文件（skills/commit/SKILL.md、.github/pull_request_template.md）作为唯一事实源
+   * Skill 文件（.kimi/skills/commit/SKILL.md、.github/pull_request_template.md）作为唯一事实源
    */
   private async generateCommitAndPrBody(files: string[]): Promise<{ commitMessage: string; prTitle: string; prBody: string }> {
     // 1. 读取 Skill 文件作为事实源
-    const commitSkill = await this.loadSkill('skills/commit/SKILL.md')
+    const commitSkill = await this.loadSkill('.kimi/skills/commit/SKILL.md')
     const prTemplate = await this.loadSkill('.github/pull_request_template.md')
 
     const fileList = files.map((f) => `- ${f}`).join('\n')

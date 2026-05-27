@@ -1,6 +1,8 @@
-# skills/ — Agent 能力地图
+# .kimi/skills/ — Agent 能力地图
 
 > 本目录存放**可复用的 Agent 能力规范**（Skill）。每个 Skill 是一个独立目录，内含 `SKILL.md` 定义该能力的规范、步骤和检查项。
+>
+> 路径放在 `.kimi/skills/` 下：Kimi CLI 启动时会自动从工作目录的 `.kimi/skills/` 识别并加载 Skill，无需额外配置。
 
 ---
 
@@ -17,7 +19,7 @@
 
 ## 使用指引
 
-- **改 commit 行为** → 直接修改 `skills/commit/SKILL.md`，无需改代码（已被 `agent.ts` 动态读取）
+- **改 commit 行为** → 直接修改 `.kimi/skills/commit/SKILL.md`，无需改代码（已被 `agent.ts` 动态读取）
 - **改 PR 模板** → 修改 `.github/pull_request_template.md`，已被 `agent.ts` 动态读取
 - **新增 Skill** → 新建目录 + `SKILL.md`，然后在 Engine 代码中通过 `loadSkill()` 接入，或先作为静态规范沉淀
 

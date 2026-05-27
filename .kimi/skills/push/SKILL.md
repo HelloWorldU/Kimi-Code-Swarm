@@ -18,7 +18,7 @@
 - [ ] `npm run test` — 测试套件（如有新增代码）
 - [ ] `npm run build` — 生产构建
 
-> **注意**：如果上述检查失败，先修复问题再推送。参考 `skills/commit/SKILL.md` 的修复流程。
+> **注意**：如果上述检查失败，先修复问题再推送。参考 `.kimi/skills/commit/SKILL.md` 的修复流程。
 
 ## PR Title 规范
 
@@ -53,5 +53,5 @@ PR 创建后：
 
 ## 相关 Skill
 
-- `skills/commit/SKILL.md` — commit message 规范
+- `.kimi/skills/commit/SKILL.md` — commit message 规范
 - `.github/pull_request_template.md` — PR 描述模板

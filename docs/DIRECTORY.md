@@ -28,10 +28,12 @@ Kimi-Code-Swarm/
 │   └── scripts/             CI 辅助脚本
 ├── scripts/               ← 🤖 自动化脚本
 │   └── cleanup.ts           熵管理清理脚本
-├── skills/                ← 🎯 Agent 能力 Skill（可复用工作流规范）
-│   ├── commit/SKILL.md      Commit 规范
-│   ├── push/SKILL.md        PR 推送规范
-│   └── debug/SKILL.md       Debug 规范
+├── .kimi/                 ← 🎯 Kimi CLI 工作目录（启动时自动加载）
+│   └── skills/              Agent 能力 Skill（可复用工作流规范）
+│       ├── task-intake/SKILL.md  任务接入门控
+│       ├── commit/SKILL.md       Commit 规范
+│       ├── push/SKILL.md         PR 推送规范
+│       └── debug/SKILL.md        Debug 规范
 ├── harness/               ← 📋 工作流模板
 │   ├── new-instance.yaml
 │   ├── bug-fix.yaml
