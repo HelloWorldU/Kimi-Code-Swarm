@@ -20,7 +20,7 @@ Vue 3 + TypeScript + Vite + Tailwind CSS + lucide-vue-next + Tauri v2 + @tauri-a
 
 - `store/useSwarmStore.ts` — UI 状态管理；业务逻辑委托给 Node.js Agent 引擎
 - `kimi-code-swarm/agent-engine/src/engine.ts` — Node.js Agent 编排引擎（生命周期 + Kimi CLI + Token 监控）
-- `types/index.ts` — AgentTask / LogEntry（含 think / tool_call / tool_result / mcp 类型）/ CommandCenterStats；修改前检查上下游依赖
+- `types/index.ts` — AgentTask / LogEntry（含 think / tool_call / tool_result / mcp 类型）/ CommandCenterStats；`AgentTask` 不再直接存储 `instruction`，指令信息从 `logs` 中 `type === 'input'` 的条目获取；修改前检查上下游依赖
 - `api/github.ts` — GitHub API 封装（PR 创建/合并/查询）
 - `api/ipc.ts` — Tauri IPC 适配层
 - `components/LoginView.vue` — API Key 登录页（验证 + keyring 存储）
@@ -33,7 +33,7 @@ Vue 3 + TypeScript + Vite + Tailwind CSS + lucide-vue-next + Tauri v2 + @tauri-a
 - `composables/useConfirm.ts` — 全局确认弹窗状态管理（命令式 API）
 - `composables/useToast.ts` — 全局 Toast 通知状态管理（命令式 API）
 - `components/SettingsPanel.vue` — 系统设置（GitHub Token + Kimi CLI 安装指引）
-- `components/AnalyticsPanel.vue` — 监控分析：状态分布、Token 排行、活跃/审阅任务
+- `components/AnalyticsPanel.vue` — 监控分析：状态分布、Token 排行、活跃/审阅任务；任务列表展示分支名而非指令摘要
 - `components/TaskCard.vue` — Agent 卡片：状态 + Token 进度 + 审阅徽章
 
 ## 环境准备
