@@ -155,6 +155,10 @@ export class Agent {
       '合并被拒绝',
       '审阅通过了此 PR',
       '审阅拒绝了此 PR',
+      // 引擎自动修复触发提示：让用户在 UI 看到「不是我发的指令，是引擎在修」
+      '自动修复',
+      '自动修改开始',
+      '正在根据执行日志自动修复',
       '全员审阅通过',
       '已指派',
       '自动修改已达最大轮次',
@@ -292,7 +296,11 @@ export class Agent {
     return history.join('\n\n')
   }
 
-  async sendInstruction(instruction: string, githubToken?: string) {
+  async sendInstruction(
+    instruction: string,
+    githubToken?: string,
+    opts: { displayAsUserInput?: boolean } = {},
+  ) {
     // Allow continuing conversation from stopped or completed state
     if (this.state.status === 'stopped' || this.state.status === 'completed') {
       this.setStatus('ready')
@@ -306,7 +314,14 @@ export class Agent {
     this.setStatus('working')
     const inputTokens = Math.floor(instruction.length / 2)
     this.state.tokenUsed += inputTokens
-    this.log('input', instruction, inputTokens)
+    // displayAsUserInput: true（默认）→ 写 'input' log，UI 显示成用户气泡 +
+    // 被 lastInput computed pick 到，作为「任务指令」展示。
+    // false → 引擎内部注入（CI 自动修复 / 审阅拒绝后的修复 prompt），写 'system'
+    // log，避免污染「任务指令」区 + 不在聊天面板显示巨大的注入 prompt；
+    // kimi 的 think / output 流仍通过 agent-stream 事件实时显示，用户照样看得见
+    // agent 在做什么。
+    const displayAsInput = opts.displayAsUserInput !== false
+    this.log(displayAsInput ? 'input' : 'system', instruction, inputTokens)
     this.syncState()
 
     if (this.state.tokenUsed >= this.state.tokenBudget) {
@@ -737,7 +752,7 @@ export class Agent {
     if (this.state.status === 'reviewing') {
       this.setStatus('ready')
     }
-    await this.sendInstruction(fixPrompt)
+    await this.sendInstruction(fixPrompt, undefined, { displayAsUserInput: false })
   }
 
   /**
@@ -769,8 +784,9 @@ export class Agent {
         }
         this.log('system', '正在根据执行日志自动修复...')
         const fixPrompt = `你刚才尝试提交代码，执行日志如下：\n\n${fullLog}\n\n请根据上述日志中的错误信息，修改相关文件，使其能够通过项目的 typecheck、lint 和 pre-commit 检查。直接修改相关文件，不需要额外说明。${FIX_PROMPT_GIT_GUARD}`
-        // 走流式 sendInstruction：修复过程实时显示在对话框，且无 runInstructionSilent 的硬超时
-        await this.sendInstruction(fixPrompt)
+        // 走流式 sendInstruction：修复过程实时显示在对话框，且无 runInstructionSilent 的硬超时；
+        // displayAsUserInput=false 让长 fix prompt 不污染「任务指令」区与聊天面板
+        await this.sendInstruction(fixPrompt, undefined, { displayAsUserInput: false })
         // 修复后重新检测变更
         if (this.state.workspace) {
           try {
@@ -1275,7 +1291,8 @@ PR_BODY:
     this.log('system', `第 ${this.reviewRound} 轮自动修改开始，基于 ${rejectedReviews.length} 条审阅意见`)
 
     try {
-      await this.sendInstruction(prompt)
+      // displayAsUserInput=false：审阅拒绝后引擎注入的修复 prompt 不算用户指令
+      await this.sendInstruction(prompt, undefined, { displayAsUserInput: false })
       // sendInstruction 完成后状态为 ready，改回 working 以符合 submitForReview 前置条件
       this.state.status = 'working'
       const { ok, steps } = await this.submitForReview(githubToken)
