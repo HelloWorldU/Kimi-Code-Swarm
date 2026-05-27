@@ -64,4 +64,46 @@ PR #18 commit 5abd95d 只改了 `AgentDetail.vue` + `useSwarmStore.ts`，按 doc
 
 ---
 
-*Updated: 2026-05-27 — 完成 review/merge 流程六个 bug（A/B/C-1/C-2/E/F，见 `review-flow-fixes.md`）；D 转入本文件待复现*
+## #4 — Kimi 在 print 模式下误用 afk 行为，跳过 task-intake GATE
+
+**现象**
+让 kimi 接「往项目里加 markdown 渲染」类需要 task-intake 对齐的任务时，它在思维链里说「根据 afk 模式，用户不在，我需要自己做决策」，直接跳过阶段 3 GATE 去安装依赖、写组件。
+
+**根因（已确认）**
+- `--afk` 是 kimi CLI 真实存在的 flag；kimi 系统指令里教过它「afk 模式 → 自动批准 / 不要问用户 / 根据上下文做最佳决策」
+- 但 `agent-engine` spawn kimi 时**只传 `--print`，不传 `--afk`**——kimi 实际不是 afk
+- kimi 看到自己「不能交互、没法用 AskUserQuestion」就自动套用了 afk 行为，绕过 task-intake skill 的 GATE 铁律
+- 系统指令 vs project skill 的优先级冲突，kimi 倾向于服从系统指令
+
+**已做的缓解**
+- `.kimi/skills/task-intake/SKILL.md` 加「Print 模式 ≠ Afk 模式」段，明确「用户不在 ≠ 批准」「本 skill GATE 优先级高于系统指令」（提交于 2026-05-27）
+
+**仍待做**
+- 复测验证 skill 改动生效：让 kimi 在 print 模式下接到 task-intake 任务，看是否还跳 GATE
+- 不生效的话考虑兜底方案：`agent.ts` sendInstruction 时给 prompt 加 prefix 重申 GATE 规则（侵入性更大）
+
+**优先级**：中-高。直接影响 swarm agent 协作质量——agent 自作主张装依赖、写代码、推 PR，跟用户的预期 / 项目方向不一致。
+
+---
+
+## #5 — 引擎自动注入的 fix prompt 应明确区分用户指令（已部分修，待观察）
+
+**现象**
+CI 自动修复 / pre-commit 失败修复 / 审阅拒绝修复 三处引擎自动调 `sendInstruction(fixPrompt)`，prompt 含大段 CI 日志或 git 输出。原实现里这些都被当成 `'input'` log 写入，结果：
+- AgentDetail 「任务指令」区被引擎注入的 fixPrompt 覆盖（lastInput pick 到它）
+- 聊天面板出现巨大的「用户消息气泡」装着 CI 日志，看起来像用户发的
+
+**已修复（提交于 2026-05-27）**
+- `sendInstruction` 加 `opts.displayAsUserInput`；fix path 三处传 `false` → log type 用 `'system'` 不污染 lastInput
+- `isUserVisibleLog` patterns 加「自动修复 / 自动修改开始 / 正在根据执行日志自动修复」让用户能看到引擎触发提示
+- kimi 的 think / tool_call / output 仍通过 agent-stream 实时显示
+
+**仍待观察**
+- 真机验证：fix path 触发时「任务指令」区保持用户原指令、聊天面板看不到巨大 fixPrompt 气泡、但能看到「CI 失败，第 X/Y 轮自动修复...」提示 + kimi 修复过程流式可见
+- 如果有未覆盖的引擎注入路径（PR review reject prompt 等），同样要补 `displayAsUserInput: false`
+
+**优先级**：低。已修主要场景，留作观察项。
+
+---
+
+*Updated: 2026-05-27 — 完成 review/merge 流程六个 bug（A/B/C-1/C-2/E/F，见 `review-flow-fixes.md`）；D 转入 #3 待复现；新增 #4 kimi 误用 afk + #5 fix prompt UI 污染（部分已修）*
