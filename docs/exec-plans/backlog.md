@@ -39,4 +39,29 @@ engine 收到未知 id 的 `delete-agent` 时，按命名规则 `E:/workspace/<a
 
 ---
 
-*Updated: 2026-05-20*
+## #3 — Agent commit 走 Node child_process 时 pre-commit hook 是否漏跑（D，根因待复现）
+
+**现象**
+PR #18 commit 5abd95d 只改了 `AgentDetail.vue` + `useSwarmStore.ts`，按 doc-map 必触发 frontend-components + frontend-store 文档同步规则——但 commit 通过推到了 GitHub。CI 上的 check-docs 拦住了，本地 pre-commit hook 当时没拦。
+
+**根因调查（不明）**
+最初假设：Node `execFileAsync('git', ...)` 派生的子进程在 Tauri GUI app 启动场景下 PATH 不含 `sh.exe` → shell hook 静默跳过。但 agent workspace 实测两路径都跑通 hook + 被拦：
+- `git commit` 交互式：被拦，exit 1
+- `node -e "execFile('git', ['commit', ...])"`：被拦，exit 1
+
+复现失败。剩下候选假设：
+1. agent 在 fix 阶段用 Bash 工具调了 `git commit --no-verify`（FIX_PROMPT_GIT_GUARD 是软约束，kimi 可无视）
+2. PR #18 commit 那一刻 `core.hooksPath` 配置丢了（config 修改 reflog 看不出来）
+3. `pre-commit` 文件在那一刻被替换 / 缺失
+
+**下次复现时主动收集**
+- agent commit 前后的 `git config --get core.hooksPath` 输出
+- `ci/hooks/pre-commit` 的 `ls -la` + mtime
+- agent commit 命令完整 stderr（hook 跳过时 git 有诊断）
+- 可能在 git.ts `gitCommit` 加 `GIT_TRACE=1` 临时环境变量调试
+
+**优先级**：低-中。当前 CI 兜底拦得住，本地 hook 漏拦只是浪费一次 push；但下次再发生时应该立刻抓数据。
+
+---
+
+*Updated: 2026-05-27 — 完成 review/merge 流程六个 bug（A/B/C-1/C-2/E/F，见 `review-flow-fixes.md`）；D 转入本文件待复现*
