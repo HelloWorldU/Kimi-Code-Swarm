@@ -111,4 +111,5 @@
 
 1. **Vue 而不是 React**：reactive() 对高频日志流更友好
 2. **先 Web 后桌面**：先验证 UI 交互，再套 Electron/Tauri 壳
-3. **Global Composable 而不是 Pinia**：当前复杂度足够，跨窗口时迁移
+3. **Markdown 渲染 instead of 纯文本**：Agent 回复常含代码块、列表等结构化内容，引入 `marked` + `highlight.js` + `DOMPurify` 做安全 Markdown 渲染，比纯文本可读性大幅提升
+4. **Global Composable 而不是 Pinia**：当前复杂度足够，跨窗口时迁移

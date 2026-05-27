@@ -8,6 +8,7 @@ import {
 } from 'lucide-vue-next'
 import type { AgentTask } from '../types'
 import { getLastInput } from '../utils/getLastInput'
+import { renderMarkdown } from '../utils/renderMarkdown'
 import { useSwarmStore } from '../store/useSwarmStore'
 
 const props = withDefaults(defineProps<{
@@ -370,7 +371,8 @@ watch(() => props.agent.status, async () => {
         <div v-if="log.type === 'input'" class="flex justify-end animate-message-enter">
           <div class="flex items-end gap-2 max-w-[85%] min-w-0">
             <div class="bg-swarm-600 text-white rounded-2xl rounded-tr-sm px-4 py-2.5 shadow-sm">
-              <p class="text-sm whitespace-pre-wrap break-words leading-relaxed">{{ log.content }}</p>
+              <!-- eslint-disable-next-line vue/no-v-html -->
+              <div class="markdown-content markdown-content--light text-sm leading-relaxed" v-html="renderMarkdown(log.content)" />
               <div class="flex items-center justify-end gap-2 mt-1">
                 <span v-if="log.tokens" class="text-[10px] opacity-60">{{ log.tokens }} tokens</span>
                 <span class="text-[10px] opacity-60">{{ new Date(log.timestamp).toLocaleTimeString() }}</span>
@@ -389,7 +391,8 @@ watch(() => props.agent.status, async () => {
               <Bot class="w-3.5 h-3.5 text-blue-600" />
             </div>
             <div class="bg-white text-gray-800 rounded-2xl rounded-tl-sm px-4 py-2.5 shadow-sm border border-gray-100">
-              <p class="text-sm whitespace-pre-wrap break-words leading-relaxed">{{ log.content }}</p>
+              <!-- eslint-disable-next-line vue/no-v-html -->
+              <div class="markdown-content text-sm leading-relaxed" v-html="renderMarkdown(log.content)" />
               <div class="flex items-center gap-2 mt-1">
                 <span class="text-[10px] text-gray-400">{{ new Date(log.timestamp).toLocaleTimeString() }}</span>
               </div>
@@ -413,7 +416,8 @@ watch(() => props.agent.status, async () => {
                 <ChevronDown v-else class="w-3.5 h-3.5 text-amber-600 shrink-0 ml-2" />
               </button>
               <div v-if="isLogExpanded(log.id)" class="px-4 pb-2.5">
-                <p class="text-sm whitespace-pre-wrap break-words leading-relaxed">{{ log.content }}</p>
+                <!-- eslint-disable-next-line vue/no-v-html -->
+                <div class="markdown-content markdown-content--amber text-sm leading-relaxed" v-html="renderMarkdown(log.content)" />
                 <div class="flex items-center gap-2 mt-1">
                   <span class="text-[10px] text-amber-400">{{ new Date(log.timestamp).toLocaleTimeString() }}</span>
                 </div>

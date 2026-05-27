@@ -73,7 +73,7 @@ PR 创建时，Store 自动生成 `ReviewEntry[]`，包含所有其他 Agent 作
 - `kimi-code-swarm/src/` —— 纯前端，禁止直接操作进程
   - `components/LoginView.vue` — 登录页（API Key 输入 + 验证）
   - `components/AgentDashboard.vue` — Agent 卡片网格（最多 5 个），统计卡片带渐变背景与进度条
-  - `components/AgentDetail.vue` — Agent 详情（多轮对话聊天 UI + 日志 + PR 审阅）
+  - `components/AgentDetail.vue` — Agent 详情（多轮对话聊天 UI，input/output/think 支持 Markdown 渲染与代码高亮 + 日志 + PR 审阅）
   - `components/AnalyticsPanel.vue` — 数据可视化（只读聚合）
 - `src-tauri/` —— 唯一有权 spawn 进程的 Rust 后端
   - `save_api_key` / `get_api_key` / `delete_api_key` — OS Keyring 操作

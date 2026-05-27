@@ -124,6 +124,7 @@ typecheck → lint → analyze → test → check-docs → check-test-sync → b
 | **禁止硬编码绝对路径** | **非 `tests/` 代码禁止包含硬编码绝对路径**（如 `E:/workspace`、`C:\Python312\...`、`C:\nvm4w\...`）。路径应通过配置、环境变量或运行时探测获取。`tests/` 中允许硬编码（测试用例隔离、可预期）。这是可移植性的底线（vllm 经验）。 |
 | Harness 合规 | bug-fix 分支修改 src/ 代码后，必须同步更新 `docs/`、`exec-plans/` 或 `harness/bug-fix.yaml`。文档是单一事实源。 |
 | 代码改动验证 | 任何代码变更必须走 build → start → test → lint/analyze 闭环，全部通过才能开 PR。未验证代码禁止合入 main。 |
+| Markdown 渲染安全 | 聊天消息使用 `v-html` 渲染 Markdown 时，必须通过 `DOMPurify` 做 XSS 过滤；代码高亮使用 `highlight.js` + github 浅色主题；`marked` 配置 `breaks: true` 支持换行。`tool_call` / `mcp` / `tool_result` 等结构化数据保持 monospace 纯文本，不做 Markdown 解析。 |
 
 ---
 

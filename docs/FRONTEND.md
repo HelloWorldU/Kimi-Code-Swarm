@@ -4,7 +4,7 @@
 
 ## 技术栈
 
-Vue 3 + TypeScript + Vite + Tailwind CSS + lucide-vue-next + Tauri v2 + @tauri-apps/plugin-store
+Vue 3 + TypeScript + Vite + Tailwind CSS + lucide-vue-next + Tauri v2 + @tauri-apps/plugin-store + marked + highlight.js + dompurify
 
 ## 编码规范
 
@@ -21,6 +21,7 @@ Vue 3 + TypeScript + Vite + Tailwind CSS + lucide-vue-next + Tauri v2 + @tauri-a
 - `store/useSwarmStore.ts` — UI 状态管理；业务逻辑委托给 Node.js Agent 引擎
 - `kimi-code-swarm/agent-engine/src/engine.ts` — Node.js Agent 编排引擎（生命周期 + Kimi CLI + Token 监控）
 - `types/index.ts` — AgentTask / LogEntry（含 think / tool_call / tool_result / mcp 类型）/ CommandCenterStats；`AgentTask` 不再直接存储 `instruction`，指令信息从 `logs` 中 `type === 'input'` 的条目获取；修改前检查上下游依赖
+- `utils/renderMarkdown.ts` — Markdown 渲染工具：基于 `marked` + `marked-highlight` + `highlight.js` 解析并高亮，经 `DOMPurify` XSS 过滤后返回安全 HTML
 - `api/github.ts` — GitHub API 封装（PR 创建/合并/查询）
 - `api/ipc.ts` — Tauri IPC 适配层
 - `components/LoginView.vue` — API Key 登录页（验证 + keyring 存储）
@@ -29,7 +30,7 @@ Vue 3 + TypeScript + Vite + Tailwind CSS + lucide-vue-next + Tauri v2 + @tauri-a
 - `components/SwarmConfirmModal.vue` — 确认弹窗组件：支持 danger/warning/info 类型，配合 useConfirm 使用
 - `components/SwarmToast.vue` — Toast 通知组件：支持 error/success/info/warning，自动消失
 - `App.vue` — 主入口：布局框架 + 视图路由（dashboard/agent-detail/analytics）+ 全局事件处理（如文件 diff 查看）
-- `components/AgentDetail.vue` — Agent 详情：`<textarea>` 指令输入（Enter 发送 / Shift+Enter 换行，自动增高）+ 日志流（含 think / tool_call / mcp / tool_result 可折叠气泡，默认收起，点击展开查看完整内容，智能滚动：通过 `scroll` 事件跟踪用户位置，若用户之前在底部 50px 内则即时跟进，已上滚则保持阅读位置）+ PR 审阅 + 文件变更（点击通过 engine 获取 diff）。输入框草稿通过 `useSwarmStore.draftInputs` 做内存级缓存，切视图/切 Agent 时不丢失未发送内容。所有消息气泡带 `animate-message-enter` 进入动画。「打回」按钮 tooltip 说明：只切回就绪态、不自动触发修改。Reviewer 行支持 `failed` 状态展示（amber 配色 + 失败原因）
+- `components/AgentDetail.vue` — Agent 详情：`<textarea>` 指令输入（Enter 发送 / Shift+Enter 换行，自动增高）+ 日志流（`input` / `output` / `think` 消息气泡使用 `renderMarkdown` 做 Markdown 渲染，含代码语法高亮；`tool_call` / `mcp` / `tool_result` / `system` / `error` 保持原有纯文本 / 可折叠样式。智能滚动：通过 `scroll` 事件跟踪用户位置，若用户之前在底部 50px 内则即时跟进，已上滚则保持阅读位置）+ PR 审阅 + 文件变更（点击通过 engine 获取 diff）。输入框草稿通过 `useSwarmStore.draftInputs` 做内存级缓存，切视图/切 Agent 时不丢失未发送内容。所有消息气泡带 `animate-message-enter` 进入动画。「打回」按钮 tooltip 说明：只切回就绪态、不自动触发修改。Reviewer 行支持 `failed` 状态展示（amber 配色 + 失败原因）
 - `composables/useConfirm.ts` — 全局确认弹窗状态管理（命令式 API）
 - `composables/useToast.ts` — 全局 Toast 通知状态管理（命令式 API）
 - `components/SettingsPanel.vue` — 系统设置（GitHub Token + Kimi CLI 安装指引）
