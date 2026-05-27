@@ -24,7 +24,6 @@ export interface AgentTask {
   repoUrl: string
   workspace: string
   branch: string
-  instruction: string
   prStatus: PrStatus
   prNumber?: number
   prUrl?: string

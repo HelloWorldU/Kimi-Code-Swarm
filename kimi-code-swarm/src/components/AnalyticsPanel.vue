@@ -150,7 +150,7 @@ const workingTasks = computed(() => props.tasks.filter(t => t.status === 'workin
         >
           <div class="min-w-0">
             <p class="text-xs text-gray-900 truncate">{{ task.name }}</p>
-            <p class="text-[10px] text-gray-400 truncate">{{ task.instruction }}</p>
+            <p class="text-[10px] text-gray-400 truncate">{{ task.branch }}</p>
           </div>
           <div class="text-right shrink-0">
             <p class="text-xs text-amber-600">{{ task.tokenUsed.toLocaleString() }} tokens</p>

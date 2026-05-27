@@ -42,7 +42,6 @@ export interface AgentState {
   repoUrl: string
   workspace: string
   branch: string
-  instruction: string
   prStatus: PrStatus
   prNumber?: number
   prUrl?: string

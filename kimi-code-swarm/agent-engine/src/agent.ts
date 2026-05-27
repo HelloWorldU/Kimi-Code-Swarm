@@ -77,7 +77,6 @@ export class Agent {
       repoUrl,
       workspace: '',
       branch: branchName(name),
-      instruction: '',
       prStatus: 'none',
       tokenUsed: 0,
       tokenBudget,
@@ -103,7 +102,6 @@ export class Agent {
     a.state.status = p.status as TaskStatus
     a.state.workspace = p.workspace
     a.state.branch = p.branch
-    a.state.instruction = p.instruction
     a.state.prStatus = p.prStatus as PrStatus
     a.state.prNumber = p.prNumber
     a.state.prUrl = p.prUrl
@@ -306,7 +304,6 @@ export class Agent {
     // 并非每条指令都携带；autoSubmitForReview 的修复步就以无 token 调用本方法）
     if (githubToken) this.githubToken = githubToken
     this.setStatus('working')
-    this.state.instruction = instruction
     const inputTokens = Math.floor(instruction.length / 2)
     this.state.tokenUsed += inputTokens
     this.log('input', instruction, inputTokens)

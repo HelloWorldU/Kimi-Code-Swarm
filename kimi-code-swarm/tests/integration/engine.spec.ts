@@ -235,7 +235,6 @@ async function applyAgentMocks() {
     if (this.state.status !== 'ready') return
 
     this.state.status = 'working'
-    this.state.instruction = instruction
     const inputTokens = Math.floor(instruction.length / 2)
     this.state.tokenUsed += inputTokens
     this.state.logs.push({

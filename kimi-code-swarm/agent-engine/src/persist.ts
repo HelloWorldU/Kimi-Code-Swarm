@@ -26,7 +26,6 @@ export interface PersistedAgent {
   repoUrl: string
   workspace: string
   branch: string
-  instruction: string
   prStatus: string
   prNumber?: number
   prUrl?: string

@@ -48,6 +48,13 @@ function isLogExpanded(logId: string) {
 
 const tokenPercent = computed(() => (props.agent.tokenUsed / props.agent.tokenBudget) * 100)
 const approvedCount = computed(() => props.agent.reviews.filter((r) => r.status === 'approved').length)
+const lastInput = computed(() => {
+  const logs = props.agent.logs
+  for (let i = logs.length - 1; i >= 0; i--) {
+    if (logs[i].type === 'input') return logs[i].content
+  }
+  return ''
+})
 const canMerge = computed(() => props.agent.reviews.length === 0 || props.agent.reviews.every((r) => r.status === 'approved'))
 
 const statusText = computed(() => {
@@ -177,7 +184,7 @@ watch(() => props.agent.status, async () => {
     <div class="grid grid-cols-2 gap-3 mb-3 shrink-0">
       <div class="px-4 py-2.5 rounded-lg bg-gray-50 border border-gray-100">
         <p class="text-xs text-gray-500">任务指令</p>
-        <p class="text-sm text-gray-700 mt-1">{{ agent.instruction || '暂无指令' }}</p>
+        <p class="text-sm text-gray-700 mt-1">{{ lastInput || '暂无指令' }}</p>
       </div>
       <div class="px-4 py-2.5 rounded-lg bg-gray-50 border border-gray-100">
         <p class="text-xs text-gray-500">仓库</p>

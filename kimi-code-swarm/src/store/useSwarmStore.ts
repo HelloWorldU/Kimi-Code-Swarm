@@ -309,7 +309,6 @@ async function loadPersistedAgents(): Promise<AgentTask[]> {
     // orphan 卡（引擎没认领）也用这份默认值，TaskCard 按 status='orphan' 灰显
     status: 'pending' as const,
     workspace: '',
-    instruction: '',
     prStatus: 'none' as const,
     tokenUsed: 0,
     reviews: [],
@@ -339,8 +338,9 @@ if (!isTauri) {
   setInterval(() => {
     state.agents.forEach((a) => {
       if (a.status === 'working') {
-        // 基于当前 instruction 长度估算工作期间的 token 消耗，避免纯随机
-        const base = a.instruction ? Math.floor(a.instruction.length / 4) : 0
+        // 基于最近 input log 长度估算工作期间的 token 消耗，避免纯随机
+        const lastInput = a.logs.slice().reverse().find((l) => l.type === 'input')
+        const base = lastInput ? Math.floor(lastInput.content.length / 4) : 0
         const increment = Math.max(5, Math.floor(base * 0.1) + Math.floor(Math.random() * 10))
         a.tokenUsed = Math.min(a.tokenUsed + increment, a.tokenBudget)
         a.lastActivity = new Date().toISOString()
@@ -438,7 +438,6 @@ export function useSwarmStore() {
         repoUrl,
         workspace: '',
         branch: `agent/${name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}-${generateId().slice(0, 4)}`,
-        instruction: '',
         prStatus: 'none',
         tokenUsed: 0,
         tokenBudget,
@@ -515,7 +514,6 @@ export function useSwarmStore() {
         agent.logs.push({ id: generateId(), timestamp: new Date().toISOString(), type: 'system', content: 'Agent 已恢复，继续对话' })
       }
       agent.status = 'working'
-      agent.instruction = instruction
       agent.logs.push({ id: generateId(), timestamp: new Date().toISOString(), type: 'input', content: instruction, tokens: Math.floor(instruction.length / 2) })
       agent.tokenUsed += Math.floor(instruction.length / 2)
       agent.lastActivity = new Date().toISOString()
