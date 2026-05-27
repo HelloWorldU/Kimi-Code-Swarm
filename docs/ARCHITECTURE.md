@@ -54,6 +54,7 @@ PR 创建时，Store 自动生成 `ReviewEntry[]`，包含所有其他 Agent 作
 | 层级 | 存储 | 生命周期 |
 |------|------|---------|
 | UI State | reactive | 页面刷新丢失 |
+| Draft Input | `useSwarmStore.draftInputs` (reactive `Record<string, string>`) | 页面刷新丢失；切换 Agent / 离开详情页时自动保存/恢复，避免未发送输入丢失 |
 | Runtime | Main Process | 应用关闭丢失 |
 | Persistent | localStorage | 跨会话保留（浏览器 fallback） |
 | Secure | OS Keyring | 跨会话保留，系统级加密 |
