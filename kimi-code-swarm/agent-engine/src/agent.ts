@@ -727,19 +727,17 @@ export class Agent {
 
     this.log('system', `CI 失败，第 ${this.ciRetryCount}/${this.CI_MAX_RETRIES} 轮自动修复...`)
     const fixPrompt = `GitHub Actions CI 检查失败了，日志如下：\n\n${ciLogs}\n\n请根据上述日志修改代码文件，使其能够通过 CI 检查。直接修改相关文件，不需要额外说明。${FIX_PROMPT_GIT_GUARD}`
-    await this.runInstructionSilent(fixPrompt)
 
-    // 修复后重新检测变更
-    if (this.state.workspace) {
-      try {
-        this.state.changedFiles = await getChangedFiles(this.state.workspace)
-      } catch {
-        // 忽略检测失败
-      }
+    // Bug B: 走 sendInstruction 让修复过程在 UI 聊天面板可见（之前用
+    // runInstructionSilent 黑盒，用户看不到 agent 在改什么）。
+    // sendInstruction 不接受 reviewing 状态——CI 监控启动时 status 是
+    // reviewing，临时切 ready 让 sendInstruction 进入；它内部完成后会
+    // 自动检测 changedFiles + 调用 autoSubmitForReview，不需要本方法再
+    // 额外做这两步。
+    if (this.state.status === 'reviewing') {
+      this.setStatus('ready')
     }
-
-    // 重新提交（autoSubmitForReview 成功后会再次启动 CI 监控）
-    await this.autoSubmitForReview()
+    await this.sendInstruction(fixPrompt)
   }
 
   /**
