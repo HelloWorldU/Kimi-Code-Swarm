@@ -8,6 +8,7 @@ import {
 } from 'lucide-vue-next'
 import type { AgentTask } from '../types'
 import { getLastInput } from '../utils/getLastInput'
+import { useSwarmStore } from '../store/useSwarmStore'
 
 const props = withDefaults(defineProps<{
   agent: AgentTask
@@ -27,6 +28,7 @@ const emit = defineEmits<{
   (e: 'showFileDiff', agentId: string, filePath: string): void
 }>()
 
+const store = useSwarmStore()
 const instruction = ref('')
 const scrollRef = ref<HTMLDivElement>()
 
@@ -80,6 +82,7 @@ function handleSendInstruction() {
   if (!canSendMessage.value && !isWorking.value) return
   emit('sendInstruction', props.agent.id, instruction.value.trim())
   instruction.value = ''
+  store.setDraftInput(props.agent.id, '')
 }
 
 function handleKeydown(e: KeyboardEvent) {
@@ -111,6 +114,7 @@ function scrollToBottom(smooth = false) {
 let resizeObserver: ResizeObserver | null = null
 
 onMounted(() => {
+  instruction.value = store.getDraftInput(props.agent.id)
   scrollToBottom(false)
 
   if (scrollRef.value) {
@@ -125,9 +129,14 @@ onMounted(() => {
 
 onUnmounted(() => {
   resizeObserver?.disconnect()
+  store.setDraftInput(props.agent.id, instruction.value)
 })
 
-watch(() => props.agent.id, async () => {
+watch(() => props.agent.id, async (newId, oldId) => {
+  if (oldId) {
+    store.setDraftInput(oldId, instruction.value)
+  }
+  instruction.value = store.getDraftInput(newId)
   await nextTick()
   scrollToBottom(false)
 })
