@@ -6,9 +6,30 @@ import {
   User, Bot, Loader2, Brain, Wrench, Server,
   ChevronDown, ChevronRight
 } from 'lucide-vue-next'
+import { marked } from 'marked'
+import hljs from 'highlight.js'
+import DOMPurify from 'dompurify'
 import type { AgentTask } from '../types'
 import { getLastInput } from '../utils/getLastInput'
 import { useSwarmStore } from '../store/useSwarmStore'
+
+// Configure marked with syntax highlighting via custom renderer
+const renderer = new marked.Renderer()
+renderer.code = ({ text, lang }: { text: string; lang?: string }) => {
+  const language = lang && hljs.getLanguage(lang) ? lang : undefined
+  const highlighted = language
+    ? hljs.highlight(text, { language }).value
+    : hljs.highlightAuto(text).value
+  return `<pre><code class="hljs language-${lang || 'plaintext'}">${highlighted}</code></pre>`
+}
+marked.use({ renderer })
+marked.setOptions({ breaks: true })
+
+function renderMarkdown(content: string): string {
+  if (!content) return ''
+  const html = marked.parse(content, { async: false }) as string
+  return DOMPurify.sanitize(html)
+}
 
 const props = withDefaults(defineProps<{
   agent: AgentTask
@@ -370,7 +391,7 @@ watch(() => props.agent.status, async () => {
         <div v-if="log.type === 'input'" class="flex justify-end animate-message-enter">
           <div class="flex items-end gap-2 max-w-[85%] min-w-0">
             <div class="bg-swarm-600 text-white rounded-2xl rounded-tr-sm px-4 py-2.5 shadow-sm">
-              <p class="text-sm whitespace-pre-wrap break-words leading-relaxed">{{ log.content }}</p>
+              <div class="markdown-content markdown-content-inverted" v-html="renderMarkdown(log.content)" />
               <div class="flex items-center justify-end gap-2 mt-1">
                 <span v-if="log.tokens" class="text-[10px] opacity-60">{{ log.tokens }} tokens</span>
                 <span class="text-[10px] opacity-60">{{ new Date(log.timestamp).toLocaleTimeString() }}</span>
@@ -389,7 +410,7 @@ watch(() => props.agent.status, async () => {
               <Bot class="w-3.5 h-3.5 text-blue-600" />
             </div>
             <div class="bg-white text-gray-800 rounded-2xl rounded-tl-sm px-4 py-2.5 shadow-sm border border-gray-100">
-              <p class="text-sm whitespace-pre-wrap break-words leading-relaxed">{{ log.content }}</p>
+              <div class="markdown-content" v-html="renderMarkdown(log.content)" />
               <div class="flex items-center gap-2 mt-1">
                 <span class="text-[10px] text-gray-400">{{ new Date(log.timestamp).toLocaleTimeString() }}</span>
               </div>
@@ -413,7 +434,7 @@ watch(() => props.agent.status, async () => {
                 <ChevronDown v-else class="w-3.5 h-3.5 text-amber-600 shrink-0 ml-2" />
               </button>
               <div v-if="isLogExpanded(log.id)" class="px-4 pb-2.5">
-                <p class="text-sm whitespace-pre-wrap break-words leading-relaxed">{{ log.content }}</p>
+                <div class="markdown-content" v-html="renderMarkdown(log.content)" />
                 <div class="flex items-center gap-2 mt-1">
                   <span class="text-[10px] text-amber-400">{{ new Date(log.timestamp).toLocaleTimeString() }}</span>
                 </div>
