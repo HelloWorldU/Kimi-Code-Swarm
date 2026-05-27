@@ -5,6 +5,7 @@ import {
   GitPullRequest, Coins, Activity, TrendingUp,
 } from 'lucide-vue-next'
 import type { AgentTask } from '../types'
+import { getLastInput } from '../utils/getLastInput'
 
 const props = defineProps<{
   tasks: AgentTask[]
@@ -150,7 +151,7 @@ const workingTasks = computed(() => props.tasks.filter(t => t.status === 'workin
         >
           <div class="min-w-0">
             <p class="text-xs text-gray-900 truncate">{{ task.name }}</p>
-            <p class="text-[10px] text-gray-400 truncate">{{ task.branch }}</p>
+            <p class="text-[10px] text-gray-400 truncate">{{ getLastInput(task.logs) || '暂无指令' }}</p>
           </div>
           <div class="text-right shrink-0">
             <p class="text-xs text-amber-600">{{ task.tokenUsed.toLocaleString() }} tokens</p>

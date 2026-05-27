@@ -33,7 +33,7 @@ Vue 3 + TypeScript + Vite + Tailwind CSS + lucide-vue-next + Tauri v2 + @tauri-a
 - `composables/useConfirm.ts` — 全局确认弹窗状态管理（命令式 API）
 - `composables/useToast.ts` — 全局 Toast 通知状态管理（命令式 API）
 - `components/SettingsPanel.vue` — 系统设置（GitHub Token + Kimi CLI 安装指引）
-- `components/AnalyticsPanel.vue` — 监控分析：状态分布、Token 排行、活跃/审阅任务；任务列表展示分支名而非指令摘要
+- `components/AnalyticsPanel.vue` — 监控分析：状态分布、Token 排行、活跃/审阅任务；任务列表通过 `getLastInput(task.logs)` 展示最后一条 input 指令摘要
 - `components/TaskCard.vue` — Agent 卡片：状态 + Token 进度 + 审阅徽章
 
 ## 环境准备
