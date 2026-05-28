@@ -628,7 +628,7 @@ export function useSwarmStore() {
     sendToEngine({ type: 'reject-pr', agentId: id })
   }
 
-  function submitReview(agentId: string, reviewerAgentId: string, approved: boolean) {
+  function submitReview(agentId: string, reviewerAgentId: string, approved: boolean, comment?: string) {
     if (!isTauri) {
       const agent = state.agents.find((a) => a.id === agentId)
       if (!agent || agent.status !== 'reviewing') return
@@ -636,12 +636,13 @@ export function useSwarmStore() {
       if (!review) return
       review.status = approved ? 'approved' : 'rejected'
       review.reviewedAt = new Date().toISOString()
+      if (comment !== undefined) review.comment = comment
       const action = approved ? '通过' : '拒绝'
       agent.logs.push({ id: generateId(), timestamp: new Date().toISOString(), type: 'system', content: `Agent「${review.reviewerName}」审阅${action}了此 PR` })
       persistAgents()
       return
     }
-    sendToEngine({ type: 'submit-review', agentId, reviewerAgentId, approved, githubToken: getGitHubToken() || undefined })
+    sendToEngine({ type: 'submit-review', agentId, reviewerAgentId, approved, comment, githubToken: getGitHubToken() || undefined })
   }
 
   async function getFileDiff(agentId: string, filePath: string): Promise<string> {

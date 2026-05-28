@@ -804,6 +804,8 @@ export class Agent {
         // 走流式 sendInstruction：修复过程实时显示在对话框，且无 runInstructionSilent 的硬超时；
         // displayAsUserInput=false 让长 fix prompt 不污染「任务指令」区与聊天面板
         await this.sendInstruction(fixPrompt, undefined, { displayAsUserInput: false })
+        // 若用户已点停止，中断重试循环
+        if (this.state.status === 'stopped') return
         // 修复后重新检测变更
         if (this.state.workspace) {
           try {
@@ -935,13 +937,7 @@ export class Agent {
 
     const mergeResult = await gitMerge(this.state.workspace, 'origin/main')
     if (mergeResult.exitCode === 0) {
-      const commitResult = await gitCommit(this.state.workspace, 'sync: merge origin/main')
-      if (commitResult.exitCode === 0) {
-        this.log('system', `已同步 main 的 ${behindCount} 个 commit`)
-      } else {
-        this.log('error', `同步提交失败: ${commitResult.stderr}`)
-        try { await abortMerge(this.state.workspace) } catch { /* 已无 merge 状态可忽略 */ }
-      }
+      this.log('system', `已同步 main 的 ${behindCount} 个 commit`)
       return true
     }
 
@@ -1112,6 +1108,7 @@ ${fileContents.join('\n\n')}
 
     review.status = approved ? 'approved' : 'rejected'
     review.reviewedAt = new Date().toISOString()
+    if (comment !== undefined) review.comment = comment
     this.syncState()
     const action = approved ? '通过' : '拒绝'
     this.log('system', `Agent「${review.reviewerName}」审阅${action}了此 PR`)
@@ -1481,6 +1478,8 @@ PR_BODY:
     try {
       // displayAsUserInput=false：审阅拒绝后引擎注入的修复 prompt 不算用户指令
       await this.sendInstruction(prompt, undefined, { displayAsUserInput: false })
+      // 若用户已点停止，不再继续提交
+      if (this.state.status === 'stopped') return
       // sendInstruction 完成后状态为 ready，改回 working 以符合 submitForReview 前置条件
       this.state.status = 'working'
       const { ok, steps } = await this.submitForReview(githubToken)

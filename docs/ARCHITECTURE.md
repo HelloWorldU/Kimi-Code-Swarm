@@ -50,6 +50,8 @@ PR 创建时，Store 自动生成 `ReviewEntry[]`，包含所有其他 Agent 作
 
 所有发往 engine 的 review 相关命令（`submit-for-review` / `submit-review` / `merge-pr`）都必须携带当前 GitHub Token；engine 的 `canMerge` / `mergePr` 根据 token 是否存在决定走真实 GitHub API 还是 mock 路径，缺失 token 会导致真实 PR 走到 mock merge。
 
+`submit-review` 命令携带 `comment` 字段（来自自动审阅的 `review.comment`），确保 fix 闭环能获取具体审阅意见而非 fallback「审阅未通过」。
+
 **自动合并的 mock 区分**：`handleReviewVerdict` 在 reviewer 全 approved 后，**仅当有 GitHub Token 时**才主动调 `mergePr` 自动合并；mock 模式（无 token）不自动合并，UI「合并」按钮仍可点，由用户决定时机手动合并——避免 mock merge 跟 GitHub 现实状态脱钩造成误判。
 
 **审阅失败上限**：`ReviewEntry` 加 `status='failed'` 枚举 + `attempts` + `failureReason` 字段。`retryDeferredReviews` 给 `performReview` 传 `onFailed` 回调，累加 attempts；达 `MAX_REVIEW_ATTEMPTS=3` 后 status 置 `failed`，retry 自然停止。`handleReviewVerdict` 看到 `hasFailed=true` 时跳过 `fixBasedOnReviews`——「审阅多次跑不通」≠「内容拒绝」，不应让 agent 改代码方向，等用户手动处置（重试 / 改派 / 强制合并 / 打回）。
