@@ -171,7 +171,7 @@ pending ──start──→ cloning ──git clone──→ ready ──send i
   │                  │
   └──stop────────────→ stopped
                      │
-  working ──auto submit review──→ reviewing ──all approved──→ completed
+  working ──auto submit review──→ reviewing ──GitHub API 满足 required approvals──→ completed
     │                                 │
     │    ┌─ CI pass ─────────────────┘
     │    │

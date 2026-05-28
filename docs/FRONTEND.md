@@ -46,6 +46,9 @@ Vue 3 + TypeScript + Vite + Tailwind CSS + lucide-vue-next + Tauri v2 + @tauri-a
 | Kimi API Key | 必需 | App 登录 + CLI 进程注入 | [kimi.com/code/console](https://www.kimi.com/code/console) |
 | GitHub Token | 可选 | PR 真实操作（否则 Mock） | GitHub Settings → PAT |
 | Rust | 可选 | Tauri 桌面模式 | [rustup.rs](https://rustup.rs/) |
+| marked | ^14.x | Markdown 渲染（Agent 消息） | npm install 自动安装 |
+| dompurify | ^3.x | XSS 过滤 | npm install 自动安装 |
+| highlight.js | ^11.x | 代码语法高亮 | npm install 自动安装 |
 
 > **浏览器模式**（`npm run dev`）不需要 Rust。核心功能（真实 CLI 调用、Git 自动化）仅在 **Tauri 桌面模式** 生效。
 

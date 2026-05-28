@@ -28,12 +28,12 @@
 | Agent 状态持久化 | ✅ | tauri-plugin-store 自动保存/恢复 Agent 列表 | `src/store/useSwarmStore.ts` |
 | Git 自动化（clone/checkout/commit/push） | ✅ | Tauri 环境通过 IPC 执行真实 git | `src/api/ipc.ts` |
 | GitHub API（PR 创建/合并/查询） | ✅ | 配置 GitHub Token 后 Agent Engine 调用真实 GitHub REST API；无 Token 降级为 Mock | `agent-engine/src/github-api.ts` |
-| 全员审阅门控 | 🚧 | PR 创建 + CI 监控 + 审阅结果处理（approve/reject/fix）已实现；**reviewer 自动指派和触发在手动提交审阅时工作，但在 Agent 自动流程（`sendInstruction` → `autoSubmitForReview`）中缺失** —— `agent.ts` 内部 `submitForReview` 未调用 `assignReviewers`，也未触发 `performReview`，导致自动执行完指令后没有 reviewer 介入。详见 [`docs/PR_WORKFLOW.md`](PR_WORKFLOW.md) | `src/store/useSwarmStore.ts`, `agent-engine/src/agent.ts`, `agent-engine/src/engine.ts`, `docs/PR_WORKFLOW.md` |
+| 全员审阅门控 | ✅ | PR 创建 + CI 监控 + 审阅结果处理（approve/reject/fix）已实现；review-flow-fixes 已修复自动/手动路径不一致（A/B/C/E/F）；GitHub API 真实同步（APPROVE/REQUEST_CHANGES/COMMENT）已落地；自审场景 proactive COMMENT 降级已处理；reviewer 失败上限（3 次后标 `failed`）已接入；合并决策以 GitHub 分支保护规则为准，非强制 App 内全员通过。详见 [`docs/PR_WORKFLOW.md`](PR_WORKFLOW.md) | `src/store/useSwarmStore.ts`, `agent-engine/src/agent.ts`, `agent-engine/src/engine.ts`, `docs/PR_WORKFLOW.md` |
 | Agent Engine 进程管理 | ✅ | Rust 后台 spawn Node.js Agent Engine，stdin/stdout 管道通信；生产环境用预编译 `dist/index.js`，开发环境 fallback 到 tsx；Windows 主动探测 `node.exe` 路径（nvm-windows 兼容） | `src-tauri/src/lib.rs`, `agent-engine/src/index.ts` |
 | Kimi CLI 接入 | ✅ | `sendInstruction` 调用 `kimi --print --quiet`，实时 stdout 流式捕获，可取消 | `src/store/useSwarmStore.ts` |
 | Token 预算控制 | ✅ | sendInstruction 前检查预算；process-output 中按输出行长度估算并累加；耗尽时自动 kill 进程 | `src/store/useSwarmStore.ts` |
 | Agent 多轮对话交互 | ✅ | 聊天式气泡 UI，支持 input/output/system/error 消息类型；ready/stopped/completed 状态下可持续对话；working 状态显示执行中指示器；**日志已分流**（system/error 技术日志带组件前缀+颜色走终端 stderr，input/output 及关键状态变更进 UI）；**stop-agent 已修复**（前端乐观更新 + await IPC）；**滚动到底部按钮**（用户上滚后显示浮动下箭头，点击平滑滚回底部） | `src/components/AgentDetail.vue`, `src/store/useSwarmStore.ts`, `agent-engine/src/agent.ts` |
-| Agent 自动提交审阅 | ✅ | Agent 执行完指令后检测到文件变更自动 `git add/commit/push` 并创建 PR；pre-commit 失败时将完整执行日志全量回传修复（最多 3 轮）；PR 创建后自动轮询 GitHub Actions CI（30s 间隔），CI 失败时自动获取日志并修复重新提交（最多 3 轮）；**Kimi CLI 自动修复设 120s 超时保护**；无 GitHub Token 时降级为 Mock PR | `agent-engine/src/agent.ts` |
+| Agent 自动提交审阅 | ✅ | Agent 执行完指令后检测到文件变更自动 `git add/commit/push` 并创建 PR；pre-commit 失败时将完整执行日志全量回传修复（最多 3 轮）；PR 创建后自动轮询 GitHub Actions CI（30s 间隔），CI 失败时自动获取日志并修复重新提交（最多 3 轮）；**Kimi CLI 自动修复设 120s 超时保护**；无 GitHub Token 时降级为 Mock PR；**PR merge 后自动 sync branch with main**（fetch → behindCount → merge → 冲突静默解决 → sanity check → commit）| `agent-engine/src/agent.ts` |
 
 ## 质量约束
 
@@ -59,7 +59,7 @@
 | E2E 测试 | ⚡ | Playwright smoke 测试已可运行：登录 → 创建 Agent → 验证 Dashboard；浏览器 Mock 模式（无需 Tauri 后端），Rust IPC / Engine 进程 / Git 真实路径仍需集成测试覆盖 | `tests/e2e/smoke.spec.ts` |
 | 后端集成测试 | ✅ | AgentEngine 完整生命周期（create/start/stop/instruct/review/merge/delete/ping/diff/error）9 个测试全部通过；降级行为已验证 | `tests/integration/engine.spec.ts` |
 | 生产构建验证 | 🚧 | 已打通：resources 打包 + node.exe 探测 + dist 预编译 + 依赖补全；尚未接入 CI 自动化验证 | `src-tauri/tauri.conf.json`, `src-tauri/src/lib.rs` |
-| 平台兼容性 | ⚡ | **Windows 为主**。Rust 进程管理含 Windows-only 分支（`CREATE_NO_WINDOW`、`taskkill`、硬编码 nvm 路径、cmd /c fallback）；macOS/Linux 待适配 | `src-tauri/src/lib.rs` |
+| 平台兼容性 | ⚡ | **Windows 为主**。Rust 进程管理含 Windows-only 分支（`CREATE_NO_WINDOW`、`taskkill`、cmd /c fallback）；macOS/Linux 待适配 | `src-tauri/src/lib.rs` |
 
 ---
 
