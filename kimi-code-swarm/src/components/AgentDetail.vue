@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import {
-  ArrowLeft, Send, Terminal, AlertCircle, CheckCircle, Play,
+  ArrowLeft, ArrowDown, Send, Terminal, AlertCircle, CheckCircle, Play,
   GitPullRequest, GitMerge, RotateCcw, Square, Clock, XCircle, FileCode,
   User, Bot, Loader2, Brain, Wrench, Server,
   ChevronDown, ChevronRight
@@ -57,9 +57,11 @@ const scrollRef = ref<HTMLDivElement>()
 // This fixes the race where scrollHeight grows but scrollTop stays stale,
 // causing isNearBottom() to falsely return false after DOM update.
 const userWasNearBottom = ref(true)
+const showScrollToBottom = ref(false)
 
 function onScroll() {
   userWasNearBottom.value = isNearBottom()
+  showScrollToBottom.value = !isNearBottom() && props.agent.logs.length > 0
 }
 
 // Collapsible logs: expanded by default for none; stored as Set of log ids
@@ -144,6 +146,7 @@ function scrollToBottom(smooth = false) {
     el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
   } else {
     el.scrollTop = el.scrollHeight
+    showScrollToBottom.value = false
   }
 }
 
@@ -382,7 +385,7 @@ watch(() => props.agent.status, async () => {
     <!-- Chat Area -->
     <div
       ref="scrollRef"
-      class="flex-1 overflow-y-auto scrollbar-thin rounded-xl bg-gray-50/50 border border-gray-200 p-4 space-y-4 min-h-0"
+      class="flex-1 overflow-y-auto scrollbar-thin rounded-xl bg-gray-50/50 border border-gray-200 p-4 space-y-4 min-h-0 relative"
     >
       <template v-if="agent.logs.length === 0">
         <div class="h-full flex flex-col items-center justify-center text-gray-400">
@@ -530,6 +533,18 @@ watch(() => props.agent.status, async () => {
           </div>
         </div>
       </div>
+
+      <!-- Scroll to Bottom Button -->
+      <button
+        data-testid="scroll-to-bottom-button"
+        :class="[
+          'absolute bottom-4 right-4 w-9 h-9 rounded-full bg-white border border-gray-200 shadow-md flex items-center justify-center text-gray-500 hover:text-swarm-600 hover:border-swarm-200 transition-all duration-200 z-10',
+          showScrollToBottom ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none'
+        ]"
+        @click="scrollToBottom(true)"
+      >
+        <ArrowDown class="w-4 h-4" />
+      </button>
     </div>
 
     <!-- Input Area -->

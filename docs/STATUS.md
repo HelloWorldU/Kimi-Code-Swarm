@@ -32,7 +32,7 @@
 | Agent Engine 进程管理 | ✅ | Rust 后台 spawn Node.js Agent Engine，stdin/stdout 管道通信；生产环境用预编译 `dist/index.js`，开发环境 fallback 到 tsx；Windows 主动探测 `node.exe` 路径（nvm-windows 兼容） | `src-tauri/src/lib.rs`, `agent-engine/src/index.ts` |
 | Kimi CLI 接入 | ✅ | `sendInstruction` 调用 `kimi --print --quiet`，实时 stdout 流式捕获，可取消 | `src/store/useSwarmStore.ts` |
 | Token 预算控制 | ✅ | sendInstruction 前检查预算；process-output 中按输出行长度估算并累加；耗尽时自动 kill 进程 | `src/store/useSwarmStore.ts` |
-| Agent 多轮对话交互 | ✅ | 聊天式气泡 UI，支持 input/output/system/error 消息类型；ready/stopped/completed 状态下可持续对话；working 状态显示执行中指示器；**日志已分流**（system/error 技术日志带组件前缀+颜色走终端 stderr，input/output 及关键状态变更进 UI）；**stop-agent 已修复**（前端乐观更新 + await IPC） | `src/components/AgentDetail.vue`, `src/store/useSwarmStore.ts`, `agent-engine/src/agent.ts` |
+| Agent 多轮对话交互 | ✅ | 聊天式气泡 UI，支持 input/output/system/error 消息类型；ready/stopped/completed 状态下可持续对话；working 状态显示执行中指示器；**日志已分流**（system/error 技术日志带组件前缀+颜色走终端 stderr，input/output 及关键状态变更进 UI）；**stop-agent 已修复**（前端乐观更新 + await IPC）；**滚动到底部按钮**（用户上滚后显示浮动下箭头，点击平滑滚回底部） | `src/components/AgentDetail.vue`, `src/store/useSwarmStore.ts`, `agent-engine/src/agent.ts` |
 | Agent 自动提交审阅 | ✅ | Agent 执行完指令后检测到文件变更自动 `git add/commit/push` 并创建 PR；pre-commit 失败时将完整执行日志全量回传修复（最多 3 轮）；PR 创建后自动轮询 GitHub Actions CI（30s 间隔），CI 失败时自动获取日志并修复重新提交（最多 3 轮）；**Kimi CLI 自动修复设 120s 超时保护**；无 GitHub Token 时降级为 Mock PR | `agent-engine/src/agent.ts` |
 
 ## 质量约束
@@ -63,4 +63,4 @@
 
 ---
 
-*Last updated: 2026-05-16*
+*Last updated: 2026-05-28*
