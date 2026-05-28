@@ -1,6 +1,6 @@
 # AST Parser 迁移：正则 → TypeScript ESTree
 
-> **状态**: 已识别，待迁移  
+> **状态**: 阶段 1-2 已完成（`error-handling.ts` 已迁移至 ESTree）  
 > **触发条件**: 新语法变体再次导致约束失效，或项目规模扩大需复杂结构分析  
 > **影响范围**: `ast/rules/*.ts`
 
@@ -24,23 +24,25 @@
 | 实现复杂度 | ✅ 简单 | ⚡ 需学习 ESTree 节点类型 |
 | TypeScript 语法 | ❌ 不支持泛型/类型断言 | ✅ 原生支持 |
 
-## 当前 Workaround
+## 当前状态
 
-三层防御性修复已实施：
-1. 正则补丁支持 `catch {`
-2. 支持 `this.log('error')` / `log.error()` / `console.error()`
-3. 预处理：移除字符串字面量、注释、正则字面量后再匹配
+`error-handling.ts` 已于 2026-05-28 完成 ESTree 迁移：
+- `findCatchBlocks` 使用 `@typescript-eslint/typescript-estree` 遍历 `CatchClause` 节点，自动处理 `.vue` SFC 的 script 提取与行号映射
+- 字符串/注释误报、语法变体（`catch {`）、嵌套大括号计数问题已根治
+- `fixers/error-handling.ts` 同步简化，直接复用 AST 提供的 `param`
 
-**问题**：每遇到新语法变体（模板字符串、多行注释等）都需继续打补丁。
+其余规则保持正则实现，暂无迁移计划。
 
 ## 迁移计划
 
-| 阶段 | 内容 | 风险 | 时间 |
+| 阶段 | 内容 | 状态 | 说明 |
 |------|------|------|------|
-| 1 | 引入 `@typescript-eslint/typescript-estree` | 低 | 1-2h |
-| 2 | 重写 `error-handling.ts` | 中 | 半天 |
-| 3 | 迁移 `vue-structure` / `import-restrictions` / `style-constraints` | 低-中 | 1-2天 |
-| 4 | 重写 `dead-code.ts`（跨模块引用分析） | 高 | 1-2天 |
-| 5 | 移除正则 Workaround | 低 | — |
+| 1 | 引入 `@typescript-eslint/typescript-estree` | ✅ 完成 | `ast/package.json` 管理依赖 |
+| 2 | 重写 `error-handling.ts` | ✅ 完成 | ESTree 解析 + Vue SFC script 提取 |
+| 3 | 迁移 `import-restrictions` | ⏸️ 待评估 | 正则已稳定，收益有限 |
+| 4 | 重写 `dead-code.ts`（跨模块引用分析） | ⏸️ 待排期 | 仅单文件 export 解析有收益 |
+| 5 | 移除 `error-handling` 正则 Workaround | ✅ 完成 | 旧正则提取逻辑已删除 |
+
+> **注**：`vue-structure` 与 `style-constraints` 检查 Vue/HTML/CSS 结构，不适用 TypeScript ESTree，已从迁移计划中移除。
 
 *Document created: 2026-05-13*

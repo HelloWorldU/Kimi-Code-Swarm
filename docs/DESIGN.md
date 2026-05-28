@@ -41,7 +41,7 @@
 | 层 | 目录 | 职责 | 当前状态 |
 |--|------|------|---------|
 | L1 Context | `AGENTS.md` + `docs/` | 上下文分层，按需加载 | ✅ 完整 |
-| L2 Constraints | `docs/CONSTRAINTS.md` + `ci/` + `ast/` | 机械化约束（类型/Linter/自定义 ESLint 规则/AST/文档同步/测试/Dead Code 检测，报错地图式自定位） | ✅ CI 流水线 + pre-commit hook（npm install 自动配置）：typecheck → typecheck:engine → lint → analyze → test → check-docs → check-test → build |
+| L2 Constraints | `docs/CONSTRAINTS.md` + `ci/` + `ast/` | 机械化约束（类型/Linter/自定义 ESLint 规则/AST/文档同步/测试/Dead Code 检测，报错地图式自定位） | ✅ CI 流水线 + pre-commit hook（npm install 自动配置）：typecheck → typecheck:engine → lint → analyze → test → check-docs → check-test → build；CI 额外安装 `ast/` 子包依赖 |
 | L2.5 Shell | `src-tauri/` | Tauri v2 桌面壳层：Rust 主进程（唯一有权 spawn 进程） | ✅ IPC 命令已就绪（git / spawn / kill / keyring / store） |
 | L3 Observability | UI 面板 + 染色日志 | Metrics(✅ Token/实例) / Logs(✅ 染色流) / Traces(⏳ 待实现) | ✅ UI 面板已就绪 |
 | L4 Entropy Mgmt | `scripts/cleanup.ts` + `scripts/health-check.ts` | 循环清理 + 定期一致性检查（信息供给型） | ✅ health-check 已实现 |
@@ -105,7 +105,7 @@
 | new-instance: Agent 生命周期 | Agent Engine IPC + 状态机驱动 | ✅ 硬约束（Engine 统一托管，禁止前端直接 spawn CLI） |
 | auto-test: E2E 验证 | Playwright + Chromium + Vite dev server（Mock 模式） | ✅ 硬约束（UI 改动后必须跑通 smoke test） |
 
-> **技术债务**: AST 分析器当前基于正则实现，已暴露系统性缺陷（无法区分代码/字符串/注释、语法变体需持续打补丁）。长期应迁移至 TypeScript ESTree AST Parser。详见 `docs/design-docs/ast-parser-vs-regex.md`。当前约束分层：empty-catch 为 error（阻断），missing-logger 为 warn（不阻断）；非关键路径允许用 `// expected: ...` 意图注释替代日志，关键路径（外部调用/状态变更）仍必须有 log.error。
+> **技术债务（已解决）**: `error-handling.ts` 已于 2026-05-28 迁移至 TypeScript ESTree AST Parser（`@typescript-eslint/typescript-estree`），根治了正则方案的 4 类系统性缺陷（语法变体、字符串/注释误报、嵌套结构脆弱）。迁移记录详见 `docs/design-docs/ast-parser-vs-regex.md`。当前约束分层：empty-catch 为 error（阻断），missing-logger 为 warn（不阻断）；非关键路径允许用 `// expected: ...` 意图注释替代日志，关键路径（外部调用/状态变更）仍必须有 log.error。
 
 ## 关键决策记录
 

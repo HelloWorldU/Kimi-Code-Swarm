@@ -63,6 +63,8 @@ npm run dev         # 开发服务器（浏览器模式）
 首次打开后在登录页输入 Kimi API Key（所有 Agent 共享同一个 Key），验证通过后存入系统 Keyring。
 
 > `npm install` 会自动运行 `postinstall` 脚本配置 Git hooks。如果跳过此步骤，需手动执行 `git config core.hooksPath ci/hooks`。
+>
+> `ast/` 子包独立管理依赖，运行 `npm run analyze` 前需确保 `cd ast && npm install` 已执行（CI 已同步配置该步骤）。
 
 ## 命令
 
