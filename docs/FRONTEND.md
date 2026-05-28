@@ -121,3 +121,7 @@ PR CI 中额外运行 `check-test-sync`：若 `src/` 新增代码文件，`tests
 | Agent 状态持久化 | ✅ 真实 | 引擎自持久化 `engine-state.json`（事实源；按业务字段指纹去重，token 抖动不触发写盘）+ `tauri-plugin-store` 缓存 logs/UI；启动后 `engine-restored` 事件 diff 出本地多余项标 `orphan`；窗口期内所有「向引擎发命令」按钮按 `engineReady` 禁用 |
 
 文档同步检测被阻断时，不直接告知需要更新哪个文档——Agent 需回顾本次会话已读文档，或查阅 AGENTS.md 地图自行定位关联文档。
+
+## 版本
+
+当前 `v0.1.0`（首个 MVP release，2026-05-28）。`package.json` 的 `version` 字段与 `src-tauri/tauri.conf.json` / `src-tauri/Cargo.toml` 保持一致；后续每个 release 三处同步 bump。

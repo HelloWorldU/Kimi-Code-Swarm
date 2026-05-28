@@ -113,3 +113,7 @@
 2. **先 Web 后桌面**：先验证 UI 交互，再套 Electron/Tauri 壳
 3. **Global Composable 而不是 Pinia**：当前复杂度足够，跨窗口时迁移
 4. **引入 marked + highlight.js 做 Markdown 渲染**：Agent 回复天然包含 Markdown 格式（代码块、列表、粗体等），纯文本展示可读性差；配合 DOMPurify 过滤 XSS，代码高亮提升代码块可读性
+
+## 版本
+
+当前 `v0.1.0`（首个 MVP release，2026-05-28）。版本号在 `kimi-code-swarm/package.json` / `kimi-code-swarm/src-tauri/tauri.conf.json` / `kimi-code-swarm/src-tauri/Cargo.toml` 三处保持一致。语义化版本：`0.x` 期允许破坏性改动，进入 `1.0` 后承诺向后兼容。
