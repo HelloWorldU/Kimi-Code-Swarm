@@ -241,7 +241,7 @@ export async function getCheckRunLogs(
         const res = await fetch(url, { headers: getHeaders(token) })
         if (res.ok) {
           const text = await res.text()
-          return text.length > 8000 ? text.slice(0, 8000) + '\n...[truncated]' : text
+          return text.length > 8000 ? text.slice(-8000) + '\n...[truncated]' : text
         }
         console.error(`[github-api] job logs ${res.status}`)
       } catch (err) {
@@ -262,7 +262,7 @@ export async function getCheckRunLogs(
       return null
     }
     const text = await res.text()
-    return text.length > 8000 ? text.slice(0, 8000) + '\n...[truncated]' : text
+    return text.length > 8000 ? text.slice(-8000) + '\n...[truncated]' : text
   } catch (err) {
     console.error(`[github-api] getCheckRunLogs 异常: ${String(err)}`)
     return null
