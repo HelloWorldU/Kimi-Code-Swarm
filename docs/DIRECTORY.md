@@ -30,10 +30,11 @@ Kimi-Code-Swarm/
 │   └── cleanup.ts           熵管理清理脚本
 ├── .kimi/                 ← 🎯 Kimi CLI 工作目录（启动时自动加载）
 │   └── skills/              Agent 能力 Skill（可复用工作流规范）
-│       ├── task-intake/SKILL.md  任务接入门控
-│       ├── commit/SKILL.md       Commit 规范
-│       ├── push/SKILL.md         PR 推送规范
-│       └── debug/SKILL.md        Debug 规范
+│       ├── task-intake/SKILL.md    任务接入门控
+│       ├── commit/SKILL.md         Commit 规范
+│       ├── push/SKILL.md           PR 推送规范
+│       ├── resolve-conflict/SKILL.md  冲突解决规范
+│       └── debug/SKILL.md          Debug 规范
 ├── harness/               ← 📋 工作流模板
 │   ├── new-instance.yaml
 │   ├── bug-fix.yaml
@@ -48,4 +49,4 @@ Kimi-Code-Swarm/
 
 ---
 
-*Directory map version: 2026-05-16*
+*Directory map version: 2026-05-28*

@@ -212,18 +212,18 @@ githubUser !== prAuthor
 ## 7. 验收清单（修复后验证用）
 
 ### 审阅触发
-- [ ] Agent A 自动执行完指令 → PR 创建 → 其他 ready Agent 自动审阅
-- [ ] 手动点击"提交审阅"和自动流程行为一致
+- [x] Agent A 自动执行完指令 → PR 创建 → 其他 ready Agent 自动审阅（review-flow-fixes A 已修）
+- [x] 手动点击"提交审阅"和自动流程行为一致（review-flow-fixes A 已修）
 - [ ] 单 Agent 创建 PR → 进入 pending 队列 → 创建新 Agent B → B 自动审阅
-- [ ] Agent B 在 working 时被指派为 reviewer → B 完成自身任务恢复 ready → B 自动补审阅
+- [ ] Agent B 在 working 时被指派为 reviewer → B 完成自身任务恢复 ready → B 自动补审阅（设计缺口：非 ready Agent 恢复后不会自动补审阅）
 
 ### 审阅结果处理（以 GitHub 为准）
-- [ ] GitHub API 返回满足 required approvals → 自动合并 → 状态变为 completed
+- [x] GitHub API 返回满足 required approvals → 自动合并 → 状态变为 completed（review-flow-fixes C-2 已修：mock 不自动合，真实自动合）
 - [ ] GitHub API 返回 changes requested / review 不足 → 自动修改 → 重新提交 → 重新审阅（最多 3 轮）
 
 ### GitHub 真实同步
-- [ ] reviewer 审阅通过后，GitHub PR 页面上显示 "Approved" review
-- [ ] reviewer 审阅拒绝后，GitHub PR 页面上显示 "Requested changes" review
+- [ ] reviewer 审阅通过后，GitHub PR 页面上显示 "Approved" review（`submitReview` 未调用 GitHub API POST reviews，仅更新内存状态）
+- [ ] reviewer 审阅拒绝后，GitHub PR 页面上显示 "Requested changes" review（同上，未同步到 GitHub）
 - [ ] GitHub review body 包含 kimi 的审阅意见（comment）
 - [ ] 打开 PR 链接能看到所有 reviewer 的审阅记录
 - [ ] `canMerge()` 改为查询 GitHub API（`GET /pulls/{prNumber}` 或列出 reviews），以 GitHub 返回的真实 review 状态为合并依据
@@ -232,7 +232,7 @@ githubUser !== prAuthor
 ### 自审场景（单账号多工作区）
 - [ ] Agent A 创建 PR → Agent B（同一 GitHub 账号）审阅 → `submitReview` 发送 APPROVE 被 422 拒绝
 - [ ] 422 拒绝后自动降级为发送 `COMMENT` review，PR 页面可见审阅记录
-- [ ] `canMerge` 识别 `prAuthor === 当前用户`，以内部 reviews 状态为合并依据
+- [x] `canMerge` 识别 `prAuthor === 当前用户`，以内部 reviews 状态为合并依据（review-flow-fixes 附带修复已过滤 `failed` reviewer）
 - [ ] 内部审阅全部通过后自动调用 `mergePullRequest`，GitHub 管理员权限 bypass 分支保护
 - [ ] PR 成功合并，状态变为 `completed`，远程分支自动清理
 
@@ -260,4 +260,4 @@ githubUser !== prAuthor
 
 ---
 
-*Document created: 2026-05-17*
+*Document updated: 2026-05-28 — 同步 review-flow-fixes 实施状态，验收清单标注已修复项，补充 GitHub 真实同步缺口说明*
