@@ -78,8 +78,18 @@ export async function gitPush(dir: string, branch: string): Promise<GitResult> {
 }
 
 export async function getChangedFiles(dir: string): Promise<string[]> {
-  const out = await execGit(dir, ['diff', '--name-only'])
-  return out.split('\n').filter((f) => f.trim())
+  // 用 git status --porcelain 替代 git diff --name-only：后者只返回已 tracked
+  // 文件的修改，**不含 untracked（新增文件）**。agent 新建文件（如 .kimi/skills/
+  // pull/SKILL.md）就会被漏检，导致 autoSubmitForReview 不触发、PR 不创建。
+  // status --porcelain 输出每行前 2-3 字符是状态标记（'?? ' / ' M ' / 'M  '
+  // / 'A  ' / 'D  ' 等），后面是路径；这里只取路径。
+  const out = await execGit(dir, ['status', '--porcelain'])
+  return out
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .filter((line) => line.length > 0)
+    .map((line) => line.slice(3).trim())  // 跳过前 2 字符 status + 1 空格
+    .filter((path) => path.length > 0)
 }
 
 export async function getStagedFiles(dir: string): Promise<string[]> {
