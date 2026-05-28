@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * 错误处理规则
+ * 错误处理规则（ESTree AST 版）
  *
  * 约束分层设计：
  * - ERROR（红线）: catch 块为空 → 错误被静默吞没，绝对禁止
@@ -10,65 +10,96 @@
  * 只要错误不被静默吞没，即满足 harness/bug-fix.yaml 的 must-not 红线。
  */
 
+import { parse } from '@typescript-eslint/typescript-estree'
 import type { AstIssue } from '../analyzer'
 
 interface CatchBlock {
   startLine: number
   endLine: number
   content: string
+  param?: string
 }
+
+// ── 内部 AST 工具 ──
+
+/** 通用 AST 深度遍历 */
+function traverseAst(node: any, callback: (node: any) => void) {
+  if (!node || typeof node !== 'object') return
+  callback(node)
+  for (const key of Object.keys(node)) {
+    if (key === 'parent' || key === 'loc' || key === 'range' || key === 'tokens' || key === 'comments')
+      continue
+    const child = node[key]
+    if (Array.isArray(child)) {
+      child.forEach((c) => traverseAst(c, callback))
+    } else if (child && typeof child === 'object' && child.type) {
+      traverseAst(child, callback)
+    }
+  }
+}
+
+/** 从 Vue SFC 中提取所有 <script> 块及其字符/行偏移 */
+function extractScriptsFromVue(
+  content: string,
+): Array<{ code: string; charOffset: number; lineOffset: number }> {
+  const scripts: Array<{ code: string; charOffset: number; lineOffset: number }> = []
+  const regex = /<script(?:\s+[^>]*)?>([\s\S]*?)<\/script>/g
+  let match: RegExpExecArray | null
+  while ((match = regex.exec(content)) !== null) {
+    const tagEndIndex = match.index + match[0].indexOf('>') + 1
+    const charOffset = tagEndIndex
+    const beforeScript = content.slice(0, charOffset)
+    const lineOffset = (beforeScript.match(/\n/g) || []).length
+    scripts.push({ code: match[1], charOffset, lineOffset })
+  }
+  return scripts
+}
+
+/** 在一段纯 TS/JS 代码中查找 CatchClause */
+function findCatchBlocksInCode(
+  code: string,
+  charOffset: number,
+  lineOffset: number,
+  originalContent: string,
+): CatchBlock[] {
+  try {
+    const ast = parse(code, { loc: true, range: true })
+    const blocks: CatchBlock[] = []
+
+    traverseAst(ast, (node) => {
+      if (node.type !== 'CatchClause') return
+      const [start, end] = node.range as [number, number]
+      const blockContent = originalContent.slice(charOffset + start, charOffset + end)
+      const startLine = node.loc.start.line + lineOffset
+      const endLine = node.loc.end.line + lineOffset
+      const param: string | undefined = node.param?.name
+      blocks.push({ startLine, endLine, content: blockContent, param })
+    })
+
+    return blocks
+  } catch {
+    // 语法错误或空内容：安全降级，返回空列表
+    return []
+  }
+}
+
+// ── 对外接口（保持兼容） ──
 
 /** 从文件内容中提取所有 catch 块 */
 export function findCatchBlocks(content: string): CatchBlock[] {
-  const blocks: CatchBlock[] = []
-  const lines = content.split('\n')
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
-    // 先移除字符串/注释/正则字面量，避免误匹配其中的 catch 关键字
-    // 顺序很重要：先字符串（避免误伤字符串中的 //），再注释，再正则
-    const codeOnly = line
-      .replace(/(['"`])[^'"`]*\1/g, (m) => ' '.repeat(m.length))
-      .replace(/\/\/.*$/g, '')
-      .replace(/\/[^/]+\//g, (m) => ' '.repeat(m.length))
-    // 匹配 catch (...) { 或 catch { （支持可选 catch binding）
-    const catchMatch = codeOnly.match(/catch(?:\s*\([^)]*\))?\s*\{/)
-    if (!catchMatch) continue
-
-    // 找到这一行中 { 的位置
-    let braceIndex = line.indexOf('{', catchMatch.index!)
-    if (braceIndex === -1) continue
-
-    let braceCount = 0
-    let foundOpen = false
-    let endLine = i
-
-    for (let j = i; j < lines.length; j++) {
-      const scanLine = lines[j]
-      let startIdx = j === i ? braceIndex : 0
-      for (let k = startIdx; k < scanLine.length; k++) {
-        if (scanLine[k] === '{') {
-          braceCount++
-          foundOpen = true
-        } else if (scanLine[k] === '}') {
-          braceCount--
-        }
-      }
-      if (foundOpen && braceCount === 0) {
-        endLine = j
-        break
-      }
+  // 检测 Vue SFC：包含 <template> 或 <script 标签
+  const isVue = content.includes('<template>') || content.includes('<script')
+  if (isVue) {
+    const scripts = extractScriptsFromVue(content)
+    const allBlocks: CatchBlock[] = []
+    for (const { code, charOffset, lineOffset } of scripts) {
+      allBlocks.push(...findCatchBlocksInCode(code, charOffset, lineOffset, content))
     }
-
-    const blockContent = lines.slice(i, endLine + 1).join('\n')
-    blocks.push({
-      startLine: i + 1, // 1-based
-      endLine: endLine + 1,
-      content: blockContent,
-    })
+    return allBlocks
   }
 
-  return blocks
+  // 纯 TS/JS 文件
+  return findCatchBlocksInCode(content, 0, 0, content)
 }
 
 /** 判断 catch 块是否有明确的"意图注释"（说明为什么不需要日志） */
@@ -114,7 +145,7 @@ export function isEmptyCatch(content: string): boolean {
 
 /** 检查是否使用了 Logger */
 export function hasLogger(content: string): boolean {
-  return /(?:\b|\.)(?:log|logger)\.(?:error|warn|debug|info)\b|\.log\(['"`][^'"`]*error/.test(content)
+  return /(?:\b|\.)((?:log|logger)\.(?:error|warn|debug|info)\b|\.log\(['"`][^'"`]*error)/.test(content)
 }
 
 /** 检查是否直接使用了 console（ESLint 已禁止，作为兜底） */
@@ -131,15 +162,15 @@ export function checkErrorHandling(content: string, filePath: string): AstIssue[
       issues.push({
         file: filePath,
         rule: 'error-handling/empty-catch',
-        message: 'catch 块为空，错误被静默吞没。至少应记录日志：log.error(\'...\', e)',
+        message: "catch 块为空，错误被静默吞没。至少应记录日志：log.error('...', e)",
         line: block.startLine,
         fixable: true,
-        fix: '在 catch 块中添加 log.error(\'描述\', e)',
+        fix: "在 catch 块中添加 log.error('描述', e)",
       })
       continue
     }
 
-    // 有明确意图注释 → 注释即留痕，不報 missing-logger
+    // 有明确意图注释 → 注释即留痕，不报 missing-logger
     if (!hasLogger(block.content) && !hasConsole(block.content) && !hasIntentionalComment(block.content)) {
       issues.push({
         file: filePath,
@@ -147,7 +178,7 @@ export function checkErrorHandling(content: string, filePath: string): AstIssue[
         message: 'catch 块未记录错误且无说明注释。关键路径请加 log.error，非关键路径请加注释说明原因',
         line: block.startLine,
         fixable: true,
-        fix: '关键路径：添加 log.error / console.error；非关键路径：添加 // expected: ... 说明为什么忽略',
+        fix: "关键路径：添加 log.error / console.error；非关键路径：添加 // expected: ... 说明为什么忽略",
         severity: 'warn',
       })
     }

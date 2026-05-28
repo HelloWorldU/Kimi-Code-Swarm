@@ -1,0 +1,12 @@
+{
+  "name": "ast-analyzer",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@typescript-eslint/typescript-estree": "^8.59.1"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0",
+    "typescript": "~6.0.2"
+  }
+}

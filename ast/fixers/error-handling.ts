@@ -20,9 +20,8 @@ export function fixEmptyCatches(content: string): string {
   for (const block of blocks) {
     if (!isEmptyCatch(block.content)) continue
 
-    // 提取 catch 参数名
-    const catchMatch = block.content.match(/catch\s*\(\s*([_$a-zA-Z][_$a-zA-Z0-9]*)\s*\)/)
-    const param = catchMatch?.[1] ?? 'e'
+    // 提取 catch 参数名（AST 版已直接提供）
+    const param = block.param ?? 'e'
 
     // 计算插入位置（catch 块 opening brace 的下一行）和缩进
     const openLine = lines[block.startLine - 1]
