@@ -53,6 +53,12 @@ export async function cloneRepo(repoUrl: string, targetDir: string, parentDir: s
     await rm(targetDir, { recursive: true, force: true })
   }
   await execGit(parentDir, ['clone', repoUrl, targetDir])
+  // Bug #3 修复：注册 pre-commit hook 路径——agent workspace 不会跑 npm
+  // install，不触发 setup-hooks.js postinstall，core.hooksPath 不会自动
+  // 设置。不显式注册的话 git commit 走默认 .git/hooks/（空），pre-commit
+  // 完全不会跑，agent 改源码忘改文档的情况下本地拦不住，得绕一圈 CI fix。
+  // 这里跟 scripts/setup-hooks.js 做的事一样。
+  await execGit(targetDir, ['config', 'core.hooksPath', 'ci/hooks'])
 }
 
 export async function createBranch(dir: string, branch: string): Promise<void> {
