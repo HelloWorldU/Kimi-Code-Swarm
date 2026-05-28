@@ -1,9 +1,10 @@
 import type { AgentState, LogEntry, ReviewEntry, TaskStatus, PrStatus, CiStatus, EngineEvent } from './types.js'
 import type { PersistedAgent } from './persist.js'
 import { runKimi, detectKimiCli, type KimiProcess } from './kimi.js'
-import { getChangedFiles, getStagedFiles, getFileDiff, gitAdd, gitCommit, gitPush, createBranch, cloneRepo, gitFetch, getBranchDiff } from './git.js'
+import { getChangedFiles, getStagedFiles, getFileDiff, gitAdd, gitCommit, gitPush, createBranch, cloneRepo, gitFetch, getBranchDiff, gitMerge, getConflictFiles, getBehindCount, gitDiffCheck, abortMerge, stageFile } from './git.js'
 import { createPullRequest, mergePullRequest, getPullRequest, getPullRequestReviews, getCheckRuns, getCheckRunLogs, submitPullRequestReview, getAuthenticatedUser } from './github-api.js'
 import { readFile } from 'fs/promises'
+import { join } from 'path'
 
 interface SubmitStep {
   name: string
@@ -60,6 +61,10 @@ export class Agent {
   // 上次持久化时的业务字段指纹；高频字段（tokenUsed/lastActivity）不参与，
   // 避免 stdout 流式回推每 10 行就触发一次写盘。
   private lastPersistFingerprint?: string
+  // Bug #8：PR merge 后同步 main 用的临时状态
+  private pendingMergeCommit = false
+  private conflictFiles: string[] = []
+  private conflictFileOriginals = new Map<string, string>()
 
   constructor(
     name: string,
@@ -306,6 +311,17 @@ export class Agent {
       this.setStatus('ready')
       this.log('system', 'Agent 已恢复，继续对话')
     }
+
+    // Bug #8：PR merge 后同步 main（引擎硬保证 merge/commit，agent 只改冲突文件）
+    if (this.state.prStatus === 'merged' && this.state.workspace) {
+      try {
+        instruction = await this.syncBranchWithMain(instruction)
+      } catch (err) {
+        this.log('error', `同步 main 失败: ${String(err)}`)
+        // fetch 失败静默继续（决策点 5a）
+      }
+    }
+
     if (this.state.status !== 'ready') return
 
     // 有条件赋值：没传 token 不应擦掉已知的（token 是 agent 持久凭据，
@@ -495,6 +511,20 @@ export class Agent {
     this.running = false
     this.state.pid = undefined
     this.process = undefined  // 清理引用，避免 stop() 再次 kill 已死进程
+
+    // Bug #8：merge 冲突解决后，引擎完成 merge commit
+    if (this.pendingMergeCommit && this.state.workspace) {
+      try {
+        await this.finalizeMergeCommit()
+      } catch (err) {
+        this.log('error', `merge commit 失败: ${String(err)}`)
+        this.setStatus('stopped')
+        this.log('error', 'merge 冲突解决未通过 sanity check，请指挥官人工介入')
+      }
+      this.pendingMergeCommit = false
+      this.conflictFiles = []
+      this.conflictFileOriginals.clear()
+    }
 
     // Record complete output as a single log entry so the UI renders one bubble
     // Skip if text was already streamed in real-time to avoid duplicates
@@ -874,6 +904,146 @@ export class Agent {
     // working 会让输入框消失，跟「请发送新指令继续」的提示矛盾。
     this.setStatus('ready')
     this.log('system', 'PR 已打回，请发送新指令继续')
+  }
+
+  /**
+   * Bug #8：PR merge 后，sendInstruction 恢复 completed agent 时同步 main。
+   * 引擎硬保证 fetch/merge/commit；agent 只负责解决冲突文件内容。
+   * 返回可能被 conflict prefix 扩充后的 instruction。
+   */
+  private async syncBranchWithMain(instruction: string): Promise<string> {
+    if (!this.state.workspace || this.state.prStatus !== 'merged') return instruction
+
+    try {
+      await gitFetch(this.state.workspace)
+    } catch (err) {
+      this.log('error', `git fetch 失败: ${String(err)}`)
+      return instruction // 决策点 5a：fetch 失败静默继续
+    }
+
+    let behindCount = 0
+    try {
+      behindCount = await getBehindCount(this.state.workspace, 'origin/main')
+    } catch (err) {
+      this.log('error', `检测 main 新 commits 失败: ${String(err)}`)
+      return instruction // 静默继续
+    }
+
+    if (behindCount <= 0) return instruction
+
+    this.log('system', `检测到 main 有 ${behindCount} 个新 commit，正在同步...`)
+
+    const mergeResult = await gitMerge(this.state.workspace, 'origin/main')
+    if (mergeResult.exitCode === 0) {
+      const commitResult = await gitCommit(this.state.workspace, 'sync: merge origin/main')
+      if (commitResult.exitCode === 0) {
+        this.log('system', `已同步 main 的 ${behindCount} 个 commit`)
+      } else {
+        this.log('error', `同步提交失败: ${commitResult.stderr}`)
+        try { await abortMerge(this.state.workspace) } catch {}
+      }
+      return instruction
+    }
+
+    // 有冲突：需要 agent 介入
+    this.log('system', `merge 出现冲突，需要解决冲突文件...`)
+    const conflictFiles = await getConflictFiles(this.state.workspace)
+    if (conflictFiles.length === 0) {
+      this.log('error', `merge 失败但无冲突文件: ${mergeResult.stderr}`)
+      this.setStatus('stopped')
+      this.log('error', 'merge 冲突无法自动解决，请指挥官人工介入')
+      return instruction
+    }
+
+    this.log('system', `冲突文件: ${conflictFiles.join(', ')}`)
+    this.conflictFiles = conflictFiles
+    this.pendingMergeCommit = true
+
+    // 记录原始内容用于 sanity check
+    for (const file of conflictFiles) {
+      try {
+        const content = await readFile(join(this.state.workspace, file), 'utf-8')
+        this.conflictFileOriginals.set(file, content)
+      } catch {
+        // 忽略读取失败
+      }
+    }
+
+    const fileContents: string[] = []
+    for (const file of conflictFiles) {
+      try {
+        const content = await readFile(join(this.state.workspace, file), 'utf-8')
+        fileContents.push(`=== ${file} ===\n${content}`)
+      } catch {
+        fileContents.push(`=== ${file} ===\n[读取失败]`)
+      }
+    }
+
+    const conflictPrefix = `以下文件存在 merge 冲突，请解决冲突。冲突标记格式为 \`<<<<<<< HEAD\`（当前分支）、\`=======\`、\`>>>>>>> origin/main\`（main 分支）。
+
+${fileContents.join('\n\n')}
+
+解决原则：
+- 只修改 conflict marker 区域，不要在冲突文件里写用户任务相关的新代码
+- 先理解双方意图，确定语义上正确的结果
+- 最小化改动，保留当前分支原有意图
+- 逐个文件解决
+
+请直接输出修改后的完整文件内容，不需要额外说明。${FIX_PROMPT_GIT_GUARD}`
+
+    return `${conflictPrefix}\n\n---\n\n${instruction}`
+  }
+
+  /**
+   * Bug #8：kimi 解决 merge 冲突后，引擎执行 sanity check 并完成 merge commit。
+   */
+  private async finalizeMergeCommit(): Promise<void> {
+    if (!this.state.workspace || this.conflictFiles.length === 0) return
+
+    for (const file of this.conflictFiles) {
+      const content = await readFile(join(this.state.workspace, file), 'utf-8')
+
+      // sanity check 1: 冲突标记残留
+      if (/^<{7}|^={7}|^>{7}/m.test(content)) {
+        throw new Error(`${file} 中仍有冲突标记残留`)
+      }
+
+      // sanity check 2: 文件非空
+      if (!content.trim()) {
+        throw new Error(`${file} 内容为空`)
+      }
+
+      // sanity check 3: 行数膨胀阈值（3 倍）
+      const original = this.conflictFileOriginals.get(file)
+      if (original) {
+        const origLines = original.split('\n').length
+        const newLines = content.split('\n').length
+        if (newLines > origLines * 3) {
+          throw new Error(`${file} 行数从 ${origLines} 膨胀到 ${newLines}，超过 3 倍阈值`)
+        }
+      }
+    }
+
+    // sanity check 4: git diff --check
+    const diffCheck = await gitDiffCheck(this.state.workspace)
+    if (diffCheck.exitCode !== 0) {
+      throw new Error(`git diff --check 失败: ${diffCheck.stdout || diffCheck.stderr}`)
+    }
+
+    // 只 stage 冲突文件，避免把用户任务的修改也 commit 进 merge commit
+    for (const file of this.conflictFiles) {
+      const result = await stageFile(this.state.workspace, file)
+      if (result.exitCode !== 0) {
+        throw new Error(`stage ${file} 失败: ${result.stderr}`)
+      }
+    }
+
+    const commitResult = await gitCommit(this.state.workspace, 'sync: merge origin/main')
+    if (commitResult.exitCode !== 0) {
+      throw new Error(`merge commit 失败: ${commitResult.stderr}`)
+    }
+
+    this.log('system', 'merge 冲突已解决并提交')
   }
 
   private notifyPrCreated() {

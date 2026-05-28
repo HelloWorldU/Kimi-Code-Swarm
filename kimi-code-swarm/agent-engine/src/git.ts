@@ -113,6 +113,35 @@ export async function getBranchDiff(dir: string, branch: string): Promise<string
   return await execGit(dir, ['diff', `origin/main...origin/${branch}`])
 }
 
+export async function gitMerge(dir: string, branch: string): Promise<GitResult> {
+  return await execGitRaw(dir, ['-c', 'merge.conflictstyle=zdiff3', 'merge', branch])
+}
+
+export async function getConflictFiles(dir: string): Promise<string[]> {
+  const result = await execGitRaw(dir, ['diff', '--name-only', '--diff-filter=U'])
+  if (result.exitCode !== 0) return []
+  return result.stdout.split('\n').map((f) => f.trim()).filter((f) => f)
+}
+
+export async function getBehindCount(dir: string, upstream: string): Promise<number> {
+  const result = await execGitRaw(dir, ['rev-list', '--count', `HEAD..${upstream}`])
+  if (result.exitCode !== 0) throw new Error(result.stderr)
+  const count = parseInt(result.stdout, 10)
+  return isNaN(count) ? 0 : count
+}
+
+export async function gitDiffCheck(dir: string): Promise<GitResult> {
+  return await execGitRaw(dir, ['diff', '--check'])
+}
+
+export async function abortMerge(dir: string): Promise<void> {
+  await execGit(dir, ['merge', '--abort'])
+}
+
+export async function stageFile(dir: string, file: string): Promise<GitResult> {
+  return await execGitRaw(dir, ['add', file])
+}
+
 export async function gitDeleteRemoteBranch(dir: string, branch: string): Promise<void> {
   await execGit(dir, ['push', 'origin', '--delete', branch])
 }
