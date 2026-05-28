@@ -99,9 +99,7 @@ typecheck → lint → analyze → test → check-docs → check-test-sync → b
 | `ARCHITECTURE.md` | 数据流、状态分层、模块边界 |
 | `FRONTEND.md` | 技术栈、编码规范、命令 |
 | `COMPONENT_PATTERNS.md` | 组件模板、命名规范 |
-| `CLI_HARNESS.md` | CLI 进程接入规范 |
 | `STATUS.md` | 功能状态 + 可观测性状态 |
-| `PLANS.md` | 执行计划索引 |
 
 ### 3. Skill 工作流模板 (`harness/*.yaml`)
 
@@ -155,4 +153,3 @@ typecheck → lint → analyze → test → check-docs → check-test-sync → b
 - [`AGENTS.md`](../AGENTS.md)
 - [`DESIGN.md`](DESIGN.md)
 - [`COMPONENT_PATTERNS.md`](COMPONENT_PATTERNS.md)
-- [`PLANS.md`](PLANS.md)

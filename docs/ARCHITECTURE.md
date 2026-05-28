@@ -257,11 +257,11 @@ ode.exe` 等）
 
 ## TypeScript 执行方案
 
-Agent Engine 用 TypeScript 编写，Rust 直接启动。详见 [`docs/CLI_HARNESS.md`](CLI_HARNESS.md) 的选型记录。
+Agent Engine 用 TypeScript 编写，Rust 直接启动：
 
-简要结论：
 - ❌ `node --experimental-strip-types` — Windows ESM 下 `.js`→`.ts` 映射失败
-- ✅ `npx tsx src/index.ts` — esbuild 驱动，seamless 映射，开发体验最佳
+- ✅ `npx tsx src/index.ts` — esbuild 驱动，seamless 映射，开发体验最佳（开发环境）
+- ✅ `node dist/index.js` — `tsc` 预编译产物，无 tsx 运行时依赖（生产环境）
 
 ## E2E 测试架构
 

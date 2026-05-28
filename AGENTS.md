@@ -22,7 +22,6 @@
 | 前端代码规范 | `docs/FRONTEND.md` |
 | 前端组件规范 | `docs/COMPONENT_PATTERNS.md` |
 | 功能实现状态 | `docs/STATUS.md` |
-| 完整目录结构 | `docs/DIRECTORY.md` |
 | 已知待办 | `docs/exec-plans/backlog.md` |
 
 ---
