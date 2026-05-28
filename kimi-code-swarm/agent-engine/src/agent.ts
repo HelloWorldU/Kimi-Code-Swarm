@@ -1108,7 +1108,7 @@ ${fileContents.join('\n\n')}
 
     review.status = approved ? 'approved' : 'rejected'
     review.reviewedAt = new Date().toISOString()
-    review.comment = comment || ''
+    if (comment !== undefined) review.comment = comment
     this.syncState()
     const action = approved ? '通过' : '拒绝'
     this.log('system', `Agent「${review.reviewerName}」审阅${action}了此 PR`)

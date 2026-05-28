@@ -45,7 +45,7 @@ const emit = defineEmits<{
   (e: 'submitForReview', id: string): void
   (e: 'mergePr', id: string): void
   (e: 'rejectPr', id: string): void
-  (e: 'submitReview', agentId: string, reviewerTaskId: string, approved: boolean): void
+  (e: 'submitReview', agentId: string, reviewerTaskId: string, approved: boolean, comment?: string): void
   (e: 'showFileDiff', agentId: string, filePath: string): void
 }>()
 
@@ -333,13 +333,13 @@ watch(() => props.agent.status, async () => {
             <div v-if="review.status === 'pending'" class="flex items-center gap-1">
               <button
                 class="px-2 py-0.5 rounded bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors"
-                @click="emit('submitReview', agent.id, review.reviewerTaskId, true)"
+                @click="emit('submitReview', agent.id, review.reviewerTaskId, true, review.comment)"
               >
                 通过
               </button>
               <button
                 class="px-2 py-0.5 rounded bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
-                @click="emit('submitReview', agent.id, review.reviewerTaskId, false)"
+                @click="emit('submitReview', agent.id, review.reviewerTaskId, false, review.comment)"
               >
                 拒绝
               </button>
