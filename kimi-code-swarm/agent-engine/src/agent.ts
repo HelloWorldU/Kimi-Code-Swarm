@@ -61,10 +61,11 @@ export class Agent {
   // 上次持久化时的业务字段指纹；高频字段（tokenUsed/lastActivity）不参与，
   // 避免 stdout 流式回推每 10 行就触发一次写盘。
   private lastPersistFingerprint?: string
-  // Bug #8：PR merge 后同步 main 用的临时状态
-  private pendingMergeCommit = false
-  private conflictFiles: string[] = []
-  private conflictFileOriginals = new Map<string, string>()
+  // Bug #8：上次 sync main 检查时间戳，throttle 避免每条 sendInstruction
+  // 都 fetch origin。不依赖 prStatus === 'merged' 触发，因为用户可能在
+  // GitHub web 上直接手动 merge（绕开 swarm 的 mergePr），prStatus 不更新。
+  private lastSyncCheckAt = 0
+  private static readonly SYNC_THROTTLE_MS = 5 * 60 * 1000
 
   constructor(
     name: string,
@@ -312,14 +313,13 @@ export class Agent {
       this.log('system', 'Agent 已恢复，继续对话')
     }
 
-    // Bug #8：PR merge 后同步 main（引擎硬保证 merge/commit，agent 只改冲突文件）
-    if (this.state.prStatus === 'merged' && this.state.workspace) {
-      try {
-        instruction = await this.syncBranchWithMain(instruction)
-      } catch (err) {
-        this.log('error', `同步 main 失败: ${String(err)}`)
-        // fetch 失败静默继续（决策点 5a）
-      }
+    // Bug #8：每次 sendInstruction 入口都检查 main 同步（throttle 内重复调用 skip）。
+    // 不依赖 prStatus === 'merged'——用户可能在 GitHub web 直接手动 merge，那种
+    // 场景 prStatus 永远不变 merged，但 origin/main 已经前进了。同步过程对 UI
+    // 透明：冲突解决走 runInstructionSilent 不污染聊天面板和「任务指令」区。
+    if (this.state.status === 'ready') {
+      const synced = await this.syncBranchWithMain()
+      if (!synced) return  // 同步失败 syncBranchWithMain 内部已置 stopped
     }
 
     if (this.state.status !== 'ready') return
@@ -512,19 +512,6 @@ export class Agent {
     this.state.pid = undefined
     this.process = undefined  // 清理引用，避免 stop() 再次 kill 已死进程
 
-    // Bug #8：merge 冲突解决后，引擎完成 merge commit
-    if (this.pendingMergeCommit && this.state.workspace) {
-      try {
-        await this.finalizeMergeCommit()
-      } catch (err) {
-        this.log('error', `merge commit 失败: ${String(err)}`)
-        this.setStatus('stopped')
-        this.log('error', 'merge 冲突解决未通过 sanity check，请指挥官人工介入')
-      }
-      this.pendingMergeCommit = false
-      this.conflictFiles = []
-      this.conflictFileOriginals.clear()
-    }
 
     // Record complete output as a single log entry so the UI renders one bubble
     // Skip if text was already streamed in real-time to avoid duplicates
@@ -832,18 +819,22 @@ export class Agent {
   }
 
   async canMerge(githubToken?: string): Promise<boolean> {
+    // 排除 failed reviewer——reviewer 跑不起来（kimi 卡死 / 启动失败）≠ 内容被拒，
+    // 不该阻塞合并。activeReviews 是「实际给出过裁决的 reviewer」。
+    const activeReviews = this.state.reviews.filter((r) => r.status !== 'failed')
+
     // 单账号产品 fail-open：身份判不出时回退到内部 reviews 状态
     if (githubToken && this.state.prNumber && this.state.prAuthor && this.githubUser) {
       if (this.githubUser === this.state.prAuthor) {
-        // 自审场景：GitHub 不允许自己 approve 自己，以内部 reviews 状态为准
-        if (this.state.reviews.length === 0) return true
-        const allApproved = this.state.reviews.every((r) => r.status === 'approved')
+        // 自审场景：GitHub 不允许自己 approve 自己，以内部 active reviews 为准
+        if (activeReviews.length === 0) return true
+        const allApproved = activeReviews.every((r) => r.status === 'approved')
         if (allApproved) {
-          this.log('system', '自审场景：内部 review 全部通过，准备通过管理员权限合并')
+          this.log('system', '自审场景：active reviewer 全部通过，准备通过管理员权限合并')
         }
         return allApproved
       }
-      // 多人协作场景：以 GitHub API 为准
+      // 多人协作场景：以 GitHub API 为准（API 返回不含 failed 状态，本身就是 active）
       const reviews = await getPullRequestReviews(githubToken, this.state.repoUrl, this.state.prNumber)
       if (reviews) {
         const latestByUser = new Map<string, string>()
@@ -855,9 +846,9 @@ export class Agent {
       }
     }
 
-    // 无 Token / 未获取到身份 / Mock 模式 → 回退到内部状态
-    if (this.state.reviews.length === 0) return true
-    return this.state.reviews.every((r) => r.status === 'approved')
+    // 无 Token / 未获取到身份 / Mock 模式 → 回退到内部 active reviews 状态
+    if (activeReviews.length === 0) return true
+    return activeReviews.every((r) => r.status === 'approved')
   }
 
   async mergePr(githubToken?: string) {
@@ -908,17 +899,26 @@ export class Agent {
 
   /**
    * Bug #8：PR merge 后，sendInstruction 恢复 completed agent 时同步 main。
-   * 引擎硬保证 fetch/merge/commit；agent 只负责解决冲突文件内容。
-   * 返回可能被 conflict prefix 扩充后的 instruction。
+   * 引擎硬保证 fetch / merge / commit；冲突时通过 runInstructionSilent 让
+   * kimi 只改文件（不污染聊天面板和「任务指令」区），完成后引擎 sanity
+   * check + commit。返回 true 表示可继续走用户任务；false 表示同步失败
+   * 已置 stopped，sendInstruction 应直接 return。
+   * Throttle：5 分钟内重复调用直接 return true 跳过。
    */
-  private async syncBranchWithMain(instruction: string): Promise<string> {
-    if (!this.state.workspace || this.state.prStatus !== 'merged') return instruction
+  private async syncBranchWithMain(): Promise<boolean> {
+    if (!this.state.workspace) return true
+
+    const now = Date.now()
+    if (this.lastSyncCheckAt && now - this.lastSyncCheckAt < Agent.SYNC_THROTTLE_MS) {
+      return true
+    }
+    this.lastSyncCheckAt = now
 
     try {
       await gitFetch(this.state.workspace)
     } catch (err) {
-      this.log('error', `git fetch 失败: ${String(err)}`)
-      return instruction // 决策点 5a：fetch 失败静默继续
+      this.log('error', `git fetch 失败: ${String(err)}（继续执行，但分支可能未同步）`)
+      return true // 决策 5a：静默继续
     }
 
     let behindCount = 0
@@ -926,10 +926,10 @@ export class Agent {
       behindCount = await getBehindCount(this.state.workspace, 'origin/main')
     } catch (err) {
       this.log('error', `检测 main 新 commits 失败: ${String(err)}`)
-      return instruction // 静默继续
+      return true
     }
 
-    if (behindCount <= 0) return instruction
+    if (behindCount <= 0) return true
 
     this.log('system', `检测到 main 有 ${behindCount} 个新 commit，正在同步...`)
 
@@ -940,46 +940,37 @@ export class Agent {
         this.log('system', `已同步 main 的 ${behindCount} 个 commit`)
       } else {
         this.log('error', `同步提交失败: ${commitResult.stderr}`)
-        try { await abortMerge(this.state.workspace) } catch {}
+        try { await abortMerge(this.state.workspace) } catch { /* 已无 merge 状态可忽略 */ }
       }
-      return instruction
+      return true
     }
 
-    // 有冲突：需要 agent 介入
-    this.log('system', `merge 出现冲突，需要解决冲突文件...`)
+    // 有冲突：runInstructionSilent 让 kimi 静默改文件（不污染 UI input）
     const conflictFiles = await getConflictFiles(this.state.workspace)
     if (conflictFiles.length === 0) {
       this.log('error', `merge 失败但无冲突文件: ${mergeResult.stderr}`)
+      try { await abortMerge(this.state.workspace) } catch { /* expected */ }
       this.setStatus('stopped')
-      this.log('error', 'merge 冲突无法自动解决，请指挥官人工介入')
-      return instruction
+      this.log('error', 'merge 失败无法自动恢复，请指挥官人工介入')
+      return false
     }
 
-    this.log('system', `冲突文件: ${conflictFiles.join(', ')}`)
-    this.conflictFiles = conflictFiles
-    this.pendingMergeCommit = true
+    this.log('system', `merge 出现冲突，自动解决中：${conflictFiles.join(', ')}`)
 
-    // 记录原始内容用于 sanity check
-    for (const file of conflictFiles) {
-      try {
-        const content = await readFile(join(this.state.workspace, file), 'utf-8')
-        this.conflictFileOriginals.set(file, content)
-      } catch {
-        // 忽略读取失败
-      }
-    }
-
+    // 读原始内容供 sanity check 用（行数膨胀检测）
+    const originals = new Map<string, string>()
     const fileContents: string[] = []
     for (const file of conflictFiles) {
       try {
         const content = await readFile(join(this.state.workspace, file), 'utf-8')
+        originals.set(file, content)
         fileContents.push(`=== ${file} ===\n${content}`)
       } catch {
         fileContents.push(`=== ${file} ===\n[读取失败]`)
       }
     }
 
-    const conflictPrefix = `以下文件存在 merge 冲突，请解决冲突。冲突标记格式为 \`<<<<<<< HEAD\`（当前分支）、\`=======\`、\`>>>>>>> origin/main\`（main 分支）。
+    const conflictPrompt = `以下文件存在 merge 冲突，请解决冲突。冲突标记格式为 \`<<<<<<< HEAD\`（当前分支）、\`=======\`、\`>>>>>>> origin/main\`（main 分支）。
 
 ${fileContents.join('\n\n')}
 
@@ -989,18 +980,41 @@ ${fileContents.join('\n\n')}
 - 最小化改动，保留当前分支原有意图
 - 逐个文件解决
 
-请直接输出修改后的完整文件内容，不需要额外说明。${FIX_PROMPT_GIT_GUARD}`
+请直接修改这些文件去掉冲突标记。${FIX_PROMPT_GIT_GUARD}`
 
-    return `${conflictPrefix}\n\n---\n\n${instruction}`
+    const result = await this.runInstructionSilent(conflictPrompt)
+    if (!result.ok) {
+      this.log('error', `冲突解决 kimi 卡死/超时`)
+      try { await abortMerge(this.state.workspace) } catch { /* expected */ }
+      this.setStatus('stopped')
+      this.log('error', 'merge 冲突自动解决超时，请指挥官人工介入')
+      return false
+    }
+
+    try {
+      await this.finalizeMergeCommit(conflictFiles, originals)
+      this.log('system', `merge 冲突已自动解决，同步完成`)
+      return true
+    } catch (err) {
+      this.log('error', `merge sanity check 失败: ${String(err)}`)
+      try { await abortMerge(this.state.workspace) } catch { /* expected */ }
+      this.setStatus('stopped')
+      this.log('error', 'merge 冲突解决未通过 sanity check，请指挥官人工介入')
+      return false
+    }
   }
 
   /**
-   * Bug #8：kimi 解决 merge 冲突后，引擎执行 sanity check 并完成 merge commit。
+   * Bug #8：sanity check + 只 stage 冲突文件 + commit。
+   * 接收 conflictFiles + originals 作为参数（不再用实例字段，纯函数式）。
    */
-  private async finalizeMergeCommit(): Promise<void> {
-    if (!this.state.workspace || this.conflictFiles.length === 0) return
+  private async finalizeMergeCommit(
+    conflictFiles: string[],
+    originals: Map<string, string>,
+  ): Promise<void> {
+    if (!this.state.workspace || conflictFiles.length === 0) return
 
-    for (const file of this.conflictFiles) {
+    for (const file of conflictFiles) {
       const content = await readFile(join(this.state.workspace, file), 'utf-8')
 
       // sanity check 1: 冲突标记残留
@@ -1013,25 +1027,25 @@ ${fileContents.join('\n\n')}
         throw new Error(`${file} 内容为空`)
       }
 
-      // sanity check 3: 行数膨胀阈值（3 倍）
-      const original = this.conflictFileOriginals.get(file)
+      // sanity check 3: 行数膨胀（>3 倍阈值，疑似 kimi 写入了用户任务相关代码）
+      const original = originals.get(file)
       if (original) {
         const origLines = original.split('\n').length
         const newLines = content.split('\n').length
         if (newLines > origLines * 3) {
-          throw new Error(`${file} 行数从 ${origLines} 膨胀到 ${newLines}，超过 3 倍阈值`)
+          throw new Error(`${file} 行数从 ${origLines} 膨胀到 ${newLines}（>3 倍），疑似越界改动`)
         }
       }
     }
 
-    // sanity check 4: git diff --check
+    // sanity check 4: git diff --check（空白错误等）
     const diffCheck = await gitDiffCheck(this.state.workspace)
     if (diffCheck.exitCode !== 0) {
       throw new Error(`git diff --check 失败: ${diffCheck.stdout || diffCheck.stderr}`)
     }
 
-    // 只 stage 冲突文件，避免把用户任务的修改也 commit 进 merge commit
-    for (const file of this.conflictFiles) {
+    // 只 stage 冲突文件，避免用户任务的修改被混入 merge commit
+    for (const file of conflictFiles) {
       const result = await stageFile(this.state.workspace, file)
       if (result.exitCode !== 0) {
         throw new Error(`stage ${file} 失败: ${result.stderr}`)
@@ -1042,8 +1056,6 @@ ${fileContents.join('\n\n')}
     if (commitResult.exitCode !== 0) {
       throw new Error(`merge commit 失败: ${commitResult.stderr}`)
     }
-
-    this.log('system', 'merge 冲突已解决并提交')
   }
 
   private notifyPrCreated() {
@@ -1141,7 +1153,11 @@ ${fileContents.join('\n\n')}
    */
   private async runInstructionSilent(
     instruction: string,
-    idleMs = 120000,
+    // Kimi CLI 不是逐 token 流式输出，而是「长 think → 一批 tool call → 一段
+    // text」分批吐到 stdout，间隙经常 60-180s 没动静但 kimi 是好的；之前
+    // 默认 120s 在 runReview / fix loop 经常误判卡死 → 把上限提到 10 分钟。
+    // wall-clock 上限通过外层 setTimeout 由调用方按需附加（本函数只管 idle）。
+    idleMs = 600_000,
   ): Promise<{ ok: boolean; text: string }> {
     const kimiPath = await detectKimiCli()
     if (!kimiPath) {
@@ -1247,7 +1263,9 @@ PR_BODY:
 `
 
     try {
-      const { text: output } = await this.runInstructionSilent(prompt, 60000)
+      // commit message 生成通常 30-60s 内完成；diff 大时 kimi 思考更久也合理；
+      // 给 5 分钟兜底（之前 60s 经常误判 + fallback 到模糊 message）
+      const { text: output } = await this.runInstructionSilent(prompt, 300_000)
       const commitMatch = output.match(/COMMIT:\s*([\s\S]+?)(?=\n---\nPR_BODY:)/)
       const bodyMatch = output.match(/PR_BODY:\s*([\s\S]+)/)
 
