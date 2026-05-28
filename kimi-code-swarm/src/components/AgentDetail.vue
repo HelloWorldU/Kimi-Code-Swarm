@@ -239,7 +239,12 @@ watch(() => props.agent.status, async () => {
     <div class="grid grid-cols-2 gap-3 mb-3 shrink-0">
       <div class="px-4 py-2.5 rounded-lg bg-gray-50 border border-gray-100">
         <p class="text-xs text-gray-500">任务指令</p>
-        <p class="text-sm text-gray-700 mt-1">{{ lastInput || '暂无指令' }}</p>
+        <p
+          class="text-sm text-gray-700 mt-1 line-clamp-2 break-words"
+          :title="lastInput || '暂无指令'"
+        >
+          {{ lastInput || '暂无指令' }}
+        </p>
       </div>
       <div class="px-4 py-2.5 rounded-lg bg-gray-50 border border-gray-100">
         <p class="text-xs text-gray-500">仓库</p>
