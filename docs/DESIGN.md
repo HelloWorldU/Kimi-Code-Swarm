@@ -41,7 +41,7 @@
 | 层 | 目录 | 职责 | 当前状态 |
 |--|------|------|---------|
 | L1 Context | `AGENTS.md` + `docs/` | 上下文分层，按需加载 | ✅ 完整 |
-| L2 Constraints | `docs/CONSTRAINTS.md` + `ci/` + `ast/` | 机械化约束（类型/Linter/自定义 ESLint 规则/AST/文档同步/测试/Dead Code 检测，报错地图式自定位） | ✅ CI 流水线 + pre-commit hook（npm install 自动配置）：typecheck → typecheck:engine → lint → analyze → test → check-docs → check-test → build |
+| L2 Constraints | `docs/CONSTRAINTS.md` + `ci/` + `ast/` | 机械化约束（类型/Linter/自定义 ESLint 规则/AST/文档同步/测试/Dead Code 检测，报错地图式自定位） | ✅ CI 流水线 + pre-commit hook（npm install 自动配置）：typecheck → typecheck:engine → lint → analyze → test → check-docs → check-test → build；CI 额外安装 `ast/` 子包依赖 |
 | L2.5 Shell | `src-tauri/` | Tauri v2 桌面壳层：Rust 主进程（唯一有权 spawn 进程） | ✅ IPC 命令已就绪（git / spawn / kill / keyring / store） |
 | L3 Observability | UI 面板 + 染色日志 | Metrics(✅ Token/实例) / Logs(✅ 染色流) / Traces(⏳ 待实现) | ✅ UI 面板已就绪 |
 | L4 Entropy Mgmt | `scripts/cleanup.ts` + `scripts/health-check.ts` | 循环清理 + 定期一致性检查（信息供给型） | ✅ health-check 已实现 |

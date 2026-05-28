@@ -26,6 +26,9 @@ jobs:
       - name: Install dependencies
         run: cd kimi-code-swarm && npm ci
 
+      - name: Install ast dependencies
+        run: cd ast && npm ci
+
       - name: Type check
         run: cd kimi-code-swarm && npm run typecheck
 
