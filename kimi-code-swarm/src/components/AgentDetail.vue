@@ -182,6 +182,7 @@ watch(() => props.agent.id, async (newId, oldId) => {
   }
   instruction.value = store.getDraftInput(newId)
   userWasNearBottom.value = true
+  showScrollToBottom.value = false
   await nextTick()
   scrollToBottom(false)
 })
@@ -383,160 +384,165 @@ watch(() => props.agent.status, async () => {
     </div>
 
     <!-- Chat Area -->
-    <div
-      ref="scrollRef"
-      class="flex-1 overflow-y-auto scrollbar-thin rounded-xl bg-gray-50/50 border border-gray-200 p-4 space-y-4 min-h-0 relative"
-    >
-      <template v-if="agent.logs.length === 0">
-        <div class="h-full flex flex-col items-center justify-center text-gray-400">
-          <Bot class="w-10 h-10 mb-3 opacity-30" />
-          <p class="text-sm">Agent 已就绪，开始对话吧</p>
-        </div>
-      </template>
-
-      <template v-for="log in agent.logs" :key="log.id">
-        <!-- User Message -->
-        <div v-if="log.type === 'input'" class="flex justify-end animate-message-enter">
-          <div class="flex items-end gap-2 max-w-[85%] min-w-0">
-            <div class="bg-swarm-600 text-white rounded-2xl rounded-tr-sm px-4 py-2.5 shadow-sm">
-              <div class="markdown-content markdown-content-inverted" v-html="renderMarkdown(log.content)" />
-              <div class="flex items-center justify-end gap-2 mt-1">
-                <span v-if="log.tokens" class="text-[10px] opacity-60">{{ log.tokens }} tokens</span>
-                <span class="text-[10px] opacity-60">{{ new Date(log.timestamp).toLocaleTimeString() }}</span>
-              </div>
-            </div>
-            <div class="w-7 h-7 rounded-full bg-swarm-100 flex items-center justify-center shrink-0 mb-1">
-              <User class="w-3.5 h-3.5 text-swarm-600" />
-            </div>
+    <div class="flex-1 min-h-0 relative">
+      <div
+        ref="scrollRef"
+        class="h-full overflow-y-auto scrollbar-thin rounded-xl bg-gray-50/50 border border-gray-200 p-4 space-y-4"
+      >
+        <template v-if="agent.logs.length === 0">
+          <div class="h-full flex flex-col items-center justify-center text-gray-400">
+            <Bot class="w-10 h-10 mb-3 opacity-30" />
+            <p class="text-sm">Agent 已就绪，开始对话吧</p>
           </div>
-        </div>
+        </template>
 
-        <!-- Agent Message -->
-        <div v-else-if="log.type === 'output'" class="flex justify-start animate-message-enter">
-          <div class="flex items-end gap-2 max-w-[85%] min-w-0">
-            <div class="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center shrink-0 mb-1">
-              <Bot class="w-3.5 h-3.5 text-blue-600" />
-            </div>
-            <div class="bg-white text-gray-800 rounded-2xl rounded-tl-sm px-4 py-2.5 shadow-sm border border-gray-100">
-              <div class="markdown-content" v-html="renderMarkdown(log.content)" />
-              <div class="flex items-center gap-2 mt-1">
-                <span class="text-[10px] text-gray-400">{{ new Date(log.timestamp).toLocaleTimeString() }}</span>
+        <template v-for="log in agent.logs" :key="log.id">
+          <!-- User Message -->
+          <div v-if="log.type === 'input'" class="flex justify-end animate-message-enter">
+            <div class="flex items-end gap-2 max-w-[85%] min-w-0">
+              <div class="bg-swarm-600 text-white rounded-2xl rounded-tr-sm px-4 py-2.5 shadow-sm">
+                <div class="markdown-content markdown-content-inverted" v-html="renderMarkdown(log.content)" />
+                <div class="flex items-center justify-end gap-2 mt-1">
+                  <span v-if="log.tokens" class="text-[10px] opacity-60">{{ log.tokens }} tokens</span>
+                  <span class="text-[10px] opacity-60">{{ new Date(log.timestamp).toLocaleTimeString() }}</span>
+                </div>
+              </div>
+              <div class="w-7 h-7 rounded-full bg-swarm-100 flex items-center justify-center shrink-0 mb-1">
+                <User class="w-3.5 h-3.5 text-swarm-600" />
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- Thinking Message -->
-        <div v-else-if="log.type === 'think'" class="flex justify-start animate-message-enter">
-          <div class="flex items-end gap-2 max-w-[85%] min-w-0">
-            <div class="w-7 h-7 rounded-full bg-amber-100 flex items-center justify-center shrink-0 mb-1">
-              <Brain class="w-3.5 h-3.5 text-amber-600" />
-            </div>
-            <div class="bg-amber-50 text-amber-800 rounded-2xl rounded-tl-sm shadow-sm border border-amber-100 min-w-0">
-              <button
-                class="w-full flex items-center justify-between px-4 py-2 cursor-pointer hover:bg-amber-100/50 transition-colors rounded-2xl rounded-bl-sm"
-                @click="toggleLogExpand(log.id)"
-              >
-                <span class="text-xs font-medium text-amber-600">Thinking</span>
-                <ChevronRight v-if="!isLogExpanded(log.id)" class="w-3.5 h-3.5 text-amber-600 shrink-0 ml-2" />
-                <ChevronDown v-else class="w-3.5 h-3.5 text-amber-600 shrink-0 ml-2" />
-              </button>
-              <div v-if="isLogExpanded(log.id)" class="px-4 pb-2.5">
+          <!-- Agent Message -->
+          <div v-else-if="log.type === 'output'" class="flex justify-start animate-message-enter">
+            <div class="flex items-end gap-2 max-w-[85%] min-w-0">
+              <div class="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center shrink-0 mb-1">
+                <Bot class="w-3.5 h-3.5 text-blue-600" />
+              </div>
+              <div class="bg-white text-gray-800 rounded-2xl rounded-tl-sm px-4 py-2.5 shadow-sm border border-gray-100">
                 <div class="markdown-content" v-html="renderMarkdown(log.content)" />
                 <div class="flex items-center gap-2 mt-1">
-                  <span class="text-[10px] text-amber-400">{{ new Date(log.timestamp).toLocaleTimeString() }}</span>
+                  <span class="text-[10px] text-gray-400">{{ new Date(log.timestamp).toLocaleTimeString() }}</span>
                 </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- Tool Call / MCP Message -->
-        <div v-else-if="log.type === 'tool_call' || log.type === 'mcp'" class="flex justify-start animate-message-enter">
-          <div class="flex items-end gap-2 max-w-[85%] min-w-0">
-            <div class="w-7 h-7 rounded-full bg-purple-100 flex items-center justify-center shrink-0 mb-1">
-              <Wrench v-if="log.type === 'tool_call'" class="w-3.5 h-3.5 text-purple-600" />
-              <Server v-else class="w-3.5 h-3.5 text-purple-600" />
-            </div>
-            <div class="bg-purple-50 text-purple-800 rounded-2xl rounded-tl-sm shadow-sm border border-purple-100 min-w-0">
-              <button
-                class="w-full flex items-center justify-between px-4 py-2 cursor-pointer hover:bg-purple-100/50 transition-colors rounded-2xl rounded-bl-sm"
-                @click="toggleLogExpand(log.id)"
-              >
-                <span class="text-xs font-medium text-purple-600">{{ log.type === 'mcp' ? 'MCP' : 'Tool Call' }}</span>
-                <ChevronRight v-if="!isLogExpanded(log.id)" class="w-3.5 h-3.5 text-purple-600 shrink-0 ml-2" />
-                <ChevronDown v-else class="w-3.5 h-3.5 text-purple-600 shrink-0 ml-2" />
-              </button>
-              <div v-if="isLogExpanded(log.id)" class="px-4 pb-2.5">
-                <p class="text-sm whitespace-pre-wrap break-words leading-relaxed font-mono text-xs">{{ log.content }}</p>
-                <div class="flex items-center gap-2 mt-1">
-                  <span class="text-[10px] text-purple-400">{{ new Date(log.timestamp).toLocaleTimeString() }}</span>
+          <!-- Thinking Message -->
+          <div v-else-if="log.type === 'think'" class="flex justify-start animate-message-enter">
+            <div class="flex items-end gap-2 max-w-[85%] min-w-0">
+              <div class="w-7 h-7 rounded-full bg-amber-100 flex items-center justify-center shrink-0 mb-1">
+                <Brain class="w-3.5 h-3.5 text-amber-600" />
+              </div>
+              <div class="bg-amber-50 text-amber-800 rounded-2xl rounded-tl-sm shadow-sm border border-amber-100 min-w-0">
+                <button
+                  class="w-full flex items-center justify-between px-4 py-2 cursor-pointer hover:bg-amber-100/50 transition-colors rounded-2xl rounded-bl-sm"
+                  @click="toggleLogExpand(log.id)"
+                >
+                  <span class="text-xs font-medium text-amber-600">Thinking</span>
+                  <ChevronRight v-if="!isLogExpanded(log.id)" class="w-3.5 h-3.5 text-amber-600 shrink-0 ml-2" />
+                  <ChevronDown v-else class="w-3.5 h-3.5 text-amber-600 shrink-0 ml-2" />
+                </button>
+                <div v-if="isLogExpanded(log.id)" class="px-4 pb-2.5">
+                  <div class="markdown-content" v-html="renderMarkdown(log.content)" />
+                  <div class="flex items-center gap-2 mt-1">
+                    <span class="text-[10px] text-amber-400">{{ new Date(log.timestamp).toLocaleTimeString() }}</span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- Tool Result Message -->
-        <div v-else-if="log.type === 'tool_result'" class="flex justify-start animate-message-enter">
-          <div class="flex items-end gap-2 max-w-[85%] min-w-0">
-            <div class="w-7 h-7 rounded-full bg-green-100 flex items-center justify-center shrink-0 mb-1">
-              <CheckCircle class="w-3.5 h-3.5 text-green-600" />
-            </div>
-            <div class="bg-green-50 text-green-800 rounded-2xl rounded-tl-sm shadow-sm border border-green-100 min-w-0">
-              <button
-                class="w-full flex items-center justify-between px-4 py-2 cursor-pointer hover:bg-green-100/50 transition-colors rounded-2xl rounded-bl-sm"
-                @click="toggleLogExpand(log.id)"
-              >
-                <span class="text-xs font-medium text-green-600">Tool Result</span>
-                <ChevronRight v-if="!isLogExpanded(log.id)" class="w-3.5 h-3.5 text-green-600 shrink-0 ml-2" />
-                <ChevronDown v-else class="w-3.5 h-3.5 text-green-600 shrink-0 ml-2" />
-              </button>
-              <div v-if="isLogExpanded(log.id)" class="px-4 pb-2.5">
-                <p class="text-sm whitespace-pre-wrap break-words leading-relaxed font-mono text-xs">{{ log.content }}</p>
-                <div class="flex items-center gap-2 mt-1">
-                  <span class="text-[10px] text-green-400">{{ new Date(log.timestamp).toLocaleTimeString() }}</span>
+          <!-- Tool Call / MCP Message -->
+          <div v-else-if="log.type === 'tool_call' || log.type === 'mcp'" class="flex justify-start animate-message-enter">
+            <div class="flex items-end gap-2 max-w-[85%] min-w-0">
+              <div class="w-7 h-7 rounded-full bg-purple-100 flex items-center justify-center shrink-0 mb-1">
+                <Wrench v-if="log.type === 'tool_call'" class="w-3.5 h-3.5 text-purple-600" />
+                <Server v-else class="w-3.5 h-3.5 text-purple-600" />
+              </div>
+              <div class="bg-purple-50 text-purple-800 rounded-2xl rounded-tl-sm shadow-sm border border-purple-100 min-w-0">
+                <button
+                  class="w-full flex items-center justify-between px-4 py-2 cursor-pointer hover:bg-purple-100/50 transition-colors rounded-2xl rounded-bl-sm"
+                  @click="toggleLogExpand(log.id)"
+                >
+                  <span class="text-xs font-medium text-purple-600">{{ log.type === 'mcp' ? 'MCP' : 'Tool Call' }}</span>
+                  <ChevronRight v-if="!isLogExpanded(log.id)" class="w-3.5 h-3.5 text-purple-600 shrink-0 ml-2" />
+                  <ChevronDown v-else class="w-3.5 h-3.5 text-purple-600 shrink-0 ml-2" />
+                </button>
+                <div v-if="isLogExpanded(log.id)" class="px-4 pb-2.5">
+                  <p class="text-sm whitespace-pre-wrap break-words leading-relaxed font-mono text-xs">{{ log.content }}</p>
+                  <div class="flex items-center gap-2 mt-1">
+                    <span class="text-[10px] text-purple-400">{{ new Date(log.timestamp).toLocaleTimeString() }}</span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- System / Error Message -->
-        <div v-else class="flex justify-center animate-message-enter">
-          <div
-            :class="[
-              'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs max-w-[90%]',
-              log.type === 'error'
-                ? 'bg-red-50 text-red-600 border border-red-100'
-                : 'bg-gray-100 text-gray-500 border border-gray-200'
-            ]"
-          >
-            <Terminal v-if="log.type === 'system'" class="w-3 h-3 shrink-0" />
-            <AlertCircle v-else class="w-3 h-3 shrink-0" />
-            <span class="whitespace-pre-wrap">{{ log.content }}</span>
+          <!-- Tool Result Message -->
+          <div v-else-if="log.type === 'tool_result'" class="flex justify-start animate-message-enter">
+            <div class="flex items-end gap-2 max-w-[85%] min-w-0">
+              <div class="w-7 h-7 rounded-full bg-green-100 flex items-center justify-center shrink-0 mb-1">
+                <CheckCircle class="w-3.5 h-3.5 text-green-600" />
+              </div>
+              <div class="bg-green-50 text-green-800 rounded-2xl rounded-tl-sm shadow-sm border border-green-100 min-w-0">
+                <button
+                  class="w-full flex items-center justify-between px-4 py-2 cursor-pointer hover:bg-green-100/50 transition-colors rounded-2xl rounded-bl-sm"
+                  @click="toggleLogExpand(log.id)"
+                >
+                  <span class="text-xs font-medium text-green-600">Tool Result</span>
+                  <ChevronRight v-if="!isLogExpanded(log.id)" class="w-3.5 h-3.5 text-green-600 shrink-0 ml-2" />
+                  <ChevronDown v-else class="w-3.5 h-3.5 text-green-600 shrink-0 ml-2" />
+                </button>
+                <div v-if="isLogExpanded(log.id)" class="px-4 pb-2.5">
+                  <p class="text-sm whitespace-pre-wrap break-words leading-relaxed font-mono text-xs">{{ log.content }}</p>
+                  <div class="flex items-center gap-2 mt-1">
+                    <span class="text-[10px] text-green-400">{{ new Date(log.timestamp).toLocaleTimeString() }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      </template>
 
-      <!-- Working Indicator -->
-      <div v-if="agent.status === 'working'" class="flex justify-start">
-        <div class="flex items-end gap-2">
-          <div class="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-            <Bot class="w-3.5 h-3.5 text-blue-600" />
+          <!-- System / Error Message -->
+          <div v-else class="flex justify-center animate-message-enter">
+            <div
+              :class="[
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs max-w-[90%]',
+                log.type === 'error'
+                  ? 'bg-red-50 text-red-600 border border-red-100'
+                  : 'bg-gray-100 text-gray-500 border border-gray-200'
+              ]"
+            >
+              <Terminal v-if="log.type === 'system'" class="w-3 h-3 shrink-0" />
+              <AlertCircle v-else class="w-3 h-3 shrink-0" />
+              <span class="whitespace-pre-wrap">{{ log.content }}</span>
+            </div>
           </div>
-          <div class="bg-white rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm border border-gray-100">
-            <div class="flex items-center gap-2">
-              <Loader2 class="w-4 h-4 text-blue-500 animate-spin" />
-              <span class="text-sm text-gray-500">Agent 正在执行中...</span>
+        </template>
+
+        <!-- Working Indicator -->
+        <div v-if="agent.status === 'working'" class="flex justify-start">
+          <div class="flex items-end gap-2">
+            <div class="w-7 h-7 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+              <Bot class="w-3.5 h-3.5 text-blue-600" />
+            </div>
+            <div class="bg-white rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm border border-gray-100">
+              <div class="flex items-center gap-2">
+                <Loader2 class="w-4 h-4 text-blue-500 animate-spin" />
+                <span class="text-sm text-gray-500">Agent 正在执行中...</span>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Scroll to Bottom Button -->
+      <!-- Scroll to Bottom Button (out of scroll container so it stays pinned to viewport) -->
       <button
+        v-show="agent.logs.length > 0"
         data-testid="scroll-to-bottom-button"
+        aria-label="滚动到底部"
+        title="滚动到底部"
         :class="[
           'absolute bottom-4 right-4 w-9 h-9 rounded-full bg-white border border-gray-200 shadow-md flex items-center justify-center text-gray-500 hover:text-swarm-600 hover:border-swarm-200 transition-all duration-200 z-10',
           showScrollToBottom ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2 pointer-events-none'
