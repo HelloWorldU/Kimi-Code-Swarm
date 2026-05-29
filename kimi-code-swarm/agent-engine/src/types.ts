@@ -79,6 +79,7 @@ export type EngineCommand =
   | { type: 'get-file-diff'; agentId: string; filePath: string }
   | { type: 'ping' }
   | { type: 'shutdown' }
+  | { type: 'list-agents' }
 
 // ── Events from Node.js → Rust ──
 

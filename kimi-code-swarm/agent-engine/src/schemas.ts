@@ -58,6 +58,7 @@ export const EngineCommandSchema = z.discriminatedUnion('type', [
   }),
   z.object({ type: z.literal('ping') }),
   z.object({ type: z.literal('shutdown') }),
+  z.object({ type: z.literal('list-agents') }),
   z.object({
     type: z.literal('delete-agent'),
     agentId: z.string().min(1),

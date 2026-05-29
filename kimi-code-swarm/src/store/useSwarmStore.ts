@@ -53,9 +53,10 @@ async function startAgentEngine() {
   try {
     const running = await isEngineRunning()
     if (running) {
-      // 引擎已存在（HMR / 多次 bootstrap）：仍需保证监听器注册，
-      // 否则 engine-restored 已发出会被错过
+      // 引擎已存在（HMR / F5 刷新 / 多次 bootstrap）：注册监听器后发 list-agents
+      // 让 engine 重放 agent-created + engine-restored，恢复前端 state.agents
       await initEngineListeners()
+      await sendToEngine({ type: 'list-agents' })
       return
     }
     // 必须先注册监听器再 spawn：引擎启动后立刻 emit engine-restored / pong，

@@ -218,6 +218,17 @@ export class AgentEngine {
           break
         }
 
+        case 'list-agents': {
+          // F5 刷新后前端 state.agents 为空，发此命令拉回全量 agent 状态
+          const ids: string[] = []
+          for (const agent of this.agents.values()) {
+            this.broadcast({ type: 'agent-created', agent: agent.state })
+            ids.push(agent.state.id)
+          }
+          this.broadcast({ type: 'engine-restored', restoredAgentIds: ids })
+          break
+        }
+
         case 'shutdown': {
           // Stop all agents gracefully
           if (this.reviewRetryTimer) clearInterval(this.reviewRetryTimer)
