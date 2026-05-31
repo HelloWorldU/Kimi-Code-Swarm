@@ -8,12 +8,12 @@
 
 单 Kimi 账号 → 本地 N 个独立工作区 → N 个 CLI 工人并发开发 → 各自提 PR → 你审阅合并。
 
+[![Release](https://img.shields.io/github/v/release/HelloWorldU/Kimi-Code-Swarm?include_prereleases&label=release)](https://github.com/HelloWorldU/Kimi-Code-Swarm/releases/latest)
 [![License](https://img.shields.io/github/license/HelloWorldU/Kimi-Code-Swarm)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows-0078D4?logo=windows&logoColor=white)](https://github.com/HelloWorldU/Kimi-Code-Swarm/releases/latest)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Platform](https://img.shields.io/badge/platform-Windows-blue)](https://github.com/HelloWorldU/Kimi-Code-Swarm/releases/latest)
 [![Stars](https://img.shields.io/github/stars/HelloWorldU/Kimi-Code-Swarm?style=flat)](https://github.com/HelloWorldU/Kimi-Code-Swarm/stargazers)
 
-**[🏗 设计](docs/DESIGN.md)** · **[📊 状态](docs/STATUS.md)** · **[English](README.md)**
+**[⬇ 下载 v0.1.0](https://github.com/HelloWorldU/Kimi-Code-Swarm/releases/latest)** · **[📖 文档](docs/)** · **[🐛 Backlog](docs/exec-plans/backlog.md)** · **[English](README.md)**
 
 </div>
 
@@ -96,7 +96,6 @@ npm run tauri dev    # 桌面模式（需 Rust）
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — 数据流、状态分层、模块边界
 - [`docs/STATUS.md`](docs/STATUS.md) — 功能实现状态单一事实源
 - [`docs/exec-plans/backlog.md`](docs/exec-plans/backlog.md) — 已知问题与架构决策
-- [**配套博文** — 在智能体优先的世界中实践 Harness Engineering](https://swiftact.cn/articles/kimi-code.html) — 从这个项目里踩过的坑、失败模式与方法论总结
 
 ## 许可证
 

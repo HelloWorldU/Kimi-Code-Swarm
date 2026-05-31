@@ -8,12 +8,12 @@
 
 One Kimi account → N isolated workspaces → N concurrent CLI workers → each submits a PR → you review and merge.
 
+[![Release](https://img.shields.io/github/v/release/HelloWorldU/Kimi-Code-Swarm?include_prereleases&label=release)](https://github.com/HelloWorldU/Kimi-Code-Swarm/releases/latest)
 [![License](https://img.shields.io/github/license/HelloWorldU/Kimi-Code-Swarm)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows-0078D4?logo=windows&logoColor=white)](https://github.com/HelloWorldU/Kimi-Code-Swarm/releases/latest)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Platform](https://img.shields.io/badge/platform-Windows-blue)](https://github.com/HelloWorldU/Kimi-Code-Swarm/releases/latest)
 [![Stars](https://img.shields.io/github/stars/HelloWorldU/Kimi-Code-Swarm?style=flat)](https://github.com/HelloWorldU/Kimi-Code-Swarm/stargazers)
 
-**[🏗 Design](docs/DESIGN.md)** · **[📊 Status](docs/STATUS.md)** · **[简体中文](README.zh-CN.md)**
+**[⬇ Download v0.1.0](https://github.com/HelloWorldU/Kimi-Code-Swarm/releases/latest)** · **[📖 Docs](docs/)** · **[🐛 Backlog](docs/exec-plans/backlog.md)** · **[简体中文](README.zh-CN.md)**
 
 </div>
 
@@ -96,7 +96,6 @@ Core features (real CLI invocation, Git automation) only work in **Tauri desktop
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — Data flow, state layering, module boundaries
 - [`docs/STATUS.md`](docs/STATUS.md) — Single source of truth for feature implementation status
 - [`docs/exec-plans/backlog.md`](docs/exec-plans/backlog.md) — Known issues and architectural decisions
-- [**Blog Post** — Harness Engineering in an Agent-First World](https://swiftact.cn/articles/kimi-code.html) — Lessons, failure modes, and methodology from building this project
 
 ## License
 
