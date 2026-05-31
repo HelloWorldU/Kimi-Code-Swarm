@@ -47,7 +47,6 @@ export class AgentEngine {
             cmd.payload.repoUrl,
             cmd.payload.tokenBudget,
             this.broadcast,
-            (agentId, branch, token) => this.triggerReviews(agentId, branch, token),
             this.agentPersistCallback,
           )
           this.agents.set(agent.state.id, agent)
@@ -109,8 +108,6 @@ export class AgentEngine {
             break
           }
 
-          // 先停止 CI 轮询，避免 Agent 删除后定时器还在跑
-          agent.stopCiMonitor()
           this.broadcast({ type: 'log', agentId: cmd.agentId, entry: { id: 'system', timestamp: new Date().toISOString(), type: 'system', content: `[delete-agent] 停止 agent 进程...` } })
           await agent.stop()
           const workspace = agent.state.workspace || `E:/workspace/${agent.state.id}`
@@ -245,10 +242,6 @@ export class AgentEngine {
     }
   }
 
-  /**
-   * 记录一条审阅结论，并据此决定合并或触发自动修复。
-   * 命令路径与两条自动回调路径共用，避免「只合并、不修复」的不对称。
-   */
   private async handleReviewVerdict(
     agent: Agent,
     reviewerId: string,
@@ -283,13 +276,6 @@ export class AgentEngine {
       return
     }
 
-    // Bug F：存在 failed（reviewer 重试用尽）→ 不自动修复，等用户手动处置
-    // Bug C/F：全审完且存在 reject + 没有 failed → 触发自动修复
-    const hasPending = agent.state.reviews.some((r) => r.status === 'pending')
-    const hasFailed = agent.state.reviews.some((r) => r.status === 'failed')
-    if (!hasPending && !hasFailed) {
-      await agent.fixBasedOnReviews(githubToken)
-    }
   }
 
   /**
@@ -398,7 +384,6 @@ export class AgentEngine {
     const agent = Agent.fromPersisted(
       p,
       this.broadcast,
-      (agentId, branch, token) => this.triggerReviews(agentId, branch, token),
       this.agentPersistCallback,
     )
     this.agents.set(agent.state.id, agent)
@@ -436,7 +421,6 @@ export class AgentEngine {
       kimiSessionId: s.kimiSessionId,
       reviews: s.reviews,
       changedFiles: s.changedFiles,
-      ciStatus: s.ciStatus,
       createdAt: s.createdAt,
       lastActivity: s.lastActivity,
     }

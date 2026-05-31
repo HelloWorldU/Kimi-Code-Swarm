@@ -35,7 +35,6 @@ export interface PersistedAgent {
   kimiSessionId?: string
   reviews: unknown[]
   changedFiles?: string[]
-  ciStatus?: string
   createdAt: string
   lastActivity: string
 }

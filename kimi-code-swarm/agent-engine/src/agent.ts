@@ -1,17 +1,9 @@
-import type { AgentState, LogEntry, ReviewEntry, TaskStatus, PrStatus, CiStatus, EngineEvent } from './types.js'
+import type { AgentState, LogEntry, ReviewEntry, TaskStatus, PrStatus, EngineEvent } from './types.js'
 import type { PersistedAgent } from './persist.js'
 import { runKimi, detectKimiCli, type KimiProcess } from './kimi.js'
-import { getChangedFiles, getStagedFiles, getFileDiff, gitAdd, gitCommit, gitPush, createBranch, cloneRepo, gitFetch, getBranchDiff, gitMerge, getConflictFiles, getBehindCount, gitDiffCheck, abortMerge, stageFile } from './git.js'
-import { createPullRequest, mergePullRequest, getPullRequest, getPullRequestReviews, getCheckRuns, getCheckRunLogs, submitPullRequestReview, getAuthenticatedUser } from './github-api.js'
-import { readFile } from 'fs/promises'
-import { join } from 'path'
+import { getChangedFiles, getFileDiff, createBranch, cloneRepo, gitFetch, getBranchDiff } from './git.js'
+import { mergePullRequest, getPullRequestReviews, submitPullRequestReview, getPullRequestByBranch, getAuthenticatedUser } from './github-api.js'
 
-interface SubmitStep {
-  name: string
-  stdout: string
-  stderr: string
-  exitCode: number
-}
 
 let idCounter = 0
 const generateId = () => `agent-${Date.now().toString(36)}${(idCounter++).toString(36)}`
@@ -32,47 +24,23 @@ const termColors = {
 /** Kimi CLI 每次 --print 运行结束会在 stderr 打印的会话恢复提示，用于捕获 session id */
 export const SESSION_RESUME_RE = /To resume this session: kimi -r ([a-f0-9-]+)/i
 
-/**
- * 所有 fix prompt（pre-commit / CI / review 三处）共用的硬约束：
- * 禁止 agent 自己跑 git——commit / push / PR 由引擎统一编排，
- * agent 自跑会绕开 generateCommitAndPrBody 的规范 commit message、
- * 也会让 submitForReview 重试时命中 "nothing to commit" 兼容分支，
- * 流程双轨混乱。
- */
-const FIX_PROMPT_GIT_GUARD =
-  '\n\n**重要约束：只修改文件，不要运行 git add / git commit / git push 等任何 git 命令。提交、推送、PR 等流程将由引擎在你修改完成后自动重试。**'
-
 export class Agent {
   state: AgentState
   private process?: KimiProcess
   private emit: (event: EngineEvent) => void
   private running = false
-  private reviewRound = 0
   private githubToken?: string
   private githubUser?: string
-  private autoSubmitting = false
   /** 正在进行的审阅 target id 集合，防止延后重试对同一 target 重复 runReview */
   private activeReviews = new Set<string>()
-  private ciMonitorTimer?: NodeJS.Timeout
-  private ciRetryCount = 0
-  private readonly CI_MAX_RETRIES = 3
-  private readonly CI_POLL_INTERVAL_MS = 30000
-  private readonly CI_TIMEOUT_MS = 600000
   // 上次持久化时的业务字段指纹；高频字段（tokenUsed/lastActivity）不参与，
   // 避免 stdout 流式回推每 10 行就触发一次写盘。
   private lastPersistFingerprint?: string
-  // Bug #8：上次 sync main 检查时间戳，throttle 避免每条 sendInstruction
-  // 都 fetch origin。不依赖 prStatus === 'merged' 触发，因为用户可能在
-  // GitHub web 上直接手动 merge（绕开 swarm 的 mergePr），prStatus 不更新。
-  private lastSyncCheckAt = 0
-  private static readonly SYNC_THROTTLE_MS = 5 * 60 * 1000
-
   constructor(
     name: string,
     repoUrl: string,
     tokenBudget: number,
     emit: (event: EngineEvent) => void,
-    private onPrCreated?: (agentId: string, branch: string, githubToken?: string) => Promise<void> | void,
     private onPersist?: () => void,
   ) {
     this.emit = emit
@@ -100,10 +68,9 @@ export class Agent {
   static fromPersisted(
     p: PersistedAgent,
     emit: (event: EngineEvent) => void,
-    onPrCreated?: (agentId: string, branch: string, githubToken?: string) => Promise<void> | void,
     onPersist?: () => void,
   ): Agent {
-    const a = new Agent(p.name, p.repoUrl, p.tokenBudget, emit, onPrCreated, onPersist)
+    const a = new Agent(p.name, p.repoUrl, p.tokenBudget, emit, onPersist)
     a.state.id = p.id
     a.state.status = p.status as TaskStatus
     a.state.workspace = p.workspace
@@ -116,7 +83,6 @@ export class Agent {
     a.state.kimiSessionId = p.kimiSessionId
     a.state.reviews = (p.reviews as ReviewEntry[]) ?? []
     a.state.changedFiles = p.changedFiles
-    a.state.ciStatus = p.ciStatus as CiStatus | undefined
     a.state.createdAt = p.createdAt
     a.state.lastActivity = p.lastActivity
     a.state.logs = []   // logs 来自前端缓存
@@ -227,7 +193,7 @@ export class Agent {
       },
     })
 
-    // 仅当业务字段（status/workspace/branch/pr*/kimiSessionId/reviews/changedFiles/ciStatus）
+    // 仅当业务字段（status/workspace/branch/pr*/kimiSessionId/reviews/changedFiles）
     // 发生变化时才触发持久化；tokenUsed/lastActivity 高频抖动不参与，避免流式回推每 10 行写一次盘。
     const fp = this.businessFingerprint()
     if (fp !== this.lastPersistFingerprint) {
@@ -250,7 +216,6 @@ export class Agent {
       kimiSessionId: s.kimiSessionId,
       reviews: s.reviews,
       changedFiles: s.changedFiles,
-      ciStatus: s.ciStatus,
     })
   }
 
@@ -313,19 +278,9 @@ export class Agent {
       this.log('system', 'Agent 已恢复，继续对话')
     }
 
-    // Bug #8：每次 sendInstruction 入口都检查 main 同步（throttle 内重复调用 skip）。
-    // 不依赖 prStatus === 'merged'——用户可能在 GitHub web 直接手动 merge，那种
-    // 场景 prStatus 永远不变 merged，但 origin/main 已经前进了。同步过程对 UI
-    // 透明：冲突解决走 runInstructionSilent 不污染聊天面板和「任务指令」区。
-    if (this.state.status === 'ready') {
-      const synced = await this.syncBranchWithMain()
-      if (!synced) return  // 同步失败 syncBranchWithMain 内部已置 stopped
-    }
-
     if (this.state.status !== 'ready') return
 
-    // 有条件赋值：没传 token 不应擦掉已知的（token 是 agent 持久凭据，
-    // 并非每条指令都携带；autoSubmitForReview 的修复步就以无 token 调用本方法）
+    // token 是 agent 持久凭据，并非每条指令都携带，有条件赋值避免覆盖已知值
     if (githubToken) this.githubToken = githubToken
     this.setStatus('working')
     const inputTokens = Math.floor(instruction.length / 2)
@@ -538,9 +493,6 @@ export class Agent {
           if (files.length > 0) {
             this.log('system', `文件变更: ${files.length} 个文件`)
             this.emit({ type: 'file-changed', agentId: this.state.id, files })
-            // Agent 完成代码修改后自动提交审阅，pre-commit 失败会自动修复并重试
-            this.log('system', '检测到代码变更，自动提交审阅...')
-            await this.autoSubmitForReview()
           }
         } catch (err) {
           this.log('error', `检测文件变更失败: ${String(err)}`)
@@ -550,7 +502,6 @@ export class Agent {
   }
 
   async stop() {
-    this.stopCiMonitor()
     if (this.process) {
       this.process.kill()
       this.running = false
@@ -570,254 +521,35 @@ export class Agent {
     this.log('system', 'Agent 已停止')
   }
 
-  async submitForReview(githubToken?: string): Promise<{ ok: boolean; steps: SubmitStep[] }> {
+  async submitForReview(githubToken?: string): Promise<{ ok: boolean }> {
     if (githubToken) {
       this.githubToken = githubToken
     }
-    // reviewing 也允许：CI 失败后需在审阅中追加 commit 重新提交
     if (this.state.status !== 'working' && this.state.status !== 'ready' && this.state.status !== 'reviewing') {
-      return { ok: false, steps: [] }
+      return { ok: false }
     }
 
-    const steps: SubmitStep[] = []
-
-    let prTitle = `feat: ${this.state.name}`
-    let prBody = `由 Kimi Code Swarm Agent 自动创建`
-
-    if (this.state.workspace) {
-      // git add
-      const addRes = await gitAdd(this.state.workspace)
-      steps.push({ name: 'git add', stdout: addRes.stdout, stderr: addRes.stderr, exitCode: addRes.exitCode })
-      if (addRes.exitCode !== 0) {
-        return { ok: false, steps }
-      }
-
-      // 获取 staged 文件列表，生成规范的 commit message 和 PR 描述
-      const stagedFiles = await getStagedFiles(this.state.workspace)
-      const generated = await this.generateCommitAndPrBody(stagedFiles)
-      this.log('system', `生成提交信息: ${generated.commitMessage}`)
-
-      // git commit
-      const commitRes = await gitCommit(this.state.workspace, generated.commitMessage)
-      steps.push({ name: 'git commit', stdout: commitRes.stdout, stderr: commitRes.stderr, exitCode: commitRes.exitCode })
-      if (commitRes.exitCode !== 0) {
-        // 「nothing to commit」不是失败：改动已被提交（agent 修复时自行 commit 过 /
-        // 上一轮已提交）。应继续 push + 建 PR，而非回头让 agent 重复"修复"
-        const alreadyCommitted = /nothing to commit|working tree clean/i.test(
-          `${commitRes.stdout}\n${commitRes.stderr}`,
-        )
-        if (!alreadyCommitted) {
-          return { ok: false, steps }
+    if (githubToken) {
+      const pr = await getPullRequestByBranch(githubToken, this.state.repoUrl, this.state.branch)
+      if (pr) {
+        this.state.prStatus = 'open'
+        this.state.prNumber = pr.number
+        this.state.prUrl = pr.html_url
+        if (!this.githubUser) {
+          this.githubUser = await getAuthenticatedUser(githubToken) || undefined
         }
-        this.log('system', '工作区无新变更，改动已提交，继续推送')
+        this.state.prAuthor = pr.user.login
       }
-
-      // git push
-      const pushRes = await gitPush(this.state.workspace, this.state.branch)
-      steps.push({ name: 'git push', stdout: pushRes.stdout, stderr: pushRes.stderr, exitCode: pushRes.exitCode })
-      if (pushRes.exitCode !== 0) {
-        return { ok: false, steps }
-      }
-
-      this.log('system', '代码已推送至远程')
-
-      // 保存生成的 PR 内容（commit 后 staged 文件会被清空，需提前保存）
-      prTitle = generated.prTitle
-      prBody = generated.prBody
+    } else if (this.state.prStatus !== 'open') {
+      this.state.prStatus = 'open'
+      this.state.prNumber = Math.floor(Math.random() * 100) + 1
+      this.state.prUrl = `${this.state.repoUrl.replace(/\.git$/, '')}/pull/${this.state.prNumber}`
+      this.log('system', `PR #${this.state.prNumber} 已创建（模拟，未配置 GitHub Token）`)
     }
 
     this.setStatus('reviewing')
-
-    // 已有 open PR：跳过创建，只启动 CI 监控（审阅由 CI 通过后触发）
-    if (this.state.prStatus === 'open' && this.state.prNumber && githubToken) {
-      this.log('system', `PR #${this.state.prNumber} 已存在，新 commit 已追加`)
-      // 补录 PR 作者，并缓存当前 Token 用户（旧数据可能没有）
-      if (!this.githubUser) {
-        this.githubUser = await getAuthenticatedUser(githubToken) || undefined
-      }
-      if (!this.state.prAuthor) {
-        const pr = await getPullRequest(githubToken, this.state.repoUrl, this.state.prNumber)
-        if (pr) this.state.prAuthor = pr.user.login
-      }
-      this.syncState()
-      this.startCiMonitor(githubToken)
-      return { ok: true, steps }
-    }
-
-    // 有 GitHub Token：调用真实 API 创建 PR
-    if (githubToken) {
-      try {
-        const pr = await createPullRequest(githubToken, this.state.repoUrl, this.state.branch, prTitle, prBody)
-        if (pr) {
-          this.state.prStatus = 'open'
-          this.state.prNumber = pr.number
-          this.state.prUrl = pr.html_url
-          // 记录 PR 作者，并缓存当前 Token 用户（自审场景判断用）
-          if (!this.githubUser) {
-            this.githubUser = await getAuthenticatedUser(githubToken) || undefined
-          }
-          this.state.prAuthor = this.githubUser
-          this.log('system', `PR #${pr.number} 已创建: ${pr.html_url}`)
-          this.syncState()
-          this.startCiMonitor(githubToken)
-          return { ok: true, steps }
-        }
-        this.log('error', 'GitHub API 创建 PR 失败：返回空结果')
-      } catch (err) {
-        this.log('error', `GitHub API 创建 PR 失败: ${String(err)}`)
-      }
-      // 有 token 但创建失败 → 真失败，交回 autoSubmitForReview 处理，不伪造 mock PR
-      return { ok: false, steps }
-    }
-
-    // 仅「未配置 GitHub Token」才降级为 Mock（无真实 CI，直接触发审阅）
-    this.state.prStatus = 'open'
-    this.state.prNumber = Math.floor(Math.random() * 100) + 1
-    this.state.prUrl = `${this.state.repoUrl.replace(/\.git$/, '')}/pull/${this.state.prNumber}`
     this.syncState()
-    this.log('system', `PR #${this.state.prNumber} 已创建（模拟，未配置 GitHub Token）`)
-    this.notifyPrCreated()
-    return { ok: true, steps }
-  }
-
-  /**
-   * 启动 GitHub Actions CI 轮询监控
-   * PR 创建成功后调用，自动检测 CI 失败并触发修复
-   */
-  async startCiMonitor(githubToken: string): Promise<void> {
-    this.stopCiMonitor()
-
-    if (!this.state.prNumber || !githubToken) return
-
-    this.state.ciStatus = 'pending'
-    this.log('system', '开始监控 GitHub Actions CI 状态...')
-
-    const startTime = Date.now()
-
-    this.ciMonitorTimer = setInterval(async () => {
-      // 超时检查
-      if (Date.now() - startTime > this.CI_TIMEOUT_MS) {
-        this.stopCiMonitor()
-        this.state.ciStatus = 'unknown'
-        this.log('error', 'CI 监控超时（10分钟）：仍触发审阅，请指挥官人工核查 CI 状态')
-        this.notifyPrCreated()
-        return
-      }
-
-      // 查询 PR 获取 head sha
-      const pr = await getPullRequest(githubToken, this.state.repoUrl, this.state.prNumber!)
-      if (!pr) return
-
-      // 查询 check runs
-      const checks = await getCheckRuns(githubToken, this.state.repoUrl, pr.head.sha)
-      if (!checks || checks.total_count === 0) return
-
-      // 检查是否还有进行中
-      const hasInProgress = checks.check_runs.some((r) => r.status !== 'completed')
-      if (hasInProgress) return
-
-      // 所有 check 都完成了
-      const failedRun = checks.check_runs.find((r) => r.conclusion === 'failure')
-      if (failedRun) {
-        this.stopCiMonitor()
-        this.state.ciStatus = 'failure'
-        this.log('error', `CI 失败: ${failedRun.name}`)
-
-        const logs = await getCheckRunLogs(githubToken, this.state.repoUrl, failedRun.id, failedRun.details_url)
-        await this.fixBasedOnCiFailure(logs || `Check run "${failedRun.name}" failed. No logs available.`)
-        return
-      }
-
-      // 全部通过 → 此时才触发审阅
-      this.stopCiMonitor()
-      this.state.ciStatus = 'success'
-      this.log('system', 'GitHub Actions CI 全部通过 ✅')
-      this.notifyPrCreated()
-    }, this.CI_POLL_INTERVAL_MS)
-  }
-
-  /**
-   * 停止 CI 轮询定时器
-   */
-  stopCiMonitor(): void {
-    if (this.ciMonitorTimer) {
-      clearInterval(this.ciMonitorTimer)
-      this.ciMonitorTimer = undefined
-    }
-  }
-
-  /**
-   * 基于 CI 失败日志自动修复代码并重新提交
-   */
-  private async fixBasedOnCiFailure(ciLogs: string): Promise<void> {
-    this.ciRetryCount++
-    if (this.ciRetryCount > this.CI_MAX_RETRIES) {
-      this.log('error', `CI 修复已达最大轮次（${this.CI_MAX_RETRIES} 次），请指挥官人工介入`)
-      this.setStatus('ready')
-      return
-    }
-
-    this.log('system', `CI 失败，第 ${this.ciRetryCount}/${this.CI_MAX_RETRIES} 轮自动修复...`)
-    const fixPrompt = `GitHub Actions CI 检查失败了，日志如下：\n\n${ciLogs}\n\n请根据上述日志修改代码文件，使其能够通过 CI 检查。直接修改相关文件，不需要额外说明。${FIX_PROMPT_GIT_GUARD}`
-
-    // Bug B: 走 sendInstruction 让修复过程在 UI 聊天面板可见（之前用
-    // runInstructionSilent 黑盒，用户看不到 agent 在改什么）。
-    // sendInstruction 不接受 reviewing 状态——CI 监控启动时 status 是
-    // reviewing，临时切 ready 让 sendInstruction 进入；它内部完成后会
-    // 自动检测 changedFiles + 调用 autoSubmitForReview，不需要本方法再
-    // 额外做这两步。
-    if (this.state.status === 'reviewing') {
-      this.setStatus('ready')
-    }
-    await this.sendInstruction(fixPrompt, undefined, { displayAsUserInput: false })
-  }
-
-  /**
-   * 自动提交审阅：失败时让 Agent 流式修复并重试，最多 3 次。
-   * 防重入：修复步走 sendInstruction，其尾部会再次触发 autoSubmitForReview，
-   * 用 autoSubmitting 守卫避免无限递归——外层负责重试，尾部触发的内层直接跳过。
-   */
-  async autoSubmitForReview(maxRetries = 3): Promise<void> {
-    if (this.autoSubmitting) return
-    this.autoSubmitting = true
-    try {
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        const { ok, steps } = await this.submitForReview(this.githubToken)
-        if (ok) return
-
-        // 构建完整执行日志
-        const fullLog = steps.map((s) => {
-          let out = `=== ${s.name} (exit: ${s.exitCode}) ===`
-          if (s.stdout) out += `\n[stdout]\n${s.stdout}`
-          if (s.stderr) out += `\n[stderr]\n${s.stderr}`
-          return out
-        }).join('\n\n')
-
-        this.log('error', `提交审阅失败 (${attempt}/${maxRetries})`)
-        if (attempt >= maxRetries) {
-          this.log('error', '多次尝试后仍无法提交审阅，请指挥官人工介入')
-          this.setStatus('ready')
-          return
-        }
-        this.log('system', '正在根据执行日志自动修复...')
-        const fixPrompt = `你刚才尝试提交代码，执行日志如下：\n\n${fullLog}\n\n请根据上述日志中的错误信息，修改相关文件，使其能够通过项目的 typecheck、lint 和 pre-commit 检查。直接修改相关文件，不需要额外说明。${FIX_PROMPT_GIT_GUARD}`
-        // 走流式 sendInstruction：修复过程实时显示在对话框，且无 runInstructionSilent 的硬超时；
-        // displayAsUserInput=false 让长 fix prompt 不污染「任务指令」区与聊天面板
-        await this.sendInstruction(fixPrompt, undefined, { displayAsUserInput: false })
-        // 若用户已点停止，中断重试循环
-        if (this.state.status === 'stopped') return
-        // 修复后重新检测变更
-        if (this.state.workspace) {
-          try {
-            this.state.changedFiles = await getChangedFiles(this.state.workspace)
-          } catch {
-            // 忽略检测失败
-          }
-        }
-      }
-    } finally {
-      this.autoSubmitting = false
-    }
+    return { ok: true }
   }
 
   async canMerge(githubToken?: string): Promise<boolean> {
@@ -897,169 +629,6 @@ export class Agent {
     // working 会让输入框消失，跟「请发送新指令继续」的提示矛盾。
     this.setStatus('ready')
     this.log('system', 'PR 已打回，请发送新指令继续')
-  }
-
-  /**
-   * Bug #8：PR merge 后，sendInstruction 恢复 completed agent 时同步 main。
-   * 引擎硬保证 fetch / merge / commit；冲突时通过 runInstructionSilent 让
-   * kimi 只改文件（不污染聊天面板和「任务指令」区），完成后引擎 sanity
-   * check + commit。返回 true 表示可继续走用户任务；false 表示同步失败
-   * 已置 stopped，sendInstruction 应直接 return。
-   * Throttle：5 分钟内重复调用直接 return true 跳过。
-   */
-  private async syncBranchWithMain(): Promise<boolean> {
-    if (!this.state.workspace) return true
-
-    const now = Date.now()
-    if (this.lastSyncCheckAt && now - this.lastSyncCheckAt < Agent.SYNC_THROTTLE_MS) {
-      return true
-    }
-    this.lastSyncCheckAt = now
-
-    try {
-      await gitFetch(this.state.workspace)
-    } catch (err) {
-      this.log('error', `git fetch 失败: ${String(err)}（继续执行，但分支可能未同步）`)
-      return true // 决策 5a：静默继续
-    }
-
-    let behindCount = 0
-    try {
-      behindCount = await getBehindCount(this.state.workspace, 'origin/main')
-    } catch (err) {
-      this.log('error', `检测 main 新 commits 失败: ${String(err)}`)
-      return true
-    }
-
-    if (behindCount <= 0) return true
-
-    this.log('system', `检测到 main 有 ${behindCount} 个新 commit，正在同步...`)
-
-    const mergeResult = await gitMerge(this.state.workspace, 'origin/main')
-    if (mergeResult.exitCode === 0) {
-      this.log('system', `已同步 main 的 ${behindCount} 个 commit`)
-      return true
-    }
-
-    // 有冲突：runInstructionSilent 让 kimi 静默改文件（不污染 UI input）
-    const conflictFiles = await getConflictFiles(this.state.workspace)
-    if (conflictFiles.length === 0) {
-      this.log('error', `merge 失败但无冲突文件: ${mergeResult.stderr}`)
-      try { await abortMerge(this.state.workspace) } catch { /* expected */ }
-      this.setStatus('stopped')
-      this.log('error', 'merge 失败无法自动恢复，请指挥官人工介入')
-      return false
-    }
-
-    this.log('system', `merge 出现冲突，自动解决中：${conflictFiles.join(', ')}`)
-
-    // 读原始内容供 sanity check 用（行数膨胀检测）
-    const originals = new Map<string, string>()
-    const fileContents: string[] = []
-    for (const file of conflictFiles) {
-      try {
-        const content = await readFile(join(this.state.workspace, file), 'utf-8')
-        originals.set(file, content)
-        fileContents.push(`=== ${file} ===\n${content}`)
-      } catch {
-        fileContents.push(`=== ${file} ===\n[读取失败]`)
-      }
-    }
-
-    const conflictPrompt = `以下文件存在 merge 冲突，请解决冲突。冲突标记格式为 \`<<<<<<< HEAD\`（当前分支）、\`=======\`、\`>>>>>>> origin/main\`（main 分支）。
-
-${fileContents.join('\n\n')}
-
-解决原则：
-- 只修改 conflict marker 区域，不要在冲突文件里写用户任务相关的新代码
-- 先理解双方意图，确定语义上正确的结果
-- 最小化改动，保留当前分支原有意图
-- 逐个文件解决
-
-请直接修改这些文件去掉冲突标记。${FIX_PROMPT_GIT_GUARD}`
-
-    const result = await this.runInstructionSilent(conflictPrompt)
-    if (!result.ok) {
-      this.log('error', `冲突解决 kimi 卡死/超时`)
-      try { await abortMerge(this.state.workspace) } catch { /* expected */ }
-      this.setStatus('stopped')
-      this.log('error', 'merge 冲突自动解决超时，请指挥官人工介入')
-      return false
-    }
-
-    try {
-      await this.finalizeMergeCommit(conflictFiles, originals)
-      this.log('system', `merge 冲突已自动解决，同步完成`)
-      return true
-    } catch (err) {
-      this.log('error', `merge sanity check 失败: ${String(err)}`)
-      try { await abortMerge(this.state.workspace) } catch { /* expected */ }
-      this.setStatus('stopped')
-      this.log('error', 'merge 冲突解决未通过 sanity check，请指挥官人工介入')
-      return false
-    }
-  }
-
-  /**
-   * Bug #8：sanity check + 只 stage 冲突文件 + commit。
-   * 接收 conflictFiles + originals 作为参数（不再用实例字段，纯函数式）。
-   */
-  private async finalizeMergeCommit(
-    conflictFiles: string[],
-    originals: Map<string, string>,
-  ): Promise<void> {
-    if (!this.state.workspace || conflictFiles.length === 0) return
-
-    for (const file of conflictFiles) {
-      const content = await readFile(join(this.state.workspace, file), 'utf-8')
-
-      // sanity check 1: 冲突标记残留
-      if (/^<{7}|^={7}|^>{7}/m.test(content)) {
-        throw new Error(`${file} 中仍有冲突标记残留`)
-      }
-
-      // sanity check 2: 文件非空
-      if (!content.trim()) {
-        throw new Error(`${file} 内容为空`)
-      }
-
-      // sanity check 3: 行数膨胀（>3 倍阈值，疑似 kimi 写入了用户任务相关代码）
-      const original = originals.get(file)
-      if (original) {
-        const origLines = original.split('\n').length
-        const newLines = content.split('\n').length
-        if (newLines > origLines * 3) {
-          throw new Error(`${file} 行数从 ${origLines} 膨胀到 ${newLines}（>3 倍），疑似越界改动`)
-        }
-      }
-    }
-
-    // sanity check 4: git diff --check（空白错误等）
-    const diffCheck = await gitDiffCheck(this.state.workspace)
-    if (diffCheck.exitCode !== 0) {
-      throw new Error(`git diff --check 失败: ${diffCheck.stdout || diffCheck.stderr}`)
-    }
-
-    // 只 stage 冲突文件，避免用户任务的修改被混入 merge commit
-    for (const file of conflictFiles) {
-      const result = await stageFile(this.state.workspace, file)
-      if (result.exitCode !== 0) {
-        throw new Error(`stage ${file} 失败: ${result.stderr}`)
-      }
-    }
-
-    const commitResult = await gitCommit(this.state.workspace, 'sync: merge origin/main')
-    if (commitResult.exitCode !== 0) {
-      throw new Error(`merge commit 失败: ${commitResult.stderr}`)
-    }
-  }
-
-  private notifyPrCreated() {
-    if (this.onPrCreated) {
-      Promise.resolve(this.onPrCreated(this.state.id, this.state.branch, this.githubToken)).catch((err) => {
-        this.log('error', `PR 创建后通知 engine 失败: ${String(err)}`)
-      })
-    }
   }
 
   /** 暴露给引擎：延后审阅重试时取回 PR 操作所需的 GitHub Token */
@@ -1216,161 +785,7 @@ ${fileContents.join('\n\n')}
     return { ok: !timedOut, text }
   }
 
-  /**
-   * 从仓库根目录读取 Skill 文件内容
-   */
-  private async loadSkill(skillPath: string): Promise<string> {
-    if (!this.state.workspace) return ''
-    try {
-      const content = await readFile(`${this.state.workspace}/${skillPath}`, 'utf-8')
-      return content
-    } catch {
-      return ''
-    }
-  }
 
-  /**
-   * 基于变更文件列表生成 commit message 和 PR 描述
-   * 优先调用 Kimi CLI 生成高质量内容，失败时 fallback 到规则生成
-   * Skill 文件（.kimi/skills/commit/SKILL.md、.github/pull_request_template.md）作为唯一事实源
-   */
-  private async generateCommitAndPrBody(files: string[]): Promise<{ commitMessage: string; prTitle: string; prBody: string }> {
-    // 1. 读取 Skill 文件作为事实源
-    const commitSkill = await this.loadSkill('.kimi/skills/commit/SKILL.md')
-    const prTemplate = await this.loadSkill('.github/pull_request_template.md')
-
-    const fileList = files.map((f) => `- ${f}`).join('\n')
-    const prompt = `你是一位资深工程师。请根据以下代码变更文件列表，生成规范的 commit message 和 PR 描述。
-
-## Commit Message 规范
-${commitSkill || '遵循 Conventional Commits：type(scope): summary，英文，首字母不大写，不用句号，≤50字符'}
-
-## PR Body 规范
-${prTemplate || '用中文 Markdown 格式，列出变更文件作用、类型勾选、检查项'}
-
-变更文件：
-${fileList}
-
-请严格按以下格式输出（不要有多余内容）：
-COMMIT:
-<commit message>
----
-PR_BODY:
-<pr body>
-`
-
-    try {
-      // commit message 生成通常 30-60s 内完成；diff 大时 kimi 思考更久也合理；
-      // 给 5 分钟兜底（之前 60s 经常误判 + fallback 到模糊 message）
-      const { text: output } = await this.runInstructionSilent(prompt, 300_000)
-      const commitMatch = output.match(/COMMIT:\s*([\s\S]+?)(?=\n---\nPR_BODY:)/)
-      const bodyMatch = output.match(/PR_BODY:\s*([\s\S]+)/)
-
-      if (commitMatch && bodyMatch) {
-        const commitMessage = commitMatch[1].trim()
-        const prBody = bodyMatch[1].trim()
-        // PR title 取 commit message 的第一行
-        const prTitle = commitMessage.split('\n')[0].trim()
-        return { commitMessage, prTitle, prBody }
-      }
-    } catch {
-      // Kimi CLI 生成失败，继续 fallback
-    }
-
-    // 2. Fallback：基于规则自动生成
-    const { scope, action } = this.inferScopeAndAction(files)
-    const description = this.inferDescription(files, action)
-    const commitMessage = `${action}${scope ? `(${scope})` : ''}: ${description}`
-
-    const prBodyLines = [
-      '## 变更内容',
-      '',
-      ...files.map((f) => {
-        const filename = f.split('/').pop() || f
-        if (f.endsWith('.spec.ts') || f.endsWith('.test.ts')) return `- 补充 \`${filename}\` 单元测试`
-        if (f.endsWith('.vue')) return `- 新增/更新 \`${filename}\` 组件`
-        if (f.endsWith('.ts') || f.endsWith('.js')) return `- 新增/更新 \`${filename}\` 逻辑`
-        if (f.endsWith('.md')) return `- 更新 \`${filename}\` 文档`
-        return `- 变更 \`${filename}\``
-      }),
-      '',
-      '## 类型',
-      '',
-      `- [${action === 'feat' ? 'x' : ' '}] feat: 新功能`,
-      `- [${action === 'fix' ? 'x' : ' '}] fix: Bug 修复`,
-      `- [${action === 'refactor' ? 'x' : ' '}] refactor: 代码重构`,
-      `- [${action === 'docs' ? 'x' : ' '}] docs: 文档更新`,
-      `- [${action === 'test' ? 'x' : ' '}] test: 测试补充`,
-      `- [${action === 'chore' ? 'x' : ' '}] chore: 构建/工具链`,
-      '',
-      '## 检查项',
-      '',
-      '- [x] 本地 pre-commit 通过',
-      '- [x] 测试已补充或无需补充',
-      '- [x] 文档已同步或无需同步',
-    ]
-
-    const prBody = prBodyLines.join('\n')
-    return { commitMessage, prTitle: commitMessage, prBody }
-  }
-
-  /**
-   * 根据文件路径推断 scope 和 action
-   */
-  private inferScopeAndAction(files: string[]): { scope: string; action: string } {
-    const scopes = new Set<string>()
-    let hasNew = false
-    let hasModify = false
-
-    for (const f of files) {
-      if (f.startsWith('kimi-code-swarm/src/components/') || f.startsWith('kimi-code-swarm/src/composables/') || f.startsWith('kimi-code-swarm/src/App.vue')) {
-        scopes.add('frontend')
-      } else if (f.startsWith('kimi-code-swarm/src/store/') || f.startsWith('kimi-code-swarm/src/api/')) {
-        scopes.add('frontend')
-      } else if (f.startsWith('agent-engine/src/')) {
-        scopes.add('agent-engine')
-      } else if (f.startsWith('docs/')) {
-        scopes.add('docs')
-      } else if (f.startsWith('tests/') || f.includes('.spec.ts') || f.includes('.test.ts')) {
-        scopes.add('test')
-      } else if (f.startsWith('ci/')) {
-        scopes.add('ci')
-      } else if (f.startsWith('ast/')) {
-        scopes.add('ast')
-      } else if (f.startsWith('src-tauri/')) {
-        scopes.add('tauri')
-      }
-      // 简单判断新增还是修改（通过文件名特征无法准确判断，默认用 update，如果有测试文件用 add test）
-      if (f.includes('.spec.ts') || f.includes('.test.ts')) hasNew = true
-      else hasModify = true
-    }
-
-    const scope = scopes.size === 1 ? Array.from(scopes)[0] : scopes.size > 1 ? 'multi' : ''
-    const action = hasNew && !hasModify ? 'feat' : hasNew && hasModify ? 'feat' : 'refactor'
-    return { scope, action }
-  }
-
-  /**
-   * 根据文件名生成描述
-   */
-  private inferDescription(files: string[], action: string): string {
-    const names = files
-      .map((f) => f.split('/').pop() || f)
-      .filter((f) => !f.endsWith('.spec.ts') && !f.endsWith('.test.ts'))
-
-    if (names.length === 0) {
-      const testFiles = files.map((f) => f.split('/').pop() || f).filter((f) => f.endsWith('.spec.ts') || f.endsWith('.test.ts'))
-      if (testFiles.length > 0) return `add unit tests for ${testFiles.map((f) => f.replace(/\.(spec|test)\.ts$/, '')).join(', ')}`
-    }
-
-    if (names.length === 1) {
-      const name = names[0].replace(/\.vue$/, '').replace(/\.ts$/, '').replace(/\.js$/, '')
-      return action === 'feat' ? `add ${name}` : `update ${name}`
-    }
-
-    const baseNames = names.map((n) => n.replace(/\.vue$/, '').replace(/\.ts$/, '').replace(/\.js$/, ''))
-    return action === 'feat' ? `add ${baseNames.slice(0, 3).join(', ')}${baseNames.length > 3 ? ' and more' : ''}` : `update multiple files`
-  }
 
   /**
    * 自动审阅指定分支的代码变更
@@ -1452,48 +867,4 @@ PR_BODY:
     }
   }
 
-  /**
-   * 根据审阅意见自动修改代码并重新提交审阅
-   * 最多循环 3 轮，超过后停止并通知指挥官
-   */
-  async fixBasedOnReviews(githubToken?: string) {
-    if (this.reviewRound >= 3) {
-      this.log('error', '自动修改已达最大轮次（3 次），请指挥官人工介入')
-      return
-    }
-    this.reviewRound++
-
-    const rejectedReviews = this.state.reviews.filter((r) => r.status === 'rejected')
-    if (rejectedReviews.length === 0) return
-
-    const comments = rejectedReviews
-      .map((r) => `-${r.reviewerName}: ${r.comment || '审阅未通过'}`)
-      .join('\n')
-
-    const prompt = `你的 PR 被以下审阅意见拒绝了，请根据意见修改代码：\n\n${comments}\n\n请直接修改相关代码文件。修改完成后不需要额外说明。${FIX_PROMPT_GIT_GUARD}`
-
-    this.rejectPr()
-    this.log('system', `第 ${this.reviewRound} 轮自动修改开始，基于 ${rejectedReviews.length} 条审阅意见`)
-
-    try {
-      // displayAsUserInput=false：审阅拒绝后引擎注入的修复 prompt 不算用户指令
-      await this.sendInstruction(prompt, undefined, { displayAsUserInput: false })
-      // 若用户已点停止，不再继续提交
-      if (this.state.status === 'stopped') return
-      // sendInstruction 完成后状态为 ready，改回 working 以符合 submitForReview 前置条件
-      this.state.status = 'working'
-      const { ok, steps } = await this.submitForReview(githubToken)
-      if (!ok) {
-        const fullLog = steps.map((s) => {
-          let out = `=== ${s.name} (exit: ${s.exitCode}) ===`
-          if (s.stdout) out += `\n[stdout]\n${s.stdout}`
-          if (s.stderr) out += `\n[stderr]\n${s.stderr}`
-          return out
-        }).join('\n\n')
-        this.log('error', `自动修改后提交失败，日志如下：\n${fullLog}`)
-      }
-    } catch (err) {
-      this.log('error', `自动修改执行异常: ${String(err)}`)
-    }
-  }
 }

@@ -158,4 +158,4 @@ typecheck → lint → analyze → test → check-docs → check-test-sync → b
 
 ## 版本
 
-当前 `v0.1.0`（首个 MVP release）。版本号 bump 需同步 `kimi-code-swarm/package.json` / `tauri.conf.json` / `Cargo.toml` 三处，并新建 git tag `vX.Y.Z`。
+当前 `v0.2.0`（engine → control plane 重构）。版本号 bump 需同步 `kimi-code-swarm/package.json` / `tauri.conf.json` / `Cargo.toml` 三处，并新建 git tag `vX.Y.Z`。

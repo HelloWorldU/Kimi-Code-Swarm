@@ -1,14 +1,28 @@
+---
+name: commit
+description: 将工作区改动转化为格式良好的 git commit
+---
+
 # Commit Skill
 
-> 将当前工作区的改动转化为格式良好的 git commit。
+## Goals
 
-## 职责范围
-
-- 读取 staged 文件列表
+- 只 stage 本次任务相关文件
 - 生成符合 Conventional Commits 规范的 commit message
-- 提交前 sanity-check（避免垃圾文件入库）
+- 提交前排除垃圾文件
 
-## Commit Message 格式
+## Inputs
+
+- 工作区改动（`git diff` / `git status`）
+- 本次任务意图（决定 type / scope / summary）
+
+## Steps
+
+1. `git status` 确认改动范围，排除 `.log` / `.tmp` / 编辑器临时文件
+2. `git add <file1> <file2> ...`（只 stage 本次相关文件，不用 `git add .`）
+3. 按格式写 commit message，`git commit -m "..."`
+
+### Commit Message 格式
 
 ```
 <type>(<scope>): <summary>
@@ -18,7 +32,7 @@
 <tests>
 ```
 
-### Type（必须）
+**Type**
 
 | 类型 | 用途 |
 |------|------|
@@ -29,7 +43,7 @@
 | `test` | 测试补充/修改 |
 | `chore` | 构建、工具链、依赖升级 |
 
-### Scope（根据文件路径推断）
+**Scope**（根据文件路径推断）
 
 | 路径前缀 | Scope |
 |---------|-------|
@@ -41,43 +55,29 @@
 | `ast/` | `ast` |
 | `src-tauri/` | `tauri` |
 
-### Summary（必须）
+**Summary 规则**
+- 英文，首字母不大写，末尾不加句号，不超过 50 字符
+- 动词原形开头：`add` / `fix` / `update` / `refactor` / `remove`
 
-- 英文，首字母**不大写**，末尾**不加句号**
-- 不超过 50 个字符
-- 用动词原形开头：`add` / `fix` / `update` / `refactor` / `remove`
-- 说明"做了什么"，而非"怎么做"
+**Rationale**（可选）：1-2 句说明为什么，行宽 ≤ 72 字符
 
-### Rationale（可选但推荐）
+**Tests**（可选）：`新增 XX 测试，全部通过` / `无需补充测试（纯重构）`
 
-- 1-2 句话说明"为什么做这次变更"
-- 行宽不超过 72 字符
+## Output
 
-### Tests（可选但推荐）
+一个格式合规的 git commit，只包含本次任务相关文件。
 
-- 说明测试情况：`新增 XX 测试，全部通过` / `无需补充测试（纯重构）` / `已有测试覆盖`
-
-## 提交前 Checklist
-
-- [ ] 确认没有垃圾文件（`.log`、`.tmp`、编辑器临时文件）被 stage
-- [ ] 确认变更文件与本次意图一致
-- [ ] 如果涉及多个 scope，优先选主要变更的 scope，或用 `multi`
-
-## 示例
+## 示例 / 反例
 
 ```
+# ✅
 feat(frontend): add SwarmConfirmModal and SwarmToast components
 
-Add global confirm modal and toast notification components
-with type-safe icons and auto-dismiss functionality.
-
-新增组件单元测试，全部通过。
-```
-
-## 反例
-
-```
-feat: 前端专家                    ← 缺少 scope 和具体描述
+# ❌
+feat: 前端专家                    ← 缺 scope 和具体描述
 feat(frontend): Add Component.    ← 首字母大写、末尾句号
-feat: add something               ← 过于模糊
 ```
+
+## Related Skills
+
+- `.kimi/skills/push/SKILL.md` — push 前本地验证 + PR 创建

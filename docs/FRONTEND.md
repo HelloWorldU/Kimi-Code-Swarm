@@ -124,4 +124,4 @@ PR CI 中额外运行 `check-test-sync`：若 `src/` 新增代码文件，`tests
 
 ## 版本
 
-当前 `v0.1.0`（首个 MVP release，2026-05-28）。`package.json` 的 `version` 字段与 `src-tauri/tauri.conf.json` / `src-tauri/Cargo.toml` 保持一致；后续每个 release 三处同步 bump。
+当前 `v0.2.0`（engine → control plane 重构，2026-05-31）。`package.json` 的 `version` 字段与 `src-tauri/tauri.conf.json` / `src-tauri/Cargo.toml` 保持一致；后续每个 release 三处同步 bump。

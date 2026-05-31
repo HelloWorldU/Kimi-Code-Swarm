@@ -9,7 +9,6 @@ export type TaskStatus =
 
 export type PrStatus = 'none' | 'open' | 'merged' | 'closed'
 
-export type CiStatus = 'pending' | 'success' | 'failure' | 'unknown'
 
 export interface ReviewEntry {
   reviewerAgentId: string
@@ -59,7 +58,6 @@ export interface AgentState {
   logs: LogEntry[]
   reviews: ReviewEntry[]
   changedFiles?: string[]
-  ciStatus?: CiStatus
   /** Kimi CLI 原生会话 ID，用于 resume */
   kimiSessionId?: string
 }

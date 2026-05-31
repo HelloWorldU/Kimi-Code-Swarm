@@ -219,6 +219,31 @@ export async function submitPullRequestReview(
 }
 
 /**
+ * 按分支名查找当前 open PR（agent 通过 SKILL 自行创建 PR 后，engine 调此方法注册状态）
+ * 利用每个 agent 有唯一分支名（agent/{slug}-{id}）的事实，结果最多一条。
+ */
+export async function getPullRequestByBranch(
+  token: string,
+  repoUrl: string,
+  branch: string,
+): Promise<{ number: number; html_url: string; user: { login: string } } | null> {
+  const repo = parseRepoUrl(repoUrl)
+  if (!repo) return null
+
+  const url = `${GITHUB_API}/repos/${repo.owner}/${repo.repo}/pulls?head=${repo.owner}:${branch}&state=open`
+
+  try {
+    const res = await fetch(url, { headers: getHeaders(token) })
+    if (!res.ok) return null
+    const data = (await res.json()) as { number: number; html_url: string; user: { login: string } }[]
+    return data[0] ?? null
+  } catch (err) {
+    console.error(`[github-api] getPullRequestByBranch 异常: ${String(err)}`)
+    return null
+  }
+}
+
+/**
  * 获取失败 check run 的日志文本
  * 优先使用 GitHub Actions job logs API（check-runs 的 logs_url 经常为 null）
  */

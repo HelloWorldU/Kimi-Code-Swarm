@@ -1,57 +1,111 @@
+---
+name: push
+description: 推送分支、创建/更新 PR，并自主处理 CI 失败和 review 拒绝，直到 PR 可 merge
+---
+
 # Push Skill
 
-> 将当前分支推送到 origin，并确保存在格式规范的 Pull Request。
+## Goals
 
-## 职责范围
+- `git push` 到 origin
+- 确保存在格式规范的 PR
+- 轮询 CI，自主处理失败（最多 3 轮）
+- 读取 reviewer 意见，自主处理拒绝
+- 状态收敛后向 engine 发 `submit-for-review` 或 `merge-pr` 信号
 
-- `git push` 到远程分支
-- PR 生命周期管理：创建 / 追加 commit / 状态检查
-- PR title 和 body 格式化
+## Inputs
 
-## 推送前强制验证
+- 当前分支已有 commit（`git log --oneline main..HEAD` 非空）
+- 本地验证已通过（见下方 Checklist）
 
-在 `git push` 之前，必须确认以下检查已通过：
+## Steps
 
-- [ ] `npm run typecheck` — TypeScript 类型检查
-- [ ] `npm run lint` — ESLint 代码检查
-- [ ] `npm run analyze` — AST 结构分析
-- [ ] `npm run test` — 测试套件（如有新增代码）
-- [ ] `npm run build` — 生产构建
+### 1. 推送前本地验证（必须全部通过）
 
-> **注意**：如果上述检查失败，先修复问题再推送。参考 `.kimi/skills/commit/SKILL.md` 的修复流程。
-
-## PR Title 规范
-
-与 commit message 的首行保持一致：
-
-```
-<type>(<scope>): <summary>
+```bash
+npm run typecheck
+npm run lint
+npm run analyze
+npm run test      # 如有新增代码
+npm run build
 ```
 
-## PR Body 规范
+验证失败先修复，再回到 commit SKILL 提交修复后重新跑验证。
 
-基于 `.github/pull_request_template.md` 模板填写，必须包含：
+### 2. Push + PR
 
-1. **变更内容** — 列出每个新增/修改文件及一句话作用说明
-2. **类型勾选** — 对应 Conventional Commits 的 type
-3. **检查项** — 确认本地验证已通过
+```bash
+git push -u origin HEAD   # 首次建立 upstream
+# 后续推送
+git push
+```
 
-## PR 生命周期
+**PR 创建**（无 open PR 时）：
 
-| 场景 | 行为 |
+```bash
+gh pr create --title "<type>(<scope>): <summary>" \
+             --body "$(cat .github/pull_request_template.md)"
+```
+
+- title 与 commit message 首行一致
+- body 按模板填写：变更内容 / 类型勾选 / 检查项
+- 有 open PR：新 commit 自动追加，不修改 title/body
+- 已关闭 PR：停止，向用户报告分支状态
+
+### 3. CI 轮询（push 后自主执行）
+
+```bash
+gh pr checks              # 查看所有 check 状态
+```
+
+| 状态 | 行动 |
 |------|------|
-| 无 open PR | 创建新 PR，title/body 按规范填写 |
-| 有 open PR | 新 commit 自动追加到现有 PR，不修改 title/body |
-| 已关闭 PR | 报错，提示用户检查分支状态 |
+| 全部 pass | 进入步骤 4 |
+| pending | 等待后重新轮询 |
+| 有 fail | 获取日志，进入 CI 修复流程 |
 
-## 与 CI 的协作
+**CI 修复流程**（最多自主执行 3 轮，第 4 轮失败停止并向用户报告）：
 
-PR 创建后：
-1. 自动启动 CI 监控（轮询 GitHub Checks API）
-2. CI 失败 → 获取日志 → 自动修复 → 重新提交（最多 3 轮）
-3. CI 通过 → 停止监控，等待审阅或合并
+```bash
+gh run list --branch $(git branch --show-current) --limit 3
+gh run view <run-id> --log-failed   # 获取失败 job 日志
+```
 
-## 相关 Skill
+根据日志定位根因 → 修改代码 → 重跑本地验证 → commit → push → 重新轮询 CI。
+
+### 4. Review 处理
+
+CI 全绿后，向 engine 发送 `submit-for-review` 信号，engine 调度 reviewer agent。
+
+收到 review 结果后：
+
+```bash
+gh pr view --json reviews,comments
+gh api repos/{owner}/{repo}/pulls/{pr-number}/comments
+```
+
+| review 决定 | 行动 |
+|-------------|------|
+| approved | 进入步骤 5 |
+| changes_requested | 读全部意见 → 逐条处理 → commit → push → 重新进入 CI 轮询 |
+
+**处理 review 意见原则**：
+- 读全部 reviewer 意见后再动手，不逐条处理
+- 有歧义或不确定该不该改的条目，向用户确认后再处理
+- 不擅自决定"这条不用改"
+
+### 5. 请求 Merge
+
+所有 reviewer approved 且 CI 全绿后，向 engine 发送 `merge-pr` 信号。
+
+**不直接调用 `gh pr merge`**，merge 资格校验由 engine 硬门控执行。
+
+## Output
+
+PR 处于 merged 状态，或因超出自主修复上限 / 遇到歧义而停止并向用户报告。
+
+## Related Skills
 
 - `.kimi/skills/commit/SKILL.md` — commit message 规范
-- `.github/pull_request_template.md` — PR 描述模板
+- `.kimi/skills/resolve-conflict/SKILL.md` — 分支同步时遇 merge conflict
+- `.github/pull_request_template.md` — PR body 模板
