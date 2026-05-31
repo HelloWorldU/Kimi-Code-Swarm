@@ -106,6 +106,7 @@ PR 处于 merged 状态，或因超出自主修复上限 / 遇到歧义而停止
 
 ## Related Skills
 
+- `.kimi/skills/pull/SKILL.md` — push 前分支落后 main 时同步（fetch + merge + 冲突解决）
 - `.kimi/skills/commit/SKILL.md` — commit message 规范
-- `.kimi/skills/resolve-conflict/SKILL.md` — 分支同步时遇 merge conflict
+- `.kimi/skills/resolve-conflict/SKILL.md` — merge conflict 解决细节
 - `.github/pull_request_template.md` — PR body 模板

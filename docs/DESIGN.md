@@ -116,4 +116,4 @@
 
 ## 版本
 
-当前 `v0.2.0`（engine → control plane 重构，2026-05-31）。版本号在 `kimi-code-swarm/package.json` / `kimi-code-swarm/src-tauri/tauri.conf.json` / `kimi-code-swarm/src-tauri/Cargo.toml` 三处保持一致。语义化版本：`0.x` 期允许破坏性改动，进入 `1.0` 后承诺向后兼容。
+当前 `v0.2.1`（pull SKILL + SKILL 格式统一，2026-05-31）。版本号在 `kimi-code-swarm/package.json` / `kimi-code-swarm/src-tauri/tauri.conf.json` / `kimi-code-swarm/src-tauri/Cargo.toml` 三处保持一致。语义化版本：`0.x` 期允许破坏性改动，进入 `1.0` 后承诺向后兼容。

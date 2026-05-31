@@ -184,4 +184,42 @@ github-api.ts：
 
 ---
 
-*Started: 2026-05-31*
+---
+
+## 第二轮
+
+### 背景
+
+`syncBranchWithMain` 删除后留下一个行为缺口：原来 engine 每 5 分钟在 `sendInstruction` 入口自动将 main 的新 commit 合并进 agent 分支；现在 agent 可能在不知情的情况下基于过时的 base 工作，等到 push 时才发现冲突。
+
+遵循 agent 自主处理的原则，解法是新建 pull SKILL，让 agent 自己决定何时同步。
+
+---
+
+### R — 发现
+
+**现有 SKILL 覆盖情况：**
+- push SKILL scenario D：有分支同步步骤，但触发时机是 push 流程内——属于被动（push 失败才发现）
+- resolve-conflict SKILL：覆盖冲突解决细节，但不覆盖"何时 fetch/merge"的决策
+- task-intake SKILL：接任务时没有任何 sync 检查
+- 无独立的 pull SKILL
+
+**缺口：** agent 开始工作时没有任何指引提示它先检查 main 是否前进，行为上比原来 engine 的自动 sync 被动很多。
+
+---
+
+### P — 改动方向
+
+**新建 `.kimi/skills/pull/SKILL.md`**，按 OpenAI skill 格式，覆盖：
+- Goals：将 origin/main 的最新改动合并进当前分支，保持分支干净
+- Inputs：当前 git 状态、origin/main 进度
+- Steps：fetch → 检查是否落后 → 落后则 merge → 冲突时加载 resolve-conflict SKILL → 验证
+- Output：分支与 origin/main 对齐，或冲突已解决
+
+**同步更新 task-intake SKILL**：在阶段 1（需求澄清）之前加一句：接到任务后先加载 pull SKILL 检查分支是否落后 main，确保工作在最新 base 上进行。
+
+**push SKILL scenario D 简化**：直接引用 pull SKILL，不再重复描述 merge 步骤。
+
+**阶段状态 — ✅ 完成**
+
+*Updated: 2026-05-31*
