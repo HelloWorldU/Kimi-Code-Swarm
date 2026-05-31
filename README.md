@@ -8,12 +8,12 @@
 
 One Kimi account → N isolated workspaces → N concurrent CLI workers → each submits a PR → you review and merge.
 
-[![Release](https://img.shields.io/github/v/release/HelloWorldU/Kimi-Code-Swarm?include_prereleases&label=release)](https://github.com/HelloWorldU/Kimi-Code-Swarm/releases/latest)
 [![License](https://img.shields.io/github/license/HelloWorldU/Kimi-Code-Swarm)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows-blue)](https://github.com/HelloWorldU/Kimi-Code-Swarm/releases/latest)
+[![Platform](https://img.shields.io/badge/platform-Windows-0078D4?logo=windows&logoColor=white)](https://github.com/HelloWorldU/Kimi-Code-Swarm/releases/latest)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Stars](https://img.shields.io/github/stars/HelloWorldU/Kimi-Code-Swarm?style=flat)](https://github.com/HelloWorldU/Kimi-Code-Swarm/stargazers)
 
-**[⬇ Download v0.1.0](https://github.com/HelloWorldU/Kimi-Code-Swarm/releases/latest)** · **[📖 Docs](docs/)** · **[🐛 Backlog](docs/exec-plans/backlog.md)** · **[简体中文](README.zh-CN.md)**
+**[🏗 Design](docs/DESIGN.md)** · **[📊 Status](docs/STATUS.md)** · **[简体中文](README.zh-CN.md)**
 
 </div>
 

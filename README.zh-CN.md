@@ -8,12 +8,12 @@
 
 单 Kimi 账号 → 本地 N 个独立工作区 → N 个 CLI 工人并发开发 → 各自提 PR → 你审阅合并。
 
-[![Release](https://img.shields.io/github/v/release/HelloWorldU/Kimi-Code-Swarm?include_prereleases&label=release)](https://github.com/HelloWorldU/Kimi-Code-Swarm/releases/latest)
 [![License](https://img.shields.io/github/license/HelloWorldU/Kimi-Code-Swarm)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows-blue)](https://github.com/HelloWorldU/Kimi-Code-Swarm/releases/latest)
+[![Platform](https://img.shields.io/badge/platform-Windows-0078D4?logo=windows&logoColor=white)](https://github.com/HelloWorldU/Kimi-Code-Swarm/releases/latest)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Stars](https://img.shields.io/github/stars/HelloWorldU/Kimi-Code-Swarm?style=flat)](https://github.com/HelloWorldU/Kimi-Code-Swarm/stargazers)
 
-**[⬇ 下载 v0.1.0](https://github.com/HelloWorldU/Kimi-Code-Swarm/releases/latest)** · **[📖 文档](docs/)** · **[🐛 Backlog](docs/exec-plans/backlog.md)** · **[English](README.md)**
+**[🏗 设计](docs/DESIGN.md)** · **[📊 状态](docs/STATUS.md)** · **[English](README.md)**
 
 </div>
 
