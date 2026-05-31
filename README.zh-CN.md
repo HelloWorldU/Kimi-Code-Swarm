@@ -96,6 +96,7 @@ npm run tauri dev    # 桌面模式（需 Rust）
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — 数据流、状态分层、模块边界
 - [`docs/STATUS.md`](docs/STATUS.md) — 功能实现状态单一事实源
 - [`docs/exec-plans/backlog.md`](docs/exec-plans/backlog.md) — 已知问题与架构决策
+- [**配套博文** — 在智能体优先的世界中实践 Harness Engineering](https://swiftact.cn/articles/kimi-code.html) — 从这个项目里踩过的坑、失败模式与方法论总结
 
 ## 许可证
 

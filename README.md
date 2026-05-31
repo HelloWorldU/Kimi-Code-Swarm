@@ -96,6 +96,7 @@ Core features (real CLI invocation, Git automation) only work in **Tauri desktop
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — Data flow, state layering, module boundaries
 - [`docs/STATUS.md`](docs/STATUS.md) — Single source of truth for feature implementation status
 - [`docs/exec-plans/backlog.md`](docs/exec-plans/backlog.md) — Known issues and architectural decisions
+- [**Blog Post** — Harness Engineering in an Agent-First World](https://swiftact.cn/articles/kimi-code.html) — Lessons, failure modes, and methodology from building this project
 
 ## License
 
